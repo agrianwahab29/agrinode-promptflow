@@ -1,0 +1,69 @@
+{
+  "common": {
+    "projects": "Projects",
+    "newProject": "New Project",
+    "settings": "Settings",
+    "dashboard": "Dashboard",
+    "login": "Log in",
+    "logout": "Log out"
+  },
+  "landing": {
+    "heroTitle": "One title → ready-to-use animation prompt package",
+    "heroSubtitle": "Consistent characters across scenes. Multi-provider LLM. Export JSON / Markdown.",
+    "cta": "Start Free",
+    "loginCta": "Log in",
+    "feature1Title": "Title Input",
+    "feature1Desc": "Enter title + duration + style. The system generates the full package.",
+    "feature2Title": "Character Consistency",
+    "feature2Desc": "Structured character master referenced across scenes — identity stays, scenes vary.",
+    "feature3Title": "Ready-to-Use Export",
+    "feature3Desc": "Structured JSON + Markdown. Copy to your favorite image/video gen tool."
+  },
+  "auth": {
+    "loginTitle": "Log in to PromptFlow",
+    "loginSubtitle": "Welcome back",
+    "login": "Log in",
+    "register": "Sign up"
+  },
+  "generate": {
+    "title": "Generate Prompt"
+  },
+  "projects": {
+    "title": "My Projects",
+    "newProject": "New Project",
+    "empty": "No projects yet. Create your first one.",
+    "references": "Image References",
+    "referencesDesc": "Upload character/background images. The system will reference file names in prompts.",
+    "referencesEmpty": "No references yet."
+  },
+  "history": {
+    "title": "Generation History",
+    "empty": "No logs yet.",
+    "table": "Generation Log",
+    "time": "Time",
+    "provider": "Provider",
+    "model": "Model",
+    "duration": "Duration",
+    "status": "Status"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi1Title": "Total Projects",
+    "kpi1Desc": "Number of projects you created",
+    "kpi5Title": "Successful Generations",
+    "kpi5Desc": "Number of successful generates",
+    "kpiLatencyTitle": "Average Latency",
+    "kpiLatencyDesc": "Average time per generate"
+  },
+  "settings": {
+    "title": "Settings",
+    "providersTitle": "LLM Providers",
+    "providersDesc": "Add provider + API key. API key is AES-256-GCM encrypted.",
+    "providersEmpty": "No provider yet. Add one to start generating."
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "validation": "Invalid input",
+    "unauthorized": "Invalid session"
+  }
+}

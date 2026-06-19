@@ -1,0 +1,69 @@
+{
+  "common": {
+    "projects": "Proyek",
+    "newProject": "Proyek Baru",
+    "settings": "Pengaturan",
+    "dashboard": "Dasbor",
+    "login": "Masuk",
+    "logout": "Keluar"
+  },
+  "landing": {
+    "heroTitle": "Satu judul → paket prompt animasi siap pakai",
+    "heroSubtitle": "Karakter konsisten lintas adegan. Multi-provider LLM. Export JSON / Markdown.",
+    "cta": "Mulai Gratis",
+    "loginCta": "Masuk",
+    "feature1Title": "Input Judul",
+    "feature1Desc": "Masukkan judul + durasi + style. Sistem generate paket lengkap.",
+    "feature2Title": "Konsistensi Karakter",
+    "feature2Desc": "Character master terstruktur dirujuk lintas adegan — identitas tetap, adegan bervariasi.",
+    "feature3Title": "Export Siap Pakai",
+    "feature3Desc": "JSON terstruktur + Markdown. Copy ke tool image/video gen favorit."
+  },
+  "auth": {
+    "loginTitle": "Masuk ke PromptFlow",
+    "loginSubtitle": "Selamat datang kembali",
+    "login": "Masuk",
+    "register": "Daftar"
+  },
+  "generate": {
+    "title": "Generate Prompt"
+  },
+  "projects": {
+    "title": "Proyek Saya",
+    "newProject": "Proyek Baru",
+    "empty": "Belum ada proyek. Buat proyek pertama Anda.",
+    "references": "Referensi Gambar",
+    "referencesDesc": "Upload gambar tokoh/background. Sistem akan rujuk nama file dalam prompt.",
+    "referencesEmpty": "Belum ada referensi."
+  },
+  "history": {
+    "title": "Riwayat Generate",
+    "empty": "Belum ada log.",
+    "table": "Log Generate",
+    "time": "Waktu",
+    "provider": "Provider",
+    "model": "Model",
+    "duration": "Durasi",
+    "status": "Status"
+  },
+  "dashboard": {
+    "title": "Dasbor",
+    "kpi1Title": "Total Proyek",
+    "kpi1Desc": "Jumlah proyek yang Anda buat",
+    "kpi5Title": "Generate Sukses",
+    "kpi5Desc": "Jumlah generate yang berhasil",
+    "kpiLatencyTitle": "Latency Rata-rata",
+    "kpiLatencyDesc": "Waktu rata-rata per generate"
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "providersTitle": "Provider LLM",
+    "providersDesc": "Tambah provider + API key. API key terenkripsi AES-256-GCM.",
+    "providersEmpty": "Belum ada provider. Tambahkan satu untuk mulai generate."
+  },
+  "errors": {
+    "generic": "Terjadi kesalahan",
+    "validation": "Input tidak valid",
+    "unauthorized": "Sesi tidak valid"
+  }
+}

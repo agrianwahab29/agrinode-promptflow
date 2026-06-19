@@ -1,0 +1,19 @@
+import 'server-only';
+import { redirect } from 'next/navigation';
+import { auth } from './config';
+
+export async function requireSession(): Promise<{ id: number; email: string; name?: string | null }> {
+  const session = await auth();
+  if (!session?.user) redirect('/id/login');
+  const u = session.user as { id?: number; email?: string; name?: string | null };
+  if (!u.id || !u.email) redirect('/id/login');
+  return { id: u.id!, email: u.email!, name: u.name ?? null };
+}
+
+export async function getOptionalSession(): Promise<{ id: number; email: string; name?: string | null } | null> {
+  const session = await auth();
+  if (!session?.user) return null;
+  const u = session.user as { id?: number; email?: string; name?: string | null };
+  if (!u.id || !u.email) return null;
+  return { id: u.id!, email: u.email!, name: u.name ?? null };
+}
