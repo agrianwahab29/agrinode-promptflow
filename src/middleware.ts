@@ -75,13 +75,11 @@ export default async function middleware(req: NextRequest) {
   }
 
   // Auth check — Edge-safe via getToken (jose-based)
+  // Vercel production = HTTPS → NextAuth v5 uses __Secure- prefixed cookies
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
-    salt: 'authjs.session-token',
-    cookieName: process.env.NODE_ENV === 'production'
-      ? '__Secure-authjs.session-token'
-      : 'authjs.session-token',
+    secureCookie: true,
   });
 
   if (!token) {
