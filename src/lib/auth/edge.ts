@@ -1,12 +1,16 @@
-import NextAuth from 'next-auth';
 import type { NextAuthConfig } from 'next-auth';
 
+/**
+ * Edge-safe auth config — no NextAuth() instantiation here.
+ * Middleware uses `getToken` from `next-auth/jwt` (jose-based, Edge-compatible).
+ * Server-side config (src/lib/auth/config.ts) extends this with providers.
+ */
 export const authConfig: NextAuthConfig = {
   secret: process.env.NEXTAUTH_SECRET,
   trustHost: true,
   session: { strategy: 'jwt' },
   pages: { signIn: '/id/login', error: '/id/login' },
-  providers: [], // empty in Edge; full providers in server config
+  providers: [],
   callbacks: {
     async jwt({ token, user }) {
       if (user?.id) token.userId = Number(user.id);
@@ -20,8 +24,3 @@ export const authConfig: NextAuthConfig = {
     },
   },
 };
-
-// Edge-safe auth — no server-only, no Node.js deps.
-// Used by middleware.ts for session validation on Edge runtime.
-const edgeAuth = NextAuth(authConfig);
-export const auth = edgeAuth.auth;

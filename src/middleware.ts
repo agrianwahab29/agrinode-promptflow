@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth/edge';
+import { getToken } from 'next-auth/jwt';
 import { routing } from '@/lib/i18n/config';
 
 const PUBLIC_PATHS = [
@@ -52,16 +52,15 @@ function localizeUrl(pathname: string): string {
   return `/${routing.defaultLocale}${pathname}`;
 }
 
-export default auth(async function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Skip API auth routes entirely (NextAuth handler)
+  // Skip NextAuth built-in routes entirely
   if (pathname.startsWith('/api/v1/auth')) return NextResponse.next();
   if (pathname.startsWith('/api/v1/register')) return NextResponse.next();
-  // NextAuth built-in routes (signin/error/callback) — must bypass our auth check
   if (pathname.startsWith('/api/auth')) return NextResponse.next();
 
-  // Public paths OK
+  // Public paths
   if (isPublic(pathname)) {
     // Localize page-level public paths
     if (!pathname.startsWith('/api') && !pathname.startsWith('/_next') && pathname !== '/favicon.ico') {
@@ -75,10 +74,29 @@ export default auth(async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Auth check — Edge-safe via getToken (jose-based)
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  if (!token) {
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(
+        JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Sesi tidak valid' }, traceId: crypto.randomUUID() }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    const url = req.nextUrl.clone();
+    const localizedLogin = localizeUrl('/login');
+    url.pathname = localizedLogin;
+    url.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(url);
+  }
+
   // Rate limit generate endpoint
   if (pathname === '/api/v1/generate' && req.method === 'POST') {
-    const session = await auth();
-    const userKey = session?.user ? `u:${(session.user as { id?: number }).id ?? 'anon'}` : `ip:${req.headers.get('x-forwarded-for') ?? 'unknown'}`;
+    const userKey = typeof token.userId === 'number' ? `u:${token.userId}` : `ip:${req.headers.get('x-forwarded-for') ?? 'unknown'}`;
     const limit = 10; // 10 req/min per SRS-A15
     const result = checkRateLimit(`gen:${userKey}`, limit, 60_000);
     if (!result.allowed) {
@@ -97,22 +115,6 @@ export default auth(async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Auth required for everything else
-  const session = await auth();
-  if (!session?.user) {
-    if (pathname.startsWith('/api/')) {
-      return new NextResponse(
-        JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Sesi tidak valid' }, traceId: crypto.randomUUID() }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
-    const url = req.nextUrl.clone();
-    const localizedLogin = localizeUrl('/login');
-    url.pathname = localizedLogin;
-    url.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(url);
-  }
-
   // Localize page-level requests
   if (!pathname.startsWith('/api') && !pathname.startsWith('/_next')) {
     const url = req.nextUrl.clone();
@@ -124,7 +126,7 @@ export default auth(async function middleware(req: NextRequest) {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
