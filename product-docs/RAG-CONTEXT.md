@@ -1,435 +1,609 @@
-# RAG-CONTEXT.md — PromptFlow Landing Page
-> **Sumber kebenaran faktual** untuk pembangunan landing page PromptFlow
+# RAG-CONTEXT.md — PromptFlow (Refreshed for 5 New Requirements)
+> **Sumber kebenaran faktual** untuk pipeline docgen PromptFlow
 > **Root proyek:** `C:\laragon\www\PromptFlow`
 > **Docs dir:** `C:\laragon\www\PromptFlow\product-docs`
-> **Diperbarui:** 2026-06-20
-> **Deliverable:** Landing page keren, animasi, menarik klien, teratarik daftar
+> **Diperbarui:** 2026-06-21
+> **Scope:** Refresh untuk 5 requirement baru: Light Theme, Scene Transition, Complex Image Prompts, Voiceover Voice Type, Supporting Audio
 
 ---
 
 ## Daftar Isi
 
 1. [Ringkasan Temuan](#1-ringkasan-temuan)
-2. [Fakta Proyek (Source of Truth)](#2-fakta-proyek)
-3. [Landing Page Existing](#3-landing-page-existing)
-4. [Design System & Branding](#4-design-system--branding)
-5. [Best Practices Landing Page SaaS 2024-2026](#5-best-practices-landing-page)
-6. [Referensi Desain (Contoh Landing Page Bagus)](#6-referensi-desain)
-7. [Animation & Motion Best Practices](#7-animation--motion)
-8. [Gap Analysis & TIDAK ADA BUKTI](#8-gap-analysis)
-9. [Asumsi yang Diambil](#9-asumsi)
-10. [Daftar Sitasi Lengkap](#10-daftar-sitasi)
+2. [Current Codebase State](#2-current-codebase-state)
+3. [Database Schema Analysis](#3-database-schema-analysis)
+4. [Prompt System Analysis](#4-prompt-system-analysis)
+5. [Scene Transition Analysis](#5-scene-transition-analysis)
+6. [Image Prompt Analysis](#6-image-prompt-analysis)
+7. [Voiceover Analysis](#7-voiceover-analysis)
+8. [Audio/Music Analysis](#8-audiomusic-analysis)
+9. [Theme System Analysis](#9-theme-system-analysis)
+10. [Web Research Findings](#10-web-research-findings)
+11. [Gap Analysis](#11-gap-analysis)
+12. [Asumsi](#12-asumsi)
+13. [Daftar Sitasi](#13-daftar-sitasi)
 
 ---
 
 ## 1. Ringkasan Temuan
 
-### FAKTA (berbasis bukti kode + dokumen)
-- **PromptFlow** = "Workflow engine otomasi prompt animasi AI" — web app fullstack yang mengotomasi susun paket prompt animasi terstruktur (JSON + markdown) dari input minimal (judul + durasi + gaya).
-- **BUKAN** "AI document generation system" — deskripsi user mandate kontradiktif dengan semua dokumen proyek (BRD/PRD/MRD/AGENTS/README). Output = teks prompt terstruktur, BUKAN file media/dokumen generik.
-- **Landing page SUDAH ADA** di `src/app/[locale]/page.tsx` — sangat basic: hero 1 section + 3 feature cards. Tanpa animasi, tanpa social proof, tanpa FAQ, tanpa pricing.
-- **i18n keys landing sudah ada** di `messages/id.json` dan `messages/en.json` namespace `landing.*`.
-- **Design tokens sudah ada** di `globals.css` — primary violet #7c3aed, Inter font, spacing 4px, radius 6px.
-- **Tidak ada animation library** terinstall — package.json tidak punya framer-motion, gsap, atau motion.
-- **Logo**: hanya `public/references/logo_agrinode-removebg-preview-8d857ade.png` — logo AgriNode, bukan logo PromptFlow khusus.
-- **Tidak ada social proof data** — tidak ada testimonial, user count, atau case study di dokumen.
-- **Tidak ada pricing info** — dokumen tidak sebut model pricing/billing.
-- **Tech stack verified**: Next.js 15 + React 19 + Tailwind v4 + shadcn/ui + next-intl + pnpm.
+### FAKTA (berbasis bukti kode)
+- **PromptFlow** = workflow engine otomasi prompt animasi AI. Output = paket prompt terstruktur (JSON + Markdown) dari input minimal.
+- **Dark mode only** — `layout.tsx:66` hardcodes `className="dark"`. CSS light tokens SUDAH ada di `globals.css:4-28` tapi tidak dipakai. Tidak ada theme toggle.
+- **Scene = flat list** — `scenes` table punya `orderNo`, `description`, `voiceoverScript`. TIDAK ADA: transition type, duration, easing, audio cues, voice type.
+- **Image prompts = single string** — `promptText` field berisi satu baris teks. TIDAK ADA: structured layers (composition, lighting, camera, style modifiers).
+- **Voiceover = plain text** — `voiceover_script` string. TIDAK ADA: voice type, speaking rate, emotion, pauses.
+- **Audio = zero** — Tidak ada field audio di schema, tidak ada audio generation, tidak ada music/SFX spec.
+- **Prompt files = monolithic** — Semua 5 prompt system files hanya re-export `buildSystemPrompt()` dari `prompt-builder.ts`. Satu prompt builder untuk semua.
+- **Zod schema = rigid** — `SceneSchema` hanya punya `order`, `description`, `voiceover_script`, `image_prompts`. Tidak ada extension point untuk transition/audio/voice.
 
-### GAP KRITIS: Deskripsi User vs Realita Proyek
-User mandate: "Landing page untuk PromptFlow - AI document generation system"
-Realita proyek: "Workflow engine otomasi prompt animasi AI" (semua dokumen proyek)
--> **ASUMSI**: Deskripsi user adalah ringkasan longgar. Landing page harus describe PromptFlow SEBAGAI YANG ADA (animation prompt automation), bukan "document generation system".
+### GAP KRITIS untuk 5 Requirement Baru
+| # | Requirement | Status di Kode | Gap |
+|---|---|---|---|
+| 1 | Light Theme Toggle | CSS tokens light SUDAH ada (`globals.css:4-28`), tapi app force dark (`layout.tsx:66`). Landing page wrap `<div className="dark">` (`page.tsx:24`). | Perlu: theme toggle component, localStorage persist, remove hardcoded dark class |
+| 2 | Scene Transition | Schema: `scenes` table hanya `orderNo`+`description`+`voiceoverScript`. Prompt: tidak ada instruksi transition. | Perlu: new schema fields, prompt instructions, UI display |
+| 3 | Complex Image Prompts | Schema: `imagePrompts.promptText` = single string. Prompt: contoh prompt hanya 1 baris deskriptif. | Perlu: structured prompt layers, prompt builder enhancement |
+| 4 | Voiceover Voice Type | Schema: `scenes.voiceoverScript` = plain string. Prompt: tidak ada voice type spec. | Perlu: new field per scene, voice type enum, prompt instructions |
+| 5 | Supporting Audio | TIDAK ADA di schema, prompt, atau UI. | Perlu: new schema table/fields, prompt generation, UI display, export |
 
 ---
 
-## 2. Fakta Proyek
+## 2. Current Codebase State
 
-### 2.1 Apa itu PromptFlow
+### 2.1 Tech Stack Verified
 
-| Aspek | Nilai | Sitasi |
+| Lapisan | Teknologi | Versi | Sitasi |
+|---|---|---|---|
+| Framework | Next.js (App Router) | ^15.1.0 | `package.json:50` |
+| UI Library | React + ReactDOM | ^19.0.0 | `package.json:52-53` |
+| Styling | Tailwind CSS v4 | ^4.0.0 | `package.json:81` |
+| UI Components | shadcn/ui (Radix UI) | ^1.1.0 | `package.json:26-39` |
+| ORM | Drizzle ORM | ^0.38.0 | `package.json:47` |
+| Database | Turso/libSQL | ^0.14.0 | `package.json:25` |
+| Auth | NextAuth v5 (beta.25) | 5.0.0-beta.25 | `package.json:51` |
+| AI SDK | Vercel AI SDK v4 (`ai`) | ^4.0.0 | `package.json:42` |
+| AI Provider | `@ai-sdk/openai-compatible` | ^1.0.0 | `package.json:22` |
+| Validation | Zod | ^3.24.0 | `package.json:60` |
+| i18n | next-intl | ^3.26.0 | `package.json:53` |
+| Animation | framer-motion | ^12.40.0 | `package.json:48` |
+| Charts | recharts | ^3.8.1 | `package.json:56` |
+| Forms | react-hook-form + @hookform/resolvers | ^7.54.0 / ^3.10.0 | `package.json:55,24` |
+| Storage | @vercel/blob | ^0.27.0 | `package.json:41` |
+| Testing | Vitest + Playwright | ^2.1.0 / ^1.49.0 | `package.json:83,63` |
+| Package Manager | pnpm | 11.7.0 | `package.json:89` |
+| Node | Node.js | >=20.0.0 | `package.json:86` |
+
+### 2.2 Project Structure
+
+| Folder/File | Fungsi | Sitasi |
 |---|---|---|
-| Nama | PromptFlow | `README.md:1` |
-| Deskripsi | Workflow engine otomasi prompt animasi AI | `README.md:3`, `src/app/layout.tsx:6` |
-| Tipe | Web app fullstack (frontend + backend satu repo) | `AGENTS.md S1` |
-| Output | Teks prompt terstruktur (JSON + export markdown) — BUKAN file media | `AGENTS.md S1` |
-| Input | Judul + durasi target + gaya + referensi gambar (opsional) + deskripsi cerita (opsional) | `PRD.md S1.2` |
-| Multi-provider | Ollama cloud, OpenRouter, 9router, custom | `PRD.md S1.2` |
-| i18n | Dwibahasa ID + EN | `README.md:56` |
-| Deploy target | Vercel + Turso DB + Vercel Blob | `AGENTS.md S1` |
-| GitHub | https://github.com/agrianwahab29/promptflow.git | `AGENTS.md S1` |
-| Status | V1 built & berjalan. V2 = upgrade iteratif | `AGENTS.md S1` |
+| `src/app/[locale]/` | App Router pages (locale-wrapped) | `src/app/[locale]/layout.tsx` |
+| `src/app/api/v1/` | API routes (REST) | `src/app/api/v1/generate/route.ts` |
+| `src/components/ui/` | shadcn/ui components (12 files) | `src/components/ui/*.tsx` |
+| `src/components/generate/` | Generate form + result display (4 files) | `src/components/generate/*.tsx` |
+| `src/components/landing/` | Landing page sections (16 files) | `src/components/landing/*.tsx` |
+| `src/components/common/` | Shared components (5 files) | `src/components/common/*.tsx` |
+| `src/components/settings/` | Settings page (2 files) | `src/components/settings/*.tsx` |
+| `src/components/projects/` | Project management (2 files) | `src/components/projects/*.tsx` |
+| `src/components/dashboard/` | Dashboard charts (5 files) | `src/components/dashboard/*.tsx` |
+| `src/lib/ai/` | AI engine: prompt-builder, llm-client, consistency-checker | `src/lib/ai/*.ts` |
+| `src/lib/ai/prompts/` | Prompt system files (5 files, all re-export prompt-builder) | `src/lib/ai/prompts/*.ts` |
+| `src/lib/db/` | Database: schema, client, cache, repositories (10 repos) | `src/lib/db/*.ts` |
+| `src/lib/validation/` | Zod schemas (input + output) | `src/lib/validation/schemas.ts` |
+| `src/lib/auth/` | NextAuth config + middleware | `src/lib/auth/*.ts` |
+| `src/lib/i18n/` | i18n config (id/en) | `src/lib/i18n/*.ts` |
+| `src/lib/export/` | Markdown export template | `src/lib/export/markdown.template.ts` |
+| `src/lib/templates/` | Title templates (8 presets) | `src/lib/templates/titles.ts` |
+| `messages/` | i18n JSON (id.json, en.json) | `messages/*.json` |
+| `drizzle/` | Migration files | `drizzle/0000_gigantic_genesis.sql` |
+| `product-docs/` | All product documentation (14 files) | `product-docs/*.md` |
 
-### 2.2 Fitur Utama (dari BRD/PRD)
+### 2.3 API Routes
 
-| # | Fitur | Status | Sitasi |
+| Endpoint | Method | Fungsi | Sitasi |
 |---|---|---|---|
-| 1 | Generate paket prompt dari judul + durasi + gaya | V1 LIVE | `PRD.md S1.3` |
-| 2 | Konsistensi karakter lintas adegan (Character master) | V1 LIVE | `PRD.md S1.3` |
-| 3 | Multi-provider LLM (fleksibilitas biaya) | V1 LIVE | `PRD.md S1.3` |
-| 4 | Export JSON + Markdown | V1 LIVE | `PRD.md S1.3` |
-| 5 | Upload referensi gambar + AI classification | V2 | `BRD.md S1` |
-| 6 | Deskripsi cerita kontekstual | V2 | `BRD.md S1` |
-| 7 | Real-time processing logs | V2 | `BRD.md S1` |
-| 8 | Dashboard enrichment (charts, metrics) | V2 | `BRD.md S1` |
-| 9 | Konsistensi UI (loading states, error boundaries) | V2 | `BRD.md S1` |
-| 10 | Pagination + navigation optimization | V2 | `BRD.md S1` |
+| `/api/v1/generate` | POST | Generate prompt package via LLM (SSE streaming) | `route.ts:31` |
+| `/api/v1/projects` | GET | List user projects | `route.ts` |
+| `/api/v1/projects/[id]` | GET | Get project detail | `route.ts` |
+| `/api/v1/projects/[id]/scenes` | GET | List scenes for project | `route.ts:9` |
+| `/api/v1/projects/[id]/image-prompts` | GET | List image prompts for project | `route.ts:9` |
+| `/api/v1/projects/[id]/export` | GET | Export as JSON or Markdown | `route.ts:10` |
+| `/api/v1/projects/[id]/characters` | GET | List characters | `route.ts` |
+| `/api/v1/projects/[id]/delete` | POST | Soft-delete project | `route.ts` |
+| `/api/v1/projects/[id]/logs` | GET | Generation logs | `route.ts` |
+| `/api/v1/settings/providers` | GET/POST | Manage LLM providers | `route.ts` |
+| `/api/v1/upload` | POST | Upload asset references | `route.ts` |
+| `/api/v1/upload/classify` | POST | AI classify uploaded image | `route.ts` |
+| `/api/v1/health` | GET | Health check | `route.ts` |
+| `/api/v1/register` | POST | User registration | `route.ts` |
 
-### 2.3 Value Proposition
+### 2.4 Key Files for Each Requirement
 
-| # | Value | Angka | Sitasi |
-|---|---|---|---|
-| 1 | Hemat waktu susun prompt | 80% vs manual | `PRD.md S1.3` |
-| 2 | Friction reduction V2 | 50% (upload + generate 1 halaman) | `PRD.md S1.3` |
-| 3 | Prompt lebih akurat | +30% via deskripsi cerita | `BRD.md S1` |
-| 4 | Transparansi proses | Real-time logs | `BRD.md S1` |
-| 5 | Monitoring produktivitas | Dashboard enrichment | `BRD.md S1` |
-
-### 2.4 User Personas
-
-| Persona | Deskripsi | Kebutuhan UI | Sitasi |
-|---|---|---|---|
-| Kreator Solo ("Rian") | Solo creator, workflow cepat | Upload + generate 1 halaman, AI transparan | `UIUX_SPEC S1.2` |
-| Indie Studio ("Bumi Animasi") | Studio kecil, multi-proyek | Dashboard monitoring, pagination | `UIUX_SPEC S1.2` |
-| Edukator ("Bu Sinta") | Tutorial maker, edukasi | Loading jelas, error recover, dwibahasa | `UIUX_SPEC S1.2` |
+| Requirement | Primary Files | Secondary Files |
+|---|---|---|
+| Light Theme | `layout.tsx:66`, `globals.css:1-82`, `page.tsx:24` | `landing/*.tsx`, `ui/*.tsx` |
+| Scene Transition | `schema.ts:89-99`, `schemas.ts:27-32`, `prompt-builder.ts:71-97` | `scenes/route.ts`, `result-tabs.tsx` |
+| Complex Image Prompts | `prompt-builder.ts:9-69`, `schemas.ts:16-25`, `schema.ts:102-116` | `result-tabs.tsx:140-189` |
+| Voiceover Voice Type | `schema.ts:89-99`, `schemas.ts:27-32`, `prompt-builder.ts:71-97` | `result-tabs.tsx:191-205` |
+| Supporting Audio | TIDAK ADA (greenfield) | `schema.ts`, `schemas.ts` |
 
 ---
 
-## 3. Landing Page Existing
+## 3. Database Schema Analysis
 
-### 3.1 File: `src/app/[locale]/page.tsx`
+### 3.1 Tables yang Ada
 
-**Status:** SUDAH ADA — sangat basic, perlu TOTAL REDESIGN.
+| Table | Fields | Sitasi |
+|---|---|---|
+| `users` | id, email, name, passwordHash, image, role, createdAt, updatedAt | `schema.ts:5-14` |
+| `provider_configs` | id, userId, provider, name, baseUrl, model, apiKeyEncrypted, isActive, createdAt, updatedAt | `schema.ts:17-30` |
+| `projects` | id, userId, title, durationType, durationTargetSeconds, styleType, aspectRatio, resultJson, status, storyDescription, createdAt, updatedAt, deletedAt | `schema.ts:33-50` |
+| `asset_references` | id, projectId, tipe, filename, blobUrl, label, mimeType, sizeBytes, aiClassification, createdAt | `schema.ts:53-67` |
+| `characters` | id, projectId, nama, gayarambut, wajahAsal, pakaianAtas, pakaianBawah, alasKaki, deskripsiLatar, aksi, peran, createdAt | `schema.ts:70-86` |
+| `scenes` | id, projectId, orderNo, description, voiceoverScript, createdAt | `schema.ts:89-99` |
+| `image_prompts` | id, projectId, sceneId, tipe, target, promptText, referenceFilename, createdAt | `schema.ts:102-116` |
+| `generation_logs` | id, projectId, provider, model, durationMs, status, errorMessage, logsJson, createdAt | `schema.ts:119-132` |
+| `supporting_characters` | id, projectId, sceneId, nama, tipe, aksi, createdAt | `schema.ts:135-146` |
 
-**Struktur saat ini:**
+### 3.2 Schema Gaps untuk 5 Requirement Baru
+
+| Gap | Table Affected | What is Missing | Impact |
+|---|---|---|---|
+| Scene transitions | `scenes` | `transitionType`, `transitionDuration`, `transitionEasing`, `transitionDirection` | Scene jarring, no transition metadata |
+| Scene duration | `scenes` | `durationSeconds` | Cannot calculate per-scene timing |
+| Voiceover voice type | `scenes` | `voiceType`, `voiceEmotion`, `voiceSpeed`, `voicePitch` | All voiceover same voice |
+| Audio per scene | `scenes` | `musicCue`, `sfxCue`, `ambientCue`, `audioVolume` | No audio specification |
+| Audio global | `projects` | `backgroundMusic`, `audioFormat` | No global audio config |
+| Complex image prompts | `image_prompts` | `composition`, `lighting`, `cameraAngle`, `styleModifiers`, `mood` | Prompts lack detail |
+
+### 3.3 Drizzle Migration
+
+- One migration file: `drizzle/0000_gigantic_genesis.sql` — initial schema.
+- Dialect: `turso` (libSQL) — `drizzle.config.ts:18`.
+- For schema changes: run `drizzle-kit generate` + `drizzle-kit push`.
+
+---
+
+## 4. Prompt System Analysis
+
+### 4.1 Current Architecture
+
+**Single monolithic prompt builder** — all prompt files re-export from one:
+
+| File | Isi | Sitasi |
+|---|---|---|
+| `prompt-builder.ts` | `buildSystemPrompt()` + `buildUserMessage()` — satu prompt untuk semua output | `prompt-builder.ts:71-126` |
+| `scenes.system.ts` | `export { buildSystemPrompt as default } from '../prompt-builder'` | `scenes.system.ts:1` |
+| `image-prompts.system.ts` | `export { buildSystemPrompt as default } from '../prompt-builder'` | `image-prompts.system.ts:1` |
+| `voiceover.system.ts` | `export { buildSystemPrompt as default } from '../prompt-builder'` | `voiceover.system.ts:1` |
+| `character.system.ts` | `export { buildSystemPrompt as default } from '../prompt-builder'` | `character.system.ts:1` |
+| `moral.system.ts` | `export { buildSystemPrompt as default } from '../prompt-builder'` | `moral.system.ts:1` |
+
+### 4.2 Current Prompt Structure
+
+System prompt (`prompt-builder.ts:71-97`):
+- Instruksi: output HANYA JSON valid
+- JSON schema example: single hardcoded example
+- Field rules: character_profiles, scenes, image_prompts, supporting_characters, moral_message
+- Consistency rules: identity fields stable across scenes
+
+User message (`prompt-builder.ts:100-126`):
+- Input: title, duration, style, storyDescription (optional)
+- References: image reference names
+- Scene count guidance: shorts 3-6, tutorial 8-20
+
+### 4.3 Prompt Gaps
+
+| Gap | Current State | What is Needed |
+|---|---|---|
+| No transition instructions | Prompt does not mention transition | Generate transition type, duration, easing per scene |
+| No voice type spec | Prompt does not mention voice type | Generate voiceType per scene (anak/pria/wanita/lansia/narrator) |
+| No audio spec | Prompt does not mention audio | Generate musicCue, sfxCue, ambientCue per scene |
+| Basic image prompts | Example prompt is 1 line | Structured layers: subject, composition, lighting, camera, style, mood |
+| No scene duration | Prompt does not generate per-scene duration | Generate durationSeconds per scene |
+| Single JSON output | One JSON object for all | Keep single JSON, expand schema |
+
+---
+
+## 5. Scene Transition Analysis
+
+### 5.1 Current State
+
+- Schema: `scenes` table only has `orderNo` (integer), `description` (text), `voiceoverScript` (text) — `schema.ts:89-99`
+- Zod: `SceneSchema` = `{ order, description, voiceover_script, image_prompts }` — `schemas.ts:27-32`
+- Prompt: No transition instruction — `prompt-builder.ts:71-97`
+- UI: Scenes displayed as card list in `result-tabs.tsx:41-101` — no flow visualization
+
+### 5.2 Why It is Jarring
+
+1. No transition metadata — scenes change with no visual effect
+2. No scene duration — timing not determined
+3. No visual flow indicator — UI shows scenes as independent cards
+4. No continuity cues — prompt does not instruct visual continuity between scenes
+
+### 5.3 Transition Types (Best Practices)
+
+From web research:
+
+| Transition | Use Case | Duration |
+|---|---|---|
+| `cut` | Default, fast, action scenes | 0s (instant) |
+| `dissolve` / `crossfade` | Time passage, location change | 0.5-2s |
+| `fade_to_black` | Chapter end, dramatic pause | 1-3s |
+| `fade_to_white` | Dream sequence, flashback | 1-3s |
+| `wipe` | Location change, travel | 0.5-1s |
+| `match_cut` | Visual continuity (shape/color match) | 0s |
+| `morph` | Character transformation | 0.5-2s |
+| `zoom_transition` | Focus shift, dramatic reveal | 0.5-1.5s |
+
+Sources: studiobinder.com/blog/types-of-editing-transitions-in-film, boords.com/blog/video-transition-effects, adobe.com/ph_fil/creativecloud/video/discover/types-of-film-transitions.html
+
+### 5.4 What Needs to Be Added
+
+Schema fields per scene:
+- `transitionType` (enum: cut, dissolve, fade_black, fade_white, wipe, match_cut, morph, zoom)
+- `transitionDuration` (integer, milliseconds)
+- `transitionEasing` (enum: linear, ease_in, ease_out, ease_in_out)
+- `transitionDirection` (enum: forward, backward, loop — semantic direction)
+
+Prompt instructions:
+- Generate transition type based on narrative context
+- Match transition to emotional beat
+- Ensure visual continuity between scenes
+
+UI:
+- Visual flow diagram showing scene connections
+- Transition indicators between scene cards
+- Preview of transition effect
+
+---
+
+## 6. Image Prompt Analysis
+
+### 6.1 Current State
+
+- Schema: `imagePrompts.promptText` = single text field — `schema.ts:108`
+- Zod: `ImagePromptItemSchema` = `{ target, prompt_text, reference_filename }` — `schemas.ts:16-20`
+- Prompt example (from `prompt-builder.ts:35-36`):
+  ```
+  Seorang anak perempuan berusia 10 tahun dengan rambut hitam panjang bergelombang, kaos kuning lengan pendek, celana pendek biru, dan sandal gunung coklat, berdiri di tepi hutan dengan ekspresi penasaran, gaya 3D Pixar, pencahayaan sinematik
+  ```
+
+### 6.2 Quality Assessment
+
+| Aspek | Current | Ideal |
+|---|---|---|
+| Subject | Ada (deskripsi karakter) | Good |
+| Composition | TIDAK ADA | Perlu: close-up, wide shot, low angle, etc. |
+| Lighting | pencahayaan sinematik (generic) | Perlu: golden hour, rim light, soft diffused, etc. |
+| Camera | TIDAK ADA | Perlu: lens type, focal length, depth of field |
+| Style | gaya 3D Pixar (basic) | Perlu: detailed style modifiers, art direction |
+| Mood | ekspresi penasaran (basic) | Perlu: emotional tone, atmosphere |
+| Color | TIDAK ADA | Perlu: color palette, grading, saturation |
+| Detail level | Medium | Perlu: high detail, texture descriptions |
+
+### 6.3 Structured Prompt Formula (Best Practices)
+
+From web research (budgetpixel.com, promptsera.com, kling.ai/blog):
+
 ```
-[locale]/page.tsx
-├── Hero section (h1 + p + 2 CTA buttons)
-└── Feature grid (3 cards: Input Judul, Konsistensi Karakter, Export Siap Pakai)
+[Subject] + [Action/Pose] + [Composition/Framing] + [Camera Angle] + [Lighting] + [Color/Mood] + [Style/Art Direction] + [Technical Specs] + [Quality Modifiers]
 ```
 
-**Yang ADA:**
-- Hero title: "Satu judul -> paket prompt animasi siap pakai"
-- Hero subtitle: "Karakter konsisten lintas adegan. Multi-provider LLM. Export JSON / Markdown."
-- 2 CTA: "Mulai Gratis" (-> /generate) + "Masuk" (-> /login)
-- 3 feature cards basic
-
-**Yang TIDAK ADA (perlu ditambah):**
-- Animasi apapun (scroll, hover, entrance)
-- Social proof (testimonial, user count, logos)
-- Product demo / screenshot
-- Pricing section
-- FAQ section
-- How it works section
-- Trust signals
-- Footer
-- Navbar (mungkin shared)
-
-### 3.2 i18n Keys Existing
-
-```json
-// messages/id.json — namespace "landing"
-{
-  "heroTitle": "Satu judul -> paket prompt animasi siap pakai",
-  "heroSubtitle": "Karakter konsisten lintas adegan. Multi-provider LLM. Export JSON / Markdown.",
-  "cta": "Mulai Gratis",
-  "loginCta": "Masuk",
-  "feature1Title": "Input Judul",
-  "feature1Desc": "Masukkan judul + durasi + style. Sistem generate paket lengkap.",
-  "feature2Title": "Konsistensi Karakter",
-  "feature2Desc": "Character master terstruktur dirujuk lintas adegan — identitas tetap, adegan bervariasi.",
-  "feature3Title": "Export Siap Pakai",
-  "feature3Desc": "JSON terstruktur + Markdown. Copy ke tool image/video gen favorit."
-}
+Example enhanced prompt:
 ```
-- Sitasi: `messages/id.json:11-22`, `messages/en.json` (mirip)
+A 10-year-old Indonesian girl with long wavy black hair, wearing a yellow t-shirt and blue shorts, standing at the edge of a dense tropical forest with curious expression, wide-angle composition from low angle, golden hour rim lighting with volumetric god rays through canopy, warm earth-tone color palette with emerald green accents, 3D Pixar-style rendering, depth of field f/2.8, 4K ultra-detailed, cinematic quality
+```
 
-**Catatan:** Keys ini perlu DITAMBAH untuk section baru (social proof, how it works, FAQ, pricing, dll).
+### 6.4 What Needs to Be Added
+
+Schema: `promptText` can stay as single string, but prompt builder must generate structured content.
+
+Prompt enhancement:
+- Instruct to generate prompt with 7-8 layers
+- Template structure for consistency
+- Style-specific modifiers (3D vs 2D)
+
+UI:
+- Display prompt with labeled sections (optional)
+- Copy per section or full prompt
 
 ---
 
-## 4. Design System & Branding
+## 7. Voiceover Analysis
 
-### 4.1 Design Tokens (dari globals.css + UIUX_SPEC)
+### 7.1 Current State
 
-| Token | Nilai | Kegunaan | Sitasi |
-|---|---|---|---|
-| `--primary` | `#7c3aed` (violet) | CTA, brand color | `globals.css:10` |
-| `--primary-foreground` | `#ffffff` | Teks di atas primary | `globals.css:11` |
-| `--background` | `#ffffff` | Body bg (light mode) | `globals.css:4` |
-| `--foreground` | `#0a0a0a` | Body text | `globals.css:5` |
-| `--accent` | `#ede9fe` | Highlight, hover | `globals.css:16` |
-| `--muted-foreground` | `#71717a` | Helper text | `globals.css:14` |
-| `--border` | `#e4e4e7` | Border, divider | `globals.css:23` |
-| `--font-sans` | Inter, system-ui, ... | Body font | `globals.css:27` |
-| `--font-mono` | JetBrains Mono, ... | Code/mono font | `globals.css:28` |
-| `--radius` | 6px | Default radius | `globals.css:26` |
+- Schema: `scenes.voiceoverScript` = text field — `schema.ts:94`
+- Zod: `SceneSchema.voiceover_script` = string — `schemas.ts:30`
+- Prompt: No voice type spec — `prompt-builder.ts:71-97`
+- UI: Voiceover displayed as plain text in `result-tabs.tsx:191-205`
 
-### 4.2 Dark Mode Tokens
+### 7.2 Voice Types Needed
 
-| Token | Nilai | Sitasi |
+From ElevenLabs documentation (elevenlabs.io/docs/eleven-creative/voices/voice-design) + BRD/PRD/SRS keputusan resmi:
+
+| Voice Type | Indonesian | Use Case |
 |---|---|---|
-| `--primary` (dark) | `#a78bfa` | `globals.css:56` |
-| `--background` (dark) | `#0a0a0a` | `globals.css:50` |
-| `--accent` (dark) | `#3b0764` | `globals.css:62` |
+| `child` | Anak | Karakter anak-anak (usia < 12 tahun) |
+| `teen` | Remaja | Karakter remaja (usia 12-17 tahun) |
+| `adult_male` | Pria Dewasa | Narator pria, karakter pria dewasa |
+| `adult_female` | Wanita Dewasa | Narator wanita, karakter wanita dewasa |
+| `elderly_male` | Lansia Pria | Karakter pria lansia, wisdom figure |
+| `elderly_female` | Lansia Wanita | Karakter wanita lansia, wisdom figure |
+| `narrator` | Narator | Narator non-character, voice-over umum |
 
-### 4.3 Typography Scale
+> **Catatan:** 7 types ini = keputusan resmi (BRD S6.4 + PRD S7.4 + SRS Lampiran B.2). Tidak ada `male`, `female`, `elderly`, atau `custom` — semua sudah dipecah berdasarkan usia dan gender.
 
-| Level | Size | Weight | Penggunaan | Sitasi |
-|---|---|---|---|---|
-| `text-4xl` | 36px | 800 | Landing hero | `UIUX_SPEC S2.4` |
-| `text-5xl` | 48px | 800 | Landing hero display | `UIUX_SPEC S2.4` |
-| `text-3xl` | 30px | 700 | Page H1, hero | `UIUX_SPEC S2.4` |
-| `text-2xl` | 24px | 700 | Page H2, wizard step | `UIUX_SPEC S2.4` |
-| `text-xl` | 20px | 600 | Page H3, metric value | `UIUX_SPEC S2.4` |
-| `text-lg` | 18px | 500 | Card title, section | `UIUX_SPEC S2.4` |
-| `text-base` | 16px | 400 | Body default | `UIUX_SPEC S2.4` |
-| `text-sm` | 14px | 400 | Body sekunder | `UIUX_SPEC S2.4` |
+### 7.3 What Needs to Be Added
 
-### 4.4 Spacing Scale
+Schema fields per scene:
+- `voiceType` (enum: child, teen, adult_male, adult_female, elderly_male, elderly_female, narrator)
+- `voiceEmotion` (enum: neutral, happy, sad, excited, calm, dramatic)
+- `voiceSpeed` (float, 0.5-2.0, default 1.0)
+- `voicePitch` (enum: low, medium, high, auto)
 
-| Token | px | Penggunaan Landing | Sitasi |
-|---|---|---|---|
-| `space-16` | 64 | Padding hero | `UIUX_SPEC S2.5` |
-| `space-12` | 48 | Margin block besar | `UIUX_SPEC S2.5` |
-| `space-10` | 40 | Padding landing section | `UIUX_SPEC S2.5` |
-| `space-8` | 32 | Margin antar section | `UIUX_SPEC S2.5` |
-| `space-6` | 24 | Gap block | `UIUX_SPEC S2.5` |
+Prompt instructions:
+- Generate voiceType based on character role
+- Match emotion to scene narrative
+- Consider pacing for duration
 
-### 4.5 Brand Voice
+UI:
+- Voice type selector per scene
+- Emotion dropdown
+- Speed/pitch controls
 
-| Aspek | Nilai | Sitasi |
+---
+
+## 8. Audio/Music Analysis
+
+### 8.1 Current State
+
+**TIDAK ADA** — zero audio support in entire codebase.
+
+### 8.2 Audio Categories Needed
+
+From sound design best practices (animationexploration.org, theplot.io):
+
+| Category | Description | Example |
 |---|---|---|
-| Tone | Profesional hangat, edukatif, ringkas | `UIUX_SPEC S1.4` |
-| Bahasa | Dwibahasa ID+EN. ID default | `UIUX_SPEC S1.4` |
-| AI copy | Netral ("AI menganalisis..." bukan "GPT-4o mendeteksi...") | `UIUX_SPEC S1.4` |
-| Error message | Manusiawi + sebut aksi recovery | `UIUX_SPEC S1.4` |
+| Background Music | Continuous music bed per scene | Orchestral, upbeat, mysterious |
+| SFX (Sound Effects) | Discrete sounds tied to actions | Footsteps, door creak, whoosh |
+| Ambient | Environmental atmosphere | Forest birds, city traffic, rain |
+| Music Cue | Specific music moment | Tension build, emotional peak |
+| Transition Audio | Sound during transitions | Whoosh, chime, rumble |
 
-### 4.6 Logo & Aset
+### 8.3 What Needs to Be Added
 
-| Aset | Path | Status | Sitasi |
-|---|---|---|---|
-| Logo AgriNode | `public/references/logo_agrinode-removebg-preview-8d857ade.png` | ADA (bukan logo PromptFlow khusus) | `public/references/` |
+Option A: New table `scene_audio`:
+- `id`, `projectId`, `sceneId`
+- `audioType` (enum: background_music, sfx, ambient, music_cue, transition)
+- `description` (text — what the audio should be)
+- `timing` (enum: start, throughout, end, specific_moment)
+- `duration` (integer, seconds)
+- `volume` (float, 0.0-1.0)
+- `fade_in` (integer, ms)
+- `fade_out` (integer, ms)
 
-**TIDAK ADA BUKTI:** Logo PromptFlow khusus, brand guidelines, color palette resmi beyond CSS tokens, font files lokal (Inter via system-ui), mockup/screenshot produk untuk landing page.
+Option B: Extend `scenes` table:
+- `backgroundMusic` (text — description)
+- `sfxCues` (text — JSON array of SFX)
+- `ambientAudio` (text — description)
+
+Prompt instructions:
+- Generate audio specifications per scene
+- Match audio mood to visual narrative
+- Consider timing and transitions
+
+UI:
+- Audio specification panel per scene
+- Music/SFX/ambient separate fields
+- Volume and timing controls
 
 ---
 
-## 5. Best Practices Landing Page SaaS 2024-2026
+## 9. Theme System Analysis
 
-Sumber: fiveninestrategy.com, apexure.com, toimi.pro, saaslandingpage.com, saaspo.com
+### 9.1 Current State
 
-### 5.1 Struktur Section (urut halaman)
+**CSS infrastructure already complete:**
+- `globals.css:4-28` — Light theme tokens (default)
+- `globals.css:49-72` — Dark theme tokens (`.dark` class override)
+- All shadcn/ui components use CSS variables — automatically support light/dark
 
-| # | Section | Tujuan | Best Practice |
+**App forces dark mode:**
+- `layout.tsx:66` — `<html lang="id" className="dark">` — hardcoded
+- `page.tsx:24` — Landing page wraps `<div className="dark">` — hardcoded
+- `provider-card.tsx:88` — Hardcoded dark: variants (`dark:bg-green-950`)
+
+**Missing:**
+- Theme toggle component
+- localStorage persistence
+- `next-themes` package (not installed)
+- System preference detection
+
+### 9.2 Design Tokens Already Defined
+
+| Token | Light (default) | Dark (`.dark` class) | Sitasi |
 |---|---|---|---|
-| 1 | **Navbar** | Navigasi + brand | Logo kiri, nav links tengah, CTA kanan. Sticky. Minimal links. |
-| 2 | **Hero** | Hook dalam 10 detik | (a) Apa produk, (b) Kenapa penting, (c) CTA jelas. Product demo/screenshot > text. |
-| 3 | **Social Proof Bar** | Trust awal | Logo klien, user count, rating. Taruh SEBELUM hero atau SEGERA setelah hero. |
-| 4 | **Problem/Solution** | Resonansi pain point | Highlight masalah user -> produk sebagai solusi. Warna berbeda untuk pain point. |
-| 5 | **How It Works** | Edukasi workflow | 3-4 step visual. "Rule of three" — cukup detail tanpa overwhelming. |
-| 6 | **Features/Benefits** | Diferensiasi | Bento grid. Benefit > feature. Quantifiable data. Per-section accent colors. |
-| 7 | **Product Demo** | Bukti produk works | Live preview, screenshot, GIF, atau video. "Product is the demo." |
-| 8 | **Testimonials** | Social proof mendalam | 3+ testimonial. Short, bold, address pain point. Tie to KPI/metrics. |
-| 9 | **Pricing** | Konversi | Value-based naming (bukan Basic/Pro). Comparison table. Clear CTA per tier. |
-| 10 | **FAQ** | Objection handling | Top 5-8 questions. Short, direct answers. Sourced from real user questions. |
-| 11 | **Final CTA** | Closing conversion | Repeat primary CTA. Urgency/scarcity bila ada. |
-| 12 | **Footer** | Navigasi + legal | Minimal links, social media, copyright. |
+| `--color-background` | `#ffffff` | `#0a0a0a` | `globals.css:4,50` |
+| `--color-foreground` | `#0a0a0a` | `#fafafa` | `globals.css:5,51` |
+| `--color-card` | `#ffffff` | `#0f0f0f` | `globals.css:6,52` |
+| `--color-primary` | `#7c3aed` | `#a78bfa` | `globals.css:10,56` |
+| `--color-secondary` | `#f4f4f5` | `#27272a` | `globals.css:12,58` |
+| `--color-muted` | `#f4f4f5` | `#27272a` | `globals.css:14,60` |
+| `--color-accent` | `#ede9fe` | `#3b0764` | `globals.css:16,62` |
+| `--color-border` | `#e4e4e7` | `#27272a` | `globals.css:23,69` |
 
-### 5.2 Hero Section Best Practices
+### 9.3 What Needs to Be Added
 
-| Prinsip | Detail | Sitasi |
+**Recommended: `next-themes`**
+- Install: `pnpm add next-themes`
+- Add `<ThemeProvider>` to `providers.tsx`
+- Remove hardcoded `className="dark"` from `layout.tsx:66`
+- Remove `<div className="dark">` from `page.tsx:24`
+- Add `<ThemeToggle>` component to `app-header.tsx`
+- Persist in localStorage
+
+Files to modify:
+- `src/app/layout.tsx:66` — remove `className="dark"`
+- `src/app/[locale]/page.tsx:24` — remove `<div className="dark">`
+- `src/components/providers.tsx` — add ThemeProvider
+- `src/components/common/app-header.tsx` — add ThemeToggle
+- `src/components/settings/provider-card.tsx:88` — remove hardcoded dark: variants
+
+i18n keys to add:
+- `common.theme` / `common.themeToggle`
+- `common.lightMode` / `common.darkMode` / `common.systemMode`
+
+---
+
+## 10. Web Research Findings
+
+### 10.1 Scene Transitions
+
+Sources: studiobinder.com, boords.com, adobe.com, wevideo.com
+
+- 3 transitions cover 95%+ of use cases: cut, dissolve, fade to color
+- Match cut = most creative, maintains visual continuity
+- Dissolve = time passage, emotional connection between scenes
+- Fade to black = chapter end, dramatic pause
+- Wipe = location/travel change
+- Key principle: transition should serve story, not distract
+
+### 10.2 Complex Image Prompts
+
+Sources: budgetpixel.com, promptsera.com, kling.ai, runway help
+
+- Formula: Subject + Action + Composition + Camera + Lighting + Color + Style + Technical
+- Camera terms: close-up, wide shot, low angle, bird's eye, dolly zoom
+- Lighting terms: golden hour, rim light, volumetric, soft diffused, chiaroscuro
+- Style modifiers: cinematic, photorealistic, painterly, flat design, isometric
+- Quality boosters: 4K, ultra-detailed, sharp focus, depth of field
+
+### 10.3 Voice Types
+
+Sources: elevenlabs.io docs
+
+- Voice Design v3: age (child/teen/adult/elderly), gender, accent, emotion
+- SSML support: v3 does NOT support SSML break tags — use punctuation for pauses
+- Voice categories: narrator, character, custom
+- Emotion control: through text structure, punctuation, not explicit tags
+
+### 10.4 Light/Dark Theme in Next.js 15 + Tailwind v4
+
+- `next-themes` is the standard solution
+- Works with Tailwind v4 CSS variable system
+- Supports `class` strategy (toggle `.dark` class on `<html>`)
+- localStorage persistence built-in
+- System preference detection built-in
+- Zero config with shadcn/ui
+
+---
+
+## 11. Gap Analysis
+
+### 11.1 Per Requirement
+
+| # | Requirement | Code Exists | Schema Ready | Prompt Ready | UI Ready | Export Ready | Overall |
+|---|---|---|---|---|---|---|---|
+| 1 | Light Theme | CSS tokens YES, toggle NO | N/A | N/A | NO | N/A | 30% |
+| 2 | Scene Transition | NO | NO | NO | NO | NO | 0% |
+| 3 | Complex Image Prompts | Partial (basic prompts) | Partial (promptText) | NO | Partial (display) | Partial (JSON) | 20% |
+| 4 | Voiceover Voice Type | NO | NO | NO | NO | NO | 0% |
+| 5 | Supporting Audio | NO | NO | NO | NO | NO | 0% |
+
+### 11.2 TIDAK ADA BUKTI (no evidence found)
+
+| # | Claim | Status |
 |---|---|---|
-| 10-second rule | Komunikasi: apa produk, kenapa penting, CTA jelas — dalam 10 detik | fiveninestrategy.com SHero |
-| Singular CTA | 1 primary CTA, boleh 1 secondary. Multiple CTA = confusion. | apexure.com S5 |
-| Product visual | Screenshot/GIF/demo > text. Authentic product visuals. | apexure.com S2 |
-| Social proof ringkas | "Trusted by X users" atau logo bar di bawah hero | fiveninestrategy.com SHero |
-| Benefit headline | "Save 80% time" > "AI-powered prompt generator" | fiveninestrategy.com SHero |
+| 1 | Ada theme toggle di codebase | TIDAK ADA BUKTI |
+| 2 | Ada transition metadata di schema | TIDAK ADA BUKTI |
+| 3 | Ada voice type specification | TIDAK ADA BUKTI |
+| 4 | Ada audio/music support | TIDAK ADA BUKTI |
+| 5 | Image prompts punya structured layers | TIDAK ADA BUKTI |
+| 6 | `next-themes` terinstall | TIDAK ADA BUKTI |
+| 7 | Scene duration ditentukan per scene | TIDAK ADA BUKTI |
 
-### 5.3 Conversion Optimization
+### 11.3 What is Ready (can be leveraged)
 
-| Prinsip | Detail | Sitasi |
+| # | Asset | Status | How to Leverage |
+|---|---|---|---|
+| 1 | Light/dark CSS tokens | READY | Just toggle class, no need to create new tokens |
+| 2 | shadcn/ui components | READY | All components use CSS variables, auto support both themes |
+| 3 | Zod validation | READY | Extend schema with new fields |
+| 4 | Prompt builder architecture | READY | Extend `buildSystemPrompt()` with new instructions |
+| 5 | SSE streaming | READY | Add new stages for audio/transition generation |
+| 6 | Export (JSON/Markdown) | READY | Extend template for transition/audio data |
+| 7 | i18n infrastructure | READY | Add keys for new UI elements |
+| 8 | Drizzle ORM | READY | `drizzle-kit generate` for new migrations |
+
+---
+
+## 12. Asumsi
+
+| # | Asumsi | Alasan |
 |---|---|---|
-| 1:1 Attention Ratio | 1 halaman = 1 tujuan. Landing page != homepage. | apexure.com S1 |
-| Low cognitive load | Sedikit teks, chunking, visual guide. Rocket Money model. | apexure.com S8 |
-| Mobile-first | 50%+ traffic mobile. Jangan shrink desktop ke mobile. | apexure.com S9 |
-| Forms minimal | Multistep form bila perlu. Progressive profiling. | apexure.com S7 |
-| Urgency | Countdown, limited supply, high demand. "Rule of three" action steps. | fiveninestrategy.com SUrgency |
-| FAQ = objection handling | Sourced from real questions. Short answers. Clear CTA path. | fiveninestrategy.com SFAQ, apexure.com S4 |
+| ASM-1 | Light theme toggle pakai `next-themes` | Standard solution, zero-config with shadcn/ui, localStorage built-in |
+| ASM-2 | Scene transition ditambah sebagai field di `scenes` table | Lebih simple dari new table, cukup untuk MVP |
+| ASM-3 | Complex image prompts = enhance prompt builder, bukan new schema field | `promptText` tetap single string, tapi content-nya lebih structured |
+| ASM-4 | Voice type = enum field di `scenes` table | Simple, cukup untuk MVP |
+| ASM-5 | Supporting audio = new table `scene_audio` | Multiple audio per scene, lebih flexible dari single field |
+| ASM-6 | Semua requirement bisa diimplementasi dalam 1 schema migration | Drizzle supports additive migrations |
+| ASM-7 | Export format tetap JSON + Markdown | Tidak ada requirement untuk format baru |
+| ASM-8 | Voice type enum: child, teen, adult_male, adult_female, elderly_male, elderly_female, narrator (7 types) | Keputusan resmi BRD/PRD/SRS, lebih granular dari MVP |
+| ASM-9 | Transition types: cut, dissolve, fade_black, fade_white, wipe, match_cut | 6 types cover 95% use cases |
+| ASM-10 | Audio types: background_music, sfx, ambient, music_cue | 4 categories cover basic needs |
 
 ---
 
-## 6. Referensi Desain
+## 13. Daftar Sitasi
 
-### 6.1 Techno-Futurist Camp (Dark Mode + Neon + Shaders)
-
-| Situs | Highlight | Relevansi ke PromptFlow | Sitasi |
-|---|---|---|---|
-| **Linear** (linear.app) | Dark mode + purple accent, kinetic typography, live AI agent demo, bento grid | SANGAT relevan — PromptFlow juga AI tool, purple brand | toimi.pro SLinear |
-| **Vercel** (vercel.com) | Dark mode, shader backgrounds, Geist font, terminal-style sections | Relevan — tech/developer audience | toimi.pro SVercel |
-| **Stripe** (stripe.com) | WebGL mesh gradient, enterprise polish, interactive code tabs | Relevan untuk polish level | toimi.pro SStripe |
-| **Framer** (framer.com) | Maximum motion, cursor-triggered, kinetic type | Referensi animasi | toimi.pro SFramer |
-| **Attio** (attio.com) | Monochrome + pastel accents, live "Ask Attio" demo | Relevan — AI-first, live demo pattern | toimi.pro SAttio |
-| **Ramp** (ramp.com) | Bento grid formalized, scroll-driven narrative | Referensi layout | toimi.pro SRamp |
-| **ElevenLabs** (elevenlabs.io) | Audio waveform hero, sensory product demo | Referensi — kalau PromptFlow bisa "demo" prompt output | toimi.pro SElevenLabs |
-
-### 6.2 Editorial Counter-Camp (Warm + Serif + Whitespace)
-
-| Situs | Highlight | Relevansi | Sitasi |
-|---|---|---|---|
-| **Notion** (notion.so) | Warm illustration, persona-based navigation | Bila target non-technical | toimi.pro SNotion |
-| **PostHog** (posthog.com) | Quirky mascot, hand-drawn, multi-color | Bila mau "weird" differentiation | toimi.pro SPostHog |
-| **Anthropic** (anthropic.com) | Cream bg, serif type, editorial, restraint | Bila mau signal trust/seriousness | toimi.pro SAnthropic |
-
-### 6.3 Rekomendasi Aesthetic untuk PromptFlow
-
-**PromptFlow sebaiknya di camp Techno-Futurist** karena:
-1. Produk = AI tool -> dark mode + neon accent = natural fit
-2. Brand color violet #7c3aed -> match purple accent pattern (Linear-style)
-3. Target kreator animasi AI -> appreciate visual sophistication
-4. Product demo bisa ditampilkan (generate flow)
-
-**Concrete direction:**
-- Dark mode default (#0a0a0a bg)
-- Primary violet #7c3aed sebagai single accent
-- Inter font (sudah ada) — bisa upgrade ke Inter Display untuk headlines
-- Bento grid untuk features
-- Live product demo/screenshot di hero (generate form mockup)
-- Scroll-triggered animations
-- Minimal, high-contrast, high-craft
-
----
-
-## 7. Animation & Motion
-
-### 7.1 Library Options
-
-| Library | Size | Fitur | Rekomendasi | Sitasi |
-|---|---|---|---|---|
-| **Framer Motion** | ~30KB gzipped | `whileInView`, `useInView`, `useScroll`, spring physics, layout animations | **RECOMMENDED** — standard untuk React/Next.js | brad-carter.medium.com, shyamswaroop.hashnode.dev |
-| **CSS Scroll-Driven Animations** | 0KB (native) | `animation-timeline: scroll()`, no JS | Good untuk simple fade-in. Browser support: Chrome 115+ | rebeccamdeprey.com |
-| **GSAP ScrollTrigger** | ~25KB | Complex narratives, parallax, timeline sequences | Overkill untuk landing page | toimi.pro SLinear |
-| **Intersection Observer** | 0KB (native) | `isIntersecting` -> trigger CSS class | Basic fade-in, no spring physics | dev.to, stackoverflow |
-
-**RECOMMENDATION:** Framer Motion — install sebagai dependency baru. Paling fit untuk React/Next.js, community besar, API intuitif.
-
-### 7.2 Animation Patterns untuk Landing Page
-
-| Pattern | Kapan Pakai | Implementasi | Sitasi |
-|---|---|---|---|
-| **Fade-in on scroll** | Setiap section masuk viewport | `whileInView={{ opacity: 1 }}` Framer Motion | saaspo.com/scroll-animations |
-| **Stagger children** | Feature cards, testimonial cards | `staggerChildren` di parent | framer.com pattern |
-| **Slide up** | Hero text, section headings | `initial={{ y: 20 }} animate={{ y: 0 }}` | Linear pattern |
-| **Scale on hover** | Feature cards, CTA buttons | `whileHover={{ scale: 1.02 }}` | Attio pattern |
-| **Gradient animation** | Hero background, accent elements | CSS `@keyframes` gradient shift | Stripe/Vercel pattern |
-| **Counter animation** | Stats/numbers (users, prompts generated) | `useMotionValue` + `useTransform` | Ramp pattern |
-| **Typing effect** | Hero headline | Framer Motion word swap | Linear "teams/agents" pattern |
-| **Parallax** | Hero background elements | `useScroll` + `useTransform` | Framer pattern |
-
-### 7.3 Performance Considerations
-
-| Prinsip | Detail | Sitasi |
+| # | Path:Baris | Klaim |
 |---|---|---|
-| `prefers-reduced-motion` | Respect OS setting — disable animation | `globals.css:74-80` (SUDAH ADA) |
-| GPU-accelerated properties only | `transform`, `opacity` — avoid `width`, `height`, `top` | framer.com docs |
-| Lazy load heavy animations | Below-fold animations -> load on intersection | apexure.com S9 |
-| No layout shift | Animations shouldn't cause CLS | Core Web Vitals |
-| Bundle size | Framer Motion ~30KB gzipped — acceptable | npmjs.com |
+| C01 | `src/app/layout.tsx:66` | Hardcoded `className="dark"` — dark mode forced |
+| C02 | `src/app/[locale]/page.tsx:24` | Landing page wrap `<div className="dark">` |
+| C03 | `src/app/globals.css:4-28` | Light theme CSS tokens defined (unused) |
+| C04 | `src/app/globals.css:49-72` | Dark theme CSS tokens defined (`.dark` class) |
+| C05 | `src/lib/db/schema.ts:89-99` | `scenes` table: only orderNo, description, voiceoverScript |
+| C06 | `src/lib/db/schema.ts:102-116` | `image_prompts` table: promptText = single string |
+| C07 | `src/lib/validation/schemas.ts:27-32` | `SceneSchema`: order, description, voiceover_script, image_prompts |
+| C08 | `src/lib/validation/schemas.ts:16-20` | `ImagePromptItemSchema`: target, prompt_text, reference_filename |
+| C09 | `src/lib/ai/prompt-builder.ts:71-97` | System prompt: no transition, voice type, or audio instructions |
+| C10 | `src/lib/ai/prompt-builder.ts:35-36` | Example image prompt: basic 1-line description |
+| C11 | `src/lib/ai/prompts/scenes.system.ts:1` | Re-exports prompt-builder (no dedicated scene prompt) |
+| C12 | `src/lib/ai/prompts/image-prompts.system.ts:1` | Re-exports prompt-builder (no dedicated image prompt) |
+| C13 | `src/lib/ai/prompts/voiceover.system.ts:1` | Re-exports prompt-builder (no dedicated voiceover prompt) |
+| C14 | `src/components/generate/result-tabs.tsx:41-101` | Scene display: no transition visualization |
+| C15 | `src/components/generate/result-tabs.tsx:191-205` | Voiceover display: plain text only |
+| C16 | `src/components/generate/generate-form.tsx:23-31` | Stage labels: no audio/transition stages |
+| C17 | `src/app/api/v1/generate/route.ts:156-164` | Scene save: only orderNo, description, voiceoverScript |
+| C18 | `src/app/api/v1/projects/[id]/export/route.ts:16-17` | Export: only JSON or Markdown |
+| C19 | `src/lib/export/markdown.template.ts:41-65` | Markdown template: no transition/audio sections |
+| C20 | `package.json:50` | Next.js ^15.1.0 |
+| C21 | `package.json:81` | Tailwind CSS ^4.0.0 |
+| C22 | `package.json:47` | Drizzle ORM ^0.38.0 |
+| C23 | `package.json:25` | @libsql/client ^0.14.0 (Turso) |
+| C24 | `package.json:42` | ai ^4.0.0 (Vercel AI SDK) |
+| C25 | `package.json:51` | next-auth 5.0.0-beta.25 |
+| C26 | `package.json:48` | framer-motion ^12.40.0 |
+| C27 | `drizzle.config.ts:18` | Dialect: turso |
+| C28 | `src/lib/db/schema.ts:33-50` | `projects` table: durationType, durationTargetSeconds, styleType, aspectRatio |
+| C29 | `src/lib/db/schema.ts:70-86` | `characters` table: 9 identity fields |
+| C30 | `src/lib/db/schema.ts:135-146` | `supporting_characters` table: nama, tipe, aksi |
+| C31 | `messages/id.json:1-197` | i18n keys: no theme/audio/transition/voice type keys |
+| C32 | `messages/en.json:1-197` | i18n keys: no theme/audio/transition/voice type keys |
+| C33 | `src/components/providers.tsx:1-7` | Only SessionProvider, no ThemeProvider |
+| C34 | `src/components/common/app-header.tsx:54` | LanguageToggle exists, no ThemeToggle |
+| C35 | `src/lib/templates/titles.ts:1-18` | 8 title templates, no audio/transition presets |
+| C36 | `product-docs/PRD.md:115` | F-17 Light Mode Toggle = COULD (now promoted to MUST) |
+| C37 | `product-docs/PRD.md:671` | OOS-18 Dark/Light mode toggle = OOS V2 (now promoted to MUST) |
+| C38 | Web: studiobinder.com | Transition types: cut, dissolve, fade, wipe cover 95% use cases |
+| C39 | Web: budgetpixel.com | Image prompt structure: Subject + Composition + Camera + Lighting + Style |
+| C40 | Web: elevenlabs.io | Voice types: child, teen, adult, elderly; no SSML in v3 |
+| C41 | Web: kling.ai | Prompt formula: Subject + Movement + Scene + Cinematic |
+| C42 | Web: animationexploration.org | Sound design layering: music + SFX + ambient + voice |
 
 ---
 
-## 8. Gap Analysis
-
-### 8.1 TIDAK ADA BUKTI (Perlu Asumsi atau Konfirmasi)
-
-| ID | Gap | Dampak | Asumsi yang Diambil |
-|---|---|---|---|
-| GAP-01 | **Deskripsi user "AI document generation system" kontradiktif** dengan realita "animation prompt automation" | Landing page bisa salah describe produk | Gunakan deskripsi dari dokumen proyek (animation prompt automation) |
-| GAP-02 | **Tidak ada logo PromptFlow khusus** — hanya logo AgriNode | Branding lemah | Gunakan text-based logo "PromptFlow" dengan violet styling |
-| GAP-03 | **Tidak ada testimonial/user data** | Tidak ada social proof | Buat placeholder section, siap diisi nanti |
-| GAP-04 | **Tidak ada pricing model** | Tidak ada pricing section | Skip pricing section atau buat "Free for now" messaging |
-| GAP-05 | **Tidak ada product screenshot/mockup** | Hero tidak ada visual produk | Buat text-based hero dengan gradient/animation, atau gunakan generate form mockup |
-| GAP-06 | **Tidak ada animation library terinstall** | Butuh install framer-motion | Install framer-motion sebagai dependency baru |
-| GAP-07 | **Tidak ada OG image / meta tags untuk sharing** | Share di social media kurang menarik | Buat OG image nanti, set Metadata di layout |
-| GAP-08 | **Tidak ada analytics/tracking** | Tidak bisa track conversion | Tambahkan nanti (Vercel Analytics, GA4) |
-| GAP-09 | **Tidak ada CTA "Daftar" yang jelas** | User tidak tahu cara mulai | CTA = "Mulai Gratis" -> /register |
-| GAP-10 | **Tidak ada navbar component** | Landing page tanpa navigasi | Buat atau reuse app-header component |
-
-### 8.2 Yang SUDAH ADA (Bisa Dipakai Langsung)
-
-| # | Asset | Path | Status |
-|---|---|---|---|
-| 1 | Design tokens (warna, font, spacing) | `src/app/globals.css` | SIAP PAKAI |
-| 2 | shadcn/ui components | `src/components/ui/` | SIAP PAKAI |
-| 3 | Button component | `src/components/ui/button.tsx` | SIAP PAKAI |
-| 4 | i18n infrastructure | `next-intl` + `messages/*.json` | SIAP PAKAI |
-| 5 | Landing page basic | `src/app/[locale]/page.tsx` | PERLU REDESIGN |
-| 6 | Landing i18n keys | `messages/id.json:11-22` | PERLU EXPAND |
-| 7 | reduced-motion respect | `globals.css:74-80` | SIAP PAKAI |
-
----
-
-## 9. Asumsi
-
-| ID | Asumsi | Alasan | Dampak bila Salah |
-|---|---|---|---|
-| ASM-01 | Deskripsi produk = "animation prompt automation" (bukan "document generation") | Semua dokumen proyek konsisten | Landing page salah describe |
-| ASM-02 | Primary CTA = "Mulai Gratis" -> /register | i18n key sudah ada, flow register sudah ada | Conversion path broken |
-| ASM-03 | Secondary CTA = "Masuk" -> /login | i18n key sudah ada | — |
-| ASM-04 | Aesthetic = dark mode techno-futurist (Linear-style) | Match AI tool + purple brand | Bisa beda taste user |
-| ASM-05 | Animasi pakai Framer Motion | Standard React, fitur lengkap | Bundle tambah ~30KB |
-| ASM-06 | Landing page = `/[locale]/page.tsx` (overwrite existing) | File sudah ada, i18n sudah wired | — |
-| ASM-07 | Tidak perlu pricing section (produk free/gratis) | Tidak ada pricing info di dokumen | User mau pricing |
-| ASM-08 | Social proof = placeholder (user count, testimonial kosong) | Tidak ada data real | Page terasa kosong |
-| ASM-09 | Product demo = text-based hero (bukan screenshot) | Tidak ada screenshot produk | Kurang convincing |
-| ASM-10 | FAQ = 5-6 pertanyaan umum | Best practice 5-8 | — |
-| ASM-11 | Footer = minimal (copyright + links) | Standard SaaS pattern | — |
-| ASM-12 | Mobile-first responsive | 50%+ traffic mobile | Desktop-only |
-| ASM-13 | Bahasa default = ID, toggle EN | i18n sudah setup | — |
-| ASM-14 | Tidak perlu auth di landing page | Landing page = public | — |
-| ASM-15 | Animasi = scroll-triggered fade-in + hover effects | Standard, performa baik | User mau lebih complex |
-
----
-
-## 10. Daftar Sitasi
-
-| # | Path/URL | Klaim |
-|---|---|---|
-| S01 | `README.md:1-3` | PromptFlow = workflow engine otomasi prompt animasi AI |
-| S02 | `README.md:22` | Stack: Next.js 15 + TypeScript + Tailwind v4 + shadcn/ui + Drizzle + Turso + NextAuth v5 + Vercel AI SDK v4 + Zod + next-intl + Vitest + Playwright |
-| S03 | `package.json:22-83` | Semua dependencies dan versi |
-| S04 | `src/app/[locale]/page.tsx:1-41` | Landing page existing (basic hero + 3 cards) |
-| S05 | `messages/id.json:11-22` | i18n keys landing namespace |
-| S06 | `src/app/globals.css:1-82` | Design tokens (warna, font, spacing, dark mode, reduced-motion) |
-| S07 | `src/app/layout.tsx:5-6` | Metadata: title "PromptFlow", description "Workflow engine otomasi prompt animasi AI" |
-| S08 | `components.json:1-20` | shadcn/ui config: default style, RSC, TSX, neutral base, CSS variables |
-| S09 | `AGENTS.md S1` | Identitas proyek: web app fullstack, 9 tabel DB, 23 endpoint |
-| S10 | `BRD.md S1` | Ringkasan eksekutif + 8 fitur V2 |
-| S11 | `BRD.md S3.1` | Tujuan bisnis V2 + KPI |
-| S12 | `PRD.md S1.2` | Ringkasan produk: tipe, input, output, stack, multi-provider |
-| S13 | `PRD.md S1.3` | Value proposition V1 + V2 |
-| S14 | `PRD.md S2` | User personas: Rian, Bumi Animasi, Bu Sinta |
-| S15 | `MRD.md S2.1-2.4` | Market analysis, trends, timing |
-| S16 | `UIUX_SPEC S1.2` | Persona + implikasi UI |
-| S17 | `UIUX_SPEC S1.3` | Prinsip desain (10 prinsip) |
-| S18 | `UIUX_SPEC S1.4` | Brand voice: tone, bahasa, istilah |
-| S19 | `UIUX_SPEC S2.1` | Warna palet (14 token light + dark) |
-| S20 | `UIUX_SPEC S2.3-2.4` | Tipografi: Inter + JetBrains Mono, size scale |
-| S21 | `UIUX_SPEC S2.5` | Spacing scale (base 4px) |
-| S22 | `UIUX_SPEC S2.6` | Radius, border, shadow tokens |
-| S23 | `public/references/logo_agrinode-removebg-preview-8d857ade.png` | Logo AgriNode (bukan PromptFlow) |
-| S24 | `fiveninestrategy.com` | SaaS landing page best practices: hero, problem/solution, benefits, social proof, demo, urgency, FAQ |
-| S25 | `apexure.com` | 10 SaaS landing page best practices: attention ratio, product visuals, trust, FAQs, singular CTA, interactive features, forms, cognitive load, mobile-first, social proof |
-| S26 | `toimi.pro/blog/best-saas-website-designs/` | Top 10 SaaS website designs 2026: Linear, Stripe, Vercel, Framer, Notion, Attio, Ramp, ElevenLabs, PostHog, Anthropic |
-| S27 | `saaspo.com/industry/ai-saas-websites-inspiration` | 221 AI SaaS landing pages inspiration |
-| S28 | `brad-carter.medium.com` | Framer Motion + Intersection Observer scroll animations |
-| S29 | `rebeccamdeprey.com` | CSS scroll-driven animations (no JS) |
-| S30 | `globals.css:74-80` | `prefers-reduced-motion` sudah diimplementasi |
-
----
-
-> **Dokumen ini = sumber kebenaran untuk pembangunan landing page PromptFlow. Eksekutor harus baca dokumen ini + rujukan product-docs/ sebelum coding. Semua klaim bersitasi. Klaim tanpa bukti = ASUMSI.**
-
-**Dibuat oleh:** docgen-rag subagent
-**Tanggal:** 2026-06-20
-**Versi:** 1.0 (Landing Page Focus)
+> **Catatan:** Dokumen ini = sumber kebenaran faktual untuk pipeline docgen. Semua subagent (BRD/MRD/PRD/SRS/ARCHITECTURE) WAJIB rujuk temuan di sini, bukan mengarang. Tanpa bukti = "TIDAK ADA BUKTI".
