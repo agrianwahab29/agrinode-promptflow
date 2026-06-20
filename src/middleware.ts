@@ -6,6 +6,7 @@ import { routing } from '@/lib/i18n/config';
 const PUBLIC_PATHS = [
   '/login',
   '/register',
+  '/api/auth',
   '/api/v1/auth',
   '/api/v1/health',
   '/_next',
@@ -33,15 +34,22 @@ function checkRateLimit(key: string, limit: number, windowMs: number): { allowed
   };
 }
 
+function stripLocale(pathname: string): string {
+  const segs = pathname.split('/').filter(Boolean);
+  if (segs[0] === 'id' || segs[0] === 'en') segs.shift();
+  return '/' + segs.join('/');
+}
+
 function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const stripped = stripLocale(pathname);
+  return PUBLIC_PATHS.some((p) => stripped === p || stripped.startsWith(p + '/'));
 }
 
 function localizeUrl(pathname: string): string {
-  // If already has locale prefix, leave alone.
   const hasLocale = routing.locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
   if (hasLocale) return pathname;
-  return `/${routing.defaultLocale}${pathname === '/' ? '' : pathname}`;
+  if (pathname === '/') return `/${routing.defaultLocale}`;
+  return `/${routing.defaultLocale}${pathname}`;
 }
 
 export default auth(async function middleware(req: NextRequest) {
@@ -49,6 +57,9 @@ export default auth(async function middleware(req: NextRequest) {
 
   // Skip API auth routes entirely (NextAuth handler)
   if (pathname.startsWith('/api/v1/auth')) return NextResponse.next();
+  if (pathname.startsWith('/api/v1/register')) return NextResponse.next();
+  // NextAuth built-in routes (signin/error/callback) — must bypass our auth check
+  if (pathname.startsWith('/api/auth')) return NextResponse.next();
 
   // Public paths OK
   if (isPublic(pathname)) {

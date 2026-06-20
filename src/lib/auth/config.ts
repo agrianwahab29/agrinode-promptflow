@@ -11,7 +11,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   secret,
   trustHost: true,
   session: { strategy: 'jwt' },
-  pages: { signIn: '/id/login' },
+  pages: { signIn: '/id/login', error: '/id/login' },
   providers: [
     Credentials({
       name: 'Credentials',
@@ -22,10 +22,16 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       async authorize(creds) {
         const email = String(creds?.email ?? '').trim().toLowerCase();
         const password = String(creds?.password ?? '');
-        if (!email || !password) return null;
+        console.log('[auth] authorize called, email:', email);
+        if (!email || !password) {
+          console.log('[auth] missing email/password');
+          return null;
+        }
         const user = await findUserByEmail(email);
+        console.log('[auth] user found:', user ? user.id : 'NOT FOUND');
         if (!user) return null;
         const ok = await bcrypt.compare(password, user.passwordHash);
+        console.log('[auth] bcrypt.compare result:', ok);
         if (!ok) return null;
         return { id: String(user.id), email: user.email, name: user.name ?? user.email };
       },

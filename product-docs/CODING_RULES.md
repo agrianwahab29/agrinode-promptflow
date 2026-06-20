@@ -1,13 +1,13 @@
-# Coding Rules & Standards — PromptFlow
+# Coding Rules & Standards — PromptFlow V2
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/SRS.md` + `product-docs/DATABASE_SCHEMA.md` + `product-docs/PROJECT_ARCHITECTURE.md` + `product-docs/API_CONTRACT.md` + `product-docs/UIUX_SPEC.md` (bersitasi per klaim penting)
+> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/SRS.md V2.0` + `product-docs/DATABASE_SCHEMA.md V2.0` + `product-docs/PROJECT_ARCHITECTURE.md V2.0` + `product-docs/API_CONTRACT.md V2.0` + `product-docs/UIUX_SPEC.md V2.0`
 > **Root proyek:** `C:\laragon\www\PromptFlow`
-> **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Catatan:** Dokumen ini menurunkan SRS §4 (tech stack), §9 (keamanan), §11 (verifikasi) + PROJECT_ARCHITECTURE §5 (folder) + DATABASE_SCHEMA §8 (Drizzle) + API_CONTRACT §3/§7/§8/§9 (envelope, SSE, Zod) + UIUX_SPEC §2/§3 (tokens, komponen) menjadi aturan koding konkret & spesifik per stack. Item tanpa bukti eksplisit ditandai "ASUMSI". Identifier teknis apa adanya.
+> **GitHub:** `https://github.com/agrianwahab29/promptflow.git`
+> **Catatan:** V2 OVERWRITE V1. Pertahankan SEMUA rules V1 (L01-L30 + semua section). Update stack: AI SDK v4 (ground truth `package.json:25`). Tambah rules V2: upload flow, AI classification, story description, real-time logs, dashboard, navigation, loading/error states, GitHub, extended role classification (6 opsi), V2 security, V2 prohibitions (L31-L38).
 
 ---
 
@@ -22,7 +22,7 @@
 7. Testing
 8. Git Workflow & Commit
 9. Linting & Formatting
-10. PR Review Checklist
+10. PR Review Checklist (Definition of Done Koding)
 11. CI/CD
 12. Standar Frontend (Design Tokens & A11y)
 13. Larangan Umum
@@ -36,53 +36,59 @@
 
 Aturan koding konkret & spesifik untuk stack PromptFlow supaya agent
 eksekutor menulis kode konsisten, type-safe, aman, dan mudah dirawat. Bukan
-generik — tiap aturan tertelusur ke stack proyek. Sitasi: `SRS.md 1.1`.
+generik — tiap aturan tertelusur ke stack proyek. Sitasi: `SRS.md V2.0 1.1`.
 
-### 1.2 Stack Berlaku
+### 1.2 Stack Berlaku (V2 — GROUND TRUTH dari package.json)
 
-| Lapisan | Teknologi | Versi | Bukti |
+| Lapisan | Teknologi | Versi (package.json) | Bukti |
 |---|---|---|---|
-| Frontend + Backend | Next.js (App Router, fullstack satu repo) | stabil terkini (15+/16+) | `SRS.md 4.1` ; `RAG-CONTEXT.md 2.1` |
-| Bahasa | TypeScript (strict) | stabil terkini | `SRS.md 4.1` |
-| Styling | Tailwind CSS v4 | v4 | `SRS.md 4.1` ; `UIUX_SPEC.md 2.10` |
-| Komponen UI | shadcn/ui (copy-paste) | latest stabil | `SRS.md 4.1` ; `UIUX_SPEC.md 3.1` |
-| AI orchestration | Vercel AI SDK v6 + `@ai-sdk/openai-compatible` | v6 | `SRS.md 4.1` ; `RAG-CONTEXT.md 5.1` |
-| Validasi | Zod | stabil terkini | `SRS.md 4.1, 8.7` |
-| DB | Turso (libSQL, SQLite-compatible via HTTP) | latest | `SRS.md 4.1` ; `DATABASE_SCHEMA.md 1.1` |
-| ORM | Drizzle ORM | stabil terkini (ASUMSI) | `SRS.md 4.2 #4` ; ASUMSI SRS-A3 |
-| DB client | `@libsql/client` (di bawah Drizzle) | latest | `DATABASE_SCHEMA.md 8.3` |
-| Storage gambar | Vercel Blob | latest (ASUMSI) | ASUMSI SRS-A5 `RAG-CONTEXT.md 6` |
-| Auth | NextAuth.js (Auth.js v5+) | stabil terkini (ASUMSI) | ASUMSI SRS-A1 `RAG-CONTEXT.md 9 G2` |
-| Enkripsi | Node `crypto` (AES-256-GCM) | native (ASUMSI) | ASUMSI SRS-A4 `RAG-CONTEXT.md 11 #4` |
-| i18n | next-intl | stabil terkini (ASUMSI) | ASUMSI SRS-A2 `RAG-CONTEXT.md 9 G5` |
-| Test unit | Vitest | stabil terkini | `SRS.md 4.1, 11.1` (ASUMSI) |
-| Test e2e | Playwright | stabil terkini | `SRS.md 4.1, 11.1` (ASUMSI) |
-| Lint | ESLint + `next lint` | stabil terkini | `SRS.md 4.1, 11.1` (ASUMSI) |
-| Format | Biome (opsional) / Prettier (opsional) | stabil terkini | ASUMSI (paket konteks) |
-| Deploy | Vercel (serverless) | n/a | `RAG-CONTEXT.md 2.1` |
+| Frontend + Backend | Next.js (App Router) | ^15.1.0 | `package.json:22` |
+| Bahasa | TypeScript (strict) | ^5.7.0 | `package.json:60` |
+| Styling | Tailwind CSS v4 | ^4.0.0 | `package.json:70` |
+| Komponen UI | shadcn/ui | latest stabil | `RAG-CONTEXT.md 2.1` |
+| AI SDK | ai (Vercel AI SDK) | **^4.0.0** (CATATAN: docs sebut v6, kode = v4) | `package.json:25` |
+| AI Provider | @ai-sdk/openai-compatible | ^1.0.0 | `package.json:26` |
+| Validasi | Zod | ^3.24.0 | `package.json:27` |
+| Auth | next-auth | 5.0.0-beta.25 | `package.json:28` |
+| Auth Core | @auth/core | ^0.37.0 | `package.json:29` |
+| Password Hash | bcryptjs | ^2.4.3 | `package.json:30` |
+| DB Client | @libsql/client | ^0.14.0 | `package.json:31` |
+| ORM | drizzle-orm | ^0.38.0 | `package.json:32` |
+| ORM Kit | drizzle-kit | ^0.30.0 | `package.json:33` |
+| Storage | @vercel/blob | ^0.27.0 | `package.json:34` |
+| i18n | next-intl | ^3.26.0 | `package.json:35` |
+| Icons | lucide-react | ^0.468.0 | `package.json:36` |
+| Form | react-hook-form | ^7.54.0 | `package.json:37` |
+| Form Resolvers | @hookform/resolvers | ^3.10.0 | `package.json:38` |
+| Toast | sonner | ^1.7.0 | `package.json:39` |
+| UI Primitives | Radix UI (14 paket) | ^1.1.0–^1.2.0 | `package.json:44-57` |
+| UI Helpers | clsx + tailwind-merge + cva | ^2.1.1 / ^2.5.0 / ^0.7.1 | `package.json:41-43` |
+| DB Engine | Turso (libSQL via HTTP) | latest | `drizzle.config.ts:12` |
+| Test Unit | vitest | ^2.1.0 | `package.json:74` |
+| Test Coverage | @vitest/coverage-v8 | ^2.1.0 | `package.json:75` |
+| Test E2E | @playwright/test | ^1.49.0 | `package.json:77` |
+| Lint | eslint + eslint-config-next | ^9.17.0 / ^15.1.0 | `package.json:65-66` |
+| TS ESLint | @typescript-eslint/* | ^8.18.0 | `package.json:67-68` |
+| Format | prettier + prettier-plugin-tailwindcss | ^3.4.0 / ^0.6.0 | `package.json:78-79` |
+| Package Manager | pnpm | 11.7.0 | `package.json:81` |
+| Runtime | Node.js (server-only) | N/A | `package.json:14` |
+| V2 Baru | Recharts atau Tremor | latest stabil | Dashboard charts |
+
+> **KETIDAKSESUAIAN VERSI:** Product docs V1 menyebut AI SDK v6 tapi package.json catatan `ai: ^4.0.0`. **Kode = ground truth.** V2 pakai v4. Tidak upgrade ke v6 = out of scope V2 (`SRS.md V2.0 3.3 OOS-V2-3`).
 
 ### 1.3 Prinsip Inti
 
-1. **Type-safe by default** — TypeScript strict, no `any`, validasi input via
-   Zod di boundary (route handler, server action, LLM output). Sitasi:
-   `SRS.md 8.7`.
-2. **Secure by default** — server-only boundary di `lib/*`, API key encrypt
-   at rest (AES-256-GCM), no secret di client bundle, ownership RBAC.
-   Sitasi: `PROJECT_ARCHITECTURE.md 1.3, 9` ; `SRS.md 9.1`.
-3. **Clean code** — DRY, KISS, SOLID seperlunya, file kecil fokus, fungsi
-   pendek (<60 baris), immutability default, naming jelas.
-4. **Structured output first** — `generateObject` + Zod `PromptPackageSchema`
-   sebagai default LLM call. Fallback `streamText` + parse manual bila provider
-   tidak dukung. Sitasi: `SRS.md 4.2 #2, 8.7`.
-5. **Streaming anti-timeout** — generasi panjang via SSE. Token mulai mengalir
-   < 10s (NFR-P3). Sitasi: `SRS.md 8.1` ; `PROJECT_ARCHITECTURE.md 1.3 #3`.
-6. **Repository pattern** — akses DB lewat `lib/db/repositories/*.repo.ts`,
-   bukan query Drizzle mentah di route handler. Sitasi:
-   `PROJECT_ARCHITECTURE.md 4.2, 5`.
-7. **Design tokens WAJIB** — frontend pakai token dari `UIUX_SPEC.md 2`,
-   tidak hardcode warna/spacing/radius. Sitasi: `UIUX_SPEC.md 2.10`.
-8. **Aksesibilitas WAJIB** — WCAG 2.1 AA, keyboard nav, focus visible, ARIA.
-   Sitasi: `UIUX_SPEC.md 9` ; `PRD.md 6.6`.
+1. **Type-safe by default** — TypeScript strict, no `any`, validasi input via Zod di boundary. Sitasi: `SRS.md V2.0 8.7`.
+2. **Secure by default** — server-only boundary, API key encrypt at rest, no secret di client, ownership RBAC. Sitasi: `PROJECT_ARCHITECTURE.md V2.0 1.3, 10`.
+3. **Clean code** — DRY, KISS, SOLID seperlunya, file kecil fokus, fungsi pendek (<60 baris), immutability default.
+4. **Structured output first** — `generateObject` + Zod `PromptPackageSchema`. Fallback `streamText` + parse manual. Sitasi: `SRS.md V2.0 4.2 #2, 8.7`.
+5. **Streaming anti-timeout** — SSE token < 10s. V2 extend `log` event type. Sitasi: `SRS.md V2.0 6.5 FR-V2-05`.
+6. **Repository pattern** — akses DB lewat `lib/db/repositories/*.repo.ts`. Sitasi: `PROJECT_ARCHITECTURE.md V2.0 4.2, 5`.
+7. **Design tokens WAJIB** — frontend pakai token dari `UIUX_SPEC.md V2.0 2`. Sitasi: `UIUX_SPEC.md V2.0 2.10`.
+8. **Aksesibilitas WAJIB** — WCAG 2.1 AA. Sitasi: `UIUX_SPEC.md V2.0 9`.
+9. **V2: Vision is separate concern** — Vision LLM call di `lib/ai/image-classifier.ts`. Direct HTTP + Zod parse. BUKAN AI SDK structured output. Server-only. Sitasi: `SRS.md V2.0 6.2 FR-V2-02`.
+10. **V2: Pagination as first-class** — list endpoint WAJIB support `?page=&limit=`. Response `{data[], pagination{page, limit, total, totalPages}}`. Sitasi: `SRS.md V2.0 6.9 FR-V2-09`.
+11. **V2: Log buffer in-memory** — real-time logs buffer di memory selama SSE. Persist ke `generation_logs.logs_json` saat `done`. Sitasi: `SRS.md V2.0 6.5 FR-V2-05`.
 
 ---
 
@@ -92,141 +98,120 @@ generik — tiap aturan tertelusur ke stack proyek. Sitasi: `SRS.md 1.1`.
 
 | Tipe | Konvensi | Contoh | Bukti |
 |---|---|---|---|
-| File route handler | `route.ts` (wajib nama) | `src/app/api/v1/projects/route.ts` | `PROJECT_ARCHITECTURE.md 5` |
-| Folder route (segment) | kebab-case atau `[param]` | `api/v1/projects/[id]/route.ts` | `PROJECT_ARCHITECTURE.md 5` |
-| Folder komponen domain | kebab-case | `components/generate/`, `components/settings/` | `UIUX_SPEC.md 3.3` |
-| File komponen React (custom) | kebab-case | `prompt-card.tsx`, `provider-config-form.tsx` | `UIUX_SPEC.md 3.2` |
-| File komponen shadcn/ui | lowercase | `button.tsx`, `input.tsx`, `card.tsx` | `UIUX_SPEC.md 3.1` |
-| File lib (modul) | kebab-case | `provider-registry.ts`, `llm-client.ts`, `consistency-checker.ts` | `PROJECT_ARCHITECTURE.md 4.1, 5` |
-| File repo DB | kebab-case + `.repo.ts` | `project.repo.ts`, `provider-config.repo.ts` | `PROJECT_ARCHITECTURE.md 4.2` |
-| File prompt template | `<komponen>.system.ts` | `scenes.system.ts`, `voiceover.system.ts` | `PROJECT_ARCHITECTURE.md 5 (lib/ai/prompts)` |
-| File schema Drizzle | `schema.ts` (single source) | `src/lib/db/schema.ts` | `DATABASE_SCHEMA.md 8.1, 8.3` |
-| File Zod schema | `schemas.ts` (single source) | `src/lib/validation/schemas.ts` | `SRS.md 3.4, 8.7` |
-| File i18n messages | `<locale>.json` | `messages/id.json`, `messages/en.json` | `PROJECT_ARCHITECTURE.md 5` ; `SRS.md 5 (FR-19)` |
-| Class komponen React | PascalCase | `Button`, `PromptCard`, `SceneCard`, `ProviderConfigForm` | `UIUX_SPEC.md 3.1, 3.2` |
-| Function | camelCase | `buildProvider()`, `encrypt()`, `decrypt()`, `mask()` | `PROJECT_ARCHITECTURE.md 7.1` ; `DATABASE_SCHEMA.md 11.2` |
-| Variabel | camelCase | `providerConfig`, `apiKeyEncrypted`, `durationTargetSeconds` | `API_CONTRACT.md 3.1` |
+| File route handler | `route.ts` (wajib nama) | `src/app/api/v1/projects/route.ts` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| Folder route (segment) | kebab-case atau `[param]` | `api/v1/projects/[id]/route.ts` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| V2: Folder route baru | `api/v1/upload/classify/route.ts` | Classification endpoint | `SRS.md V2.0 8.3` |
+| V2: Folder route baru | `api/v1/dashboard/route.ts` | Dashboard enrichment | `SRS.md V2.0 8.2` |
+| Folder komponen domain | kebab-case | `components/generate/`, `components/dashboard/` | `UIUX_SPEC.md V2.0 3.3` |
+| File komponen React (custom) | kebab-case | `prompt-card.tsx`, `log-viewer.tsx` | `UIUX_SPEC.md V2.0 3.2` |
+| File komponen shadcn/ui | lowercase | `button.tsx`, `switch.tsx`, `collapsible.tsx` | `UIUX_SPEC.md V2.0 3.1` |
+| File lib (modul) | kebab-case | `provider-registry.ts`, `image-classifier.ts` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| File repo DB | kebab-case + `.repo.ts` | `project.repo.ts`, `dashboard.repo.ts` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| V2: File repo baru | `dashboard.repo.ts` | Enrichment queries | `SRS.md V2.0 6.6 FR-V2-06` |
+| File prompt template | `<komponen>.system.ts` | `scenes.system.ts` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| File schema Drizzle | `schema.ts` (single source) | `src/lib/db/schema.ts` | `DATABASE_SCHEMA.md V2.0 8.1` |
+| File Zod schema | `schemas.ts` (single source) | `src/lib/validation/schemas.ts` | `SRS.md V2.0 3.4, 8.7` |
+| File i18n messages | `<locale>.json` | `messages/id.json`, `messages/en.json` | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| Class komponen React | PascalCase | `LogViewer`, `ClassificationResult`, `MetricCard` | `UIUX_SPEC.md V2.0 3.1, 3.2` |
+| Function | camelCase | `classifyImage()`, `buildProvider()` | `PROJECT_ARCHITECTURE.md V2.0 7.1` |
+| Variabel | camelCase | `providerConfig`, `aiClassification` | `API_CONTRACT.md V2.0 3.1` |
 | Konstanta | UPPER_SNAKE_CASE | `PROVIDER_PRESETS`, `MAX_CHARACTERS_PER_PROJECT` | ASUMSI (best practice) |
-| Enum value (DB) | lowercase string | `shorts`, `tutorial`, `3D`, `2D`, `tokoh`, `background`, `utama` | `DATABASE_SCHEMA.md 4` ; `API_CONTRACT.md 8` |
-| Tabel DB | snake_case jamak | `users`, `provider_configs`, `projects`, `asset_references`, `image_prompts`, `generation_logs`, `supporting_characters` | `DATABASE_SCHEMA.md 4` |
-| Kolom DB | snake_case | `user_id`, `created_at`, `duration_target_seconds`, `api_key_encrypted`, `result_json` | `DATABASE_SCHEMA.md 4` |
-| Properti Drizzle (TS) | camelCase (mapping kolom snake) | `userId`, `projectId`, `createdAt`, `apiKeyEncrypted`, `resultJson` | `DATABASE_SCHEMA.md 8.3` |
-| Field JSON API (request/response) | camelCase | `userId`, `durationType`, `durationTargetSeconds`, `styleType`, `apiKeyMasked` | `API_CONTRACT.md 3.1` |
-| Field `PromptPackageSchema` (LLM output) | snake_case native (match PRD §8.2) | `character_profiles`, `voiceover_script`, `moral_message`, `gayarambut`, `wajah_asal`, `pakaian_atas`, `pakaian_bawah`, `alas_kaki`, `deskripsi_latar` | `API_CONTRACT.md 3.1` ; `PRD.md 8.2` ; `SRS.md 8.7` |
-| Env var | UPPER_SNAKE_CASE | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_APP_URL` | `DATABASE_SCHEMA.md 11.4` ; `SRS.md 8.2, 8.4` |
-| i18n message key | namespaced dotted | `common.save`, `generate.wizard.step1Title`, `settings.provider.apiKey`, `error.validation.titleMin` | `UIUX_SPEC.md 1.4` ; ASUMSI next-intl convention |
-| Branch git | `feature/<scope>`, `fix/<scope>`, `chore/<scope>` | `feature/provider-config`, `fix/sse-stream` | ASUMSI (best practice) |
-| Commit message | conventional commit | `feat(generate): add SSE streaming`, `fix(crypto): mask api key on update` | §8 dokumen ini |
-| Custom hook React | `use<Thing>` | `useGenerateStream`, `useTheme`, `useProjects` | `UIUX_SPEC.md 3` (implied) |
-| Test file | co-located `*.test.ts` / `*.test.tsx` | `aes.test.ts`, `prompt-builder.test.ts`, `prompt-card.test.tsx` | `SRS.md 11.1` |
-| E2E test file | `e2e/<flow>.spec.ts` | `e2e/generate-shorts.spec.ts`, `e2e/export-markdown.spec.ts` | `SRS.md 11.1` (ASUMSI Playwright convention) |
+| Enum value (DB) | lowercase string | `tokoh`, `background`, `prop`, `accessory`, `environment`, `other` | `DATABASE_SCHEMA.md V2.0 4` |
+| V2: Tipe enum extended | 6 opsi | `tokoh`, `background`, `prop`, `accessory`, `environment`, `other` | `SRS.md V2.0 6.3 FR-V2-03` |
+| Tabel DB | snake_case jamak | `users`, `provider_configs`, `projects` | `DATABASE_SCHEMA.md V2.0 4` |
+| Kolom DB | snake_case | `user_id`, `ai_classification`, `story_description`, `logs_json` | `DATABASE_SCHEMA.md V2.0 4` |
+| V2: Kolom baru DB | snake_case nullable | `story_description` (projects), `ai_classification` (asset_references), `logs_json` (generation_logs) | `DATABASE_SCHEMA.md V2.0 7.2` |
+| Properti Drizzle (TS) | camelCase (mapping kolom snake) | `userId`, `aiClassification`, `storyDescription`, `logsJson` | `DATABASE_SCHEMA.md V2.0 8.3` |
+| Field JSON API (req/res) | camelCase | `aiClassification`, `storyDescription`, `logsJson` | `API_CONTRACT.md V2.0 3.1` |
+| Field PromptPackageSchema | snake_case native | `character_profiles`, `voiceover_script`, `moral_message` | `API_CONTRACT.md V2.0 3.1` ; `PRD.md V2.0 8.2` |
+| Env var | UPPER_SNAKE_CASE | `TURSO_DATABASE_URL`, `VISION_LLM_API_KEY` | `DATABASE_SCHEMA.md V2.0 12.3` |
+| V2: Env var baru | UPPER_SNAKE_CASE | `VISION_LLM_PROVIDER`, `VISION_LLM_API_KEY`, `VISION_LLM_MODEL`, `VISION_LLM_BASE_URL` | `PROJECT_ARCHITECTURE.md V2.0 9.1` |
+| i18n message key | namespaced dotted | `generate.role.tokoh`, `dashboard.metric.totalProjects` | `UIUX_SPEC.md V2.0 1.4` |
+| Branch git | `feature/<scope>`, `fix/<scope>` | `feature/v2-upload`, `feat/v2-classification` | `SRS.md V2.0 6.10` |
+| Commit message | conventional commit | `feat(generate): add story description field` | §8 dokumen ini |
+| Custom hook React | `use<Thing>` | `useGenerateStream`, `useClassification` | ASUMSI |
+| Test file | co-located `*.test.ts` | `image-classifier.test.ts`, `log-buffer.test.ts` | `SRS.md V2.0 11.1` |
+| E2E test file | `e2e/<flow>.spec.ts` | `e2e/upload-classify-generate.spec.ts` | ASUMSI |
 
 ### 2.2 Catatan
 
-- **DB vs TS vs JSON mapping wajib eksplisit.** Drizzle schema mendefinisikan
-  kolom snake_case + properti TS camelCase via builder `integer('user_id')`
-  → `userId`. Repository layer mapping ke DTO JSON camelCase. `PromptPackageSchema`
-  field snake_case native (tidak dipetakan) karena match PRD §8.2 + dipakai
-  langsung oleh LLM. Sitasi: `DATABASE_SCHEMA.md 8.3` ; `API_CONTRACT.md 3.1, 8.4`.
-- **TIDAK ada singkatan ambigu.** `usr` → `user`, `cfg` → `config`, `tmp` →
-  `temporary`. Pengecualian: `id`, `url`, `api`, `db`, `ui` (sudah jelas).
-- **Nama file = nama default export (komponen).** `prompt-card.tsx` →
-  `PromptCard`. `provider-config-form.tsx` → `ProviderConfigForm`.
+- **DB vs TS vs JSON mapping wajib eksplisit.** Drizzle schema: kolom snake_case + properti TS camelCase. Repository layer mapping ke DTO JSON camelCase. `PromptPackageSchema` field snake_case native. Sitasi: `DATABASE_SCHEMA.md V2.0 8.3` ; `API_CONTRACT.md V2.0 3.1`.
+- **TIDAK ada singkatan ambigu.** `usr` → `user`, `cfg` → `config`. Pengecualian: `id`, `url`, `api`, `db`, `ui`.
+- **Nama file = nama default export.** `log-viewer.tsx` → `LogViewer`. `classification-result.tsx` → `ClassificationResult`.
 
 ---
 
 ## 3. Struktur Kode per Layer
 
-### 3.1 Struktur Folder Inti
+### 3.1 Struktur Folder Inti (V2)
 
-Ikut `PROJECT_ARCHITECTURE.md §5`:
+Ikut `PROJECT_ARCHITECTURE.md V2.0 5`:
 
 ```text
 PromptFlow/
-  product-docs/                      # dokumen (tidak diubah agent eksekutor)
-  drizzle/                           # output migration SQL
-  messages/                          # i18n (id.json, en.json)
-  public/
-    references/                       # dev-only upload (ASUMSI)
+  product-docs/
+  drizzle/
+  messages/ (id.json, en.json)
+  public/references/ (dev-only)
   src/
     app/
-      api/v1/                         # Route Handlers (REST + SSE)
+      api/v1/
         auth/[...nextauth]/route.ts
-        projects/route.ts
+        projects/route.ts              # V2: +pagination
         projects/[id]/route.ts
-        generate/route.ts
+        generate/route.ts              # V2: +log SSE + storyDescription
+        upload/route.ts                # V2: 6-tipe + aiClassification
+        upload/classify/route.ts       # V2 BARU
+        dashboard/stats/route.ts         # V2 BARU: /api/v1/dashboard/stats
         settings/providers/route.ts
         settings/providers/[id]/route.ts
         settings/providers/[id]/test/route.ts
-        upload/route.ts
         projects/[id]/export/route.ts
         projects/[id]/characters/route.ts
         projects/[id]/scenes/route.ts
         projects/[id]/image-prompts/route.ts
         projects/[id]/logs/route.ts
         health/route.ts
-      (dashboard)/                     # UI pages (Server Components default)
+      [locale]/
         layout.tsx
-        generate/page.tsx
-        projects/page.tsx
-        projects/[id]/page.tsx
-        settings/page.tsx
-      (auth)/
-        login/page.tsx
-      layout.tsx                       # root + i18n provider
-      page.tsx                          # redirect /generate atau /login
-      globals.css                       # Tailwind v4 + design tokens
+        (dashboard)/
+          loading.tsx, error.tsx
+          generate/loading.tsx, page.tsx
+          projects/loading.tsx, page.tsx
+          projects/[id]/loading.tsx, page.tsx
+          dashboard/loading.tsx, page.tsx
+          settings/loading.tsx, page.tsx
+        (auth)/login/page.tsx, register/page.tsx
+      layout.tsx, page.tsx, globals.css
     components/
-      ui/                               # shadcn/ui (copy-paste, jangan edit sembarangan)
-      common/                           # AppHeader, CopyButton, EmptyState, dll
-      generate/                         # WizardStep, SceneCard, ResultTabs, dll
-      projects/                         # PromptCard, list/detail
-      settings/                         # ProviderConfigForm
+      ui/ (18 shadcn components V2)
+      common/ (Pagination V2, PageLoadingSkeleton V2, PageErrorBoundary V2)
+      generate/ (LogViewer V2, ClassificationResult V2, AssetPreviewList V2, RoleBadge V2, ConfidenceBar V2, StoryDescriptionTextarea V2)
+      dashboard/ (MetricCard, WeeklyTrendChart, SuccessFailBarChart, PerProviderBreakdownTable, RecentActivityTable, StorageUsageCard)
+      projects/ (ProjectsPagination V2)
+      settings/
     lib/
-      ai/
-        provider-registry.ts            # createOpenAICompatible factory
-        prompt-builder.ts               # assemble system prompt
-        llm-client.ts                   # generateObject / streamObject + retry
-        response-parser.ts              # Zod validate + fallback parse
-        consistency-checker.ts          # FR-12 post-check
-        prompts/                        # *.system.ts templates
-      db/
-        client.ts                       # Drizzle + libSQL init
-        schema.ts                       # 9 tabel (single source)
-        repositories/                   # *.repo.ts per entitas
-      storage/blob.ts                   # Vercel Blob helper
-      auth/
-        config.ts                       # NextAuth providers, callbacks
-        middleware.ts                   # protected routes
-      crypto/aes.ts                     # AES-256-GCM encrypt/decrypt/mask
-      i18n/
-        config.ts
-        request.ts
-      validation/schemas.ts             # Zod (input + PromptPackageSchema)
+      ai/ (image-classifier.ts V2, log-buffer.ts V2, + V1 files)
+      db/ (schema.ts +3 cols, repositories/ +dashboard.repo.ts V2)
+      storage/blob.ts
+      auth/ (config.ts, middleware.ts)
+      crypto/aes.ts
+      i18n/ (config.ts, request.ts)
+      validation/schemas.ts (V2: 6-tipe + storyDescription)
       export/markdown.template.ts
-    middleware.ts                       # NextAuth + i18n + rate limit
-  drizzle.config.ts
-  next.config.ts
-  tailwind.config.ts
-  components.json                       # shadcn/ui config
-  package.json
-  tsconfig.json
-  .env.local                           # dev (TIDAK commit)
-  .env.example                         # dokumentasi env
-  .gitignore
-  README.md
+    middleware.ts
+  .env.local, .env.example, .gitignore (V2), README.md
 ```
 
-Sitasi: `PROJECT_ARCHITECTURE.md 5`.
+Sitasi: `PROJECT_ARCHITECTURE.md V2.0 5`.
 
 ### 3.2 Aturan Import
 
 **Urutan import (wajib konsisten):**
 
 ```ts
-// 1. Node/external built-in
+// 1. Server-only guard
 import 'server-only';
-import crypto from 'node:crypto';
 
 // 2. External packages (npm)
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -236,10 +221,8 @@ import { drizzle } from 'drizzle-orm/libsql';
 // 3. Internal alias (@/ = src/)
 import { db } from '@/lib/db/client';
 import { projects } from '@/lib/db/schema';
-import { encrypt, mask } from '@/lib/crypto/aes';
 
-// 4. Relative (hanya bila perlu, hindari)
-import { PromptCard } from './prompt-card';
+// 4. Relative (hindari bila bisa)
 
 // 5. Type-only import (terpisah)
 import type { ProjectDTO } from '@/lib/validation/schemas';
@@ -249,47 +232,38 @@ import type { ProjectDTO } from '@/lib/validation/schemas';
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Alias `@/` wajib | `@/lib/...`, `@/components/...` = `src/`. Konfigurasi `tsconfig.json` `paths`. | ASUMSI (Next.js convention) |
-| Absolute import utama | Hindari relative `../` lebih dari 1 level. Pakai `@/`. | ASUMSI |
-| `import 'server-only'` di lib server | `lib/ai/*`, `lib/crypto/*`, `lib/db/*`, `lib/storage/*` wajib baris pertama. Mencegah import ke Client Component. | `SRS.md 9.1 SEC-03` ; `PROJECT_ARCHITECTURE.md 9 SB-01/02` |
-| `import 'client-only'` opsional | Di file client-only (mis `useTranslations` wrapper) bila perlu. | ASUMSI |
-| Type-only import | `import type { ... }` untuk tipe murni, hilangkan dari runtime bundle. | ASUMSI (TS best practice) |
-| Barrel export selektif | `index.ts` per folder opsional. Hindari barrel besar yang mask origin. Prefer named export eksplisit. | ASUMSI |
+| Alias `@/` wajib | `@/lib/...`, `@/components/...` = `src/`. | ASUMSI |
+| `import 'server-only'` di lib server | `lib/ai/*`, `lib/crypto/*`, `lib/db/*`, `lib/storage/*`. **V2: termasuk `image-classifier.ts` dan `log-buffer.ts`.** | `SRS.md V2.0 10.1 SEC-03` |
+| Type-only import | `import type { ... }` untuk tipe murni. | ASUMSI |
 
 ### 3.3 Export: Default vs Named
 
 | Tipe file | Pola export | Contoh |
 |---|---|---|
-| Page (RSC) | `default export function Page()` wajib | `export default function GeneratePage() { ... }` |
-| Route handler | named `GET`, `POST`, `PATCH`, `DELETE`, `PUT` | `export async function POST(req: Request) { ... }` |
-| Komponen UI shadcn | default export + named sub-komponen | `export { Button }` + `export { buttonVariants }` |
-| Komponen custom | default export (komponen utama) + named (sub) | `export default PromptCard` + `export function PromptCardSkeleton()` |
-| Lib function | named export | `export function encrypt(...)`, `export function buildProvider(...)` |
-| Schema Drizzle | named export (tabel) | `export const projects = sqliteTable(...)` |
+| Page (RSC) | `default export` wajib | `export default function GeneratePage()` |
+| Route handler | named `GET`, `POST`, etc. | `export async function POST(req)` |
+| Komponen custom | default export + named sub | `export default LogViewer` |
+| Lib function | named export | `export function classifyImage()` |
+| Schema Drizzle | named export | `export const projects = sqliteTable(...)` |
 | Zod schema | named export | `export const PromptPackageSchema = z.object(...)` |
-| Type | named export (`export type`) | `export type ProjectDTO = z.infer<typeof ProjectDTOSchema>` |
-
-Sitasi: ASUMSI (Next.js + TypeScript convention).
+| Type | named export | `export type ProjectDTO = z.infer<...>` |
 
 ### 3.4 Layer Tanggung Jawab
 
 | Layer | Tanggung jawab | Bukan tanggung jawab |
 |---|---|---|
 | `app/(dashboard)/page.tsx` (RSC) | Data fetch via repo, render, metadata | Panggil LLM, decrypt, query raw Drizzle |
-| `app/api/v1/*/route.ts` | Parse request, validasi Zod, auth check, delegasi ke lib, format response envelope | Business logic kompleks, query DB mentah |
-| Server Action (di file `actions.ts` atau co-located) | Mutation dari Client Component, validasi, revalidatePath | Panggilan LLM langsung (delegasi ke lib/ai) |
-| `lib/ai/*` | Provider init, prompt build, LLM call, parse, consistency check | Render UI, akses DB mentah (delegasi ke repo) |
-| `lib/db/repositories/*` | CRUD + ownership filter `user_id` + paginate + komposit index query | Business logic LLM, render |
-| `lib/db/schema.ts` | Definisi tabel Drizzle (single source) | Query |
+| `app/api/v1/*/route.ts` | Parse request, Zod, auth, delegasi ke lib | Business logic kompleks |
+| Server Action | Mutation dari Client Component | Panggilan LLM langsung |
+| `lib/ai/*` | Provider init, prompt build, LLM call, parse, consistency check, **V2: Vision classification, log buffer** | Render UI, query DB mentah |
+| `lib/db/repositories/*` | CRUD + ownership filter + paginate + **V2: dashboard enrichment, classification update** | Business logic LLM |
+| `lib/db/schema.ts` | Definisi tabel (single source) | Query |
 | `lib/crypto/*` | Encrypt/decrypt/mask (server-only) | Akses DB, LLM |
-| `lib/validation/schemas.ts` | Zod schema (input + LLM output) | Parse LLM response (di `lib/ai/response-parser`) |
-| `lib/storage/*` | Vercel Blob put/get/del | Validasi mime (di route handler) |
-| `lib/auth/*` | NextAuth config, middleware | Business logic generate |
-| `lib/export/*` | Transform JSON → markdown | Fetch data (data sudah ada) |
-| `components/ui/*` | shadcn/ui copy-paste, jangan edit sembarangan (cuma className tuning) | Business logic |
-| `components/{generate,projects,settings,common}/*` | Presentasi + interaksi client | Data fetch langsung (via Server Action / fetch) |
+| `lib/validation/schemas.ts` | Zod schema (input + LLM output) | Parse LLM response |
+| `components/ui/*` | shadcn/ui copy-paste | Business logic |
+| `components/{generate,dashboard,projects,settings,common}/*` | Presentasi + interaksi client | Data fetch langsung |
 
-Sitasi: `PROJECT_ARCHITECTURE.md 3.2, 4` ; `SRS.md 3.2`.
+Sitasi: `PROJECT_ARCHITECTURE.md V2.0 3.2, 4` ; `SRS.md V2.0 3.2`.
 
 ---
 
@@ -327,19 +301,16 @@ Sitasi: `PROJECT_ARCHITECTURE.md 3.2, 4` ; `SRS.md 3.2`.
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| `strict: true` wajib | Semua strict check aktif. | ASUMSI (TS best practice) |
-| `noImplicitAny: true` | TIDAK boleh `any` implicit. | ASUMSI |
-| `no any` | Hindari `any`. Bila terpaksa pakai `unknown` + narrow, atau `Record<string, unknown>`. Pengecualian: third-party API tanpa type (komentar `// eslint-disable-next-line @typescript-eslint/no-explicit-any` + alasan). | ASUMSI |
-| Explicit return type public function | Function/method publik (`export`) wajib return type eksplisit. Private/helper boleh infer. | ASUMSI |
-| `interface` vs `type` | `interface` untuk object shape yang bisa di-extend/merge. `type` untuk union, mapped, conditional. Prefer `interface` bila bisa. | ASUMSI |
-| `as const` | Literal yang harus narrow (const array, object enum-like) pakai `as const`. | ASUMSI |
-| `satisfies` | Validasi tipe tanpa widen: `const x = { ... } satisfies Schema`. | ASUMSI |
-| Discriminated union | Untuk state/action bercabang: `type Result = { ok: true; data } \| { ok: false; error }`. | ASUMSI |
-| `z.infer` untuk DTO | Tipe DTO diderivasi dari Zod schema: `type ProjectDTO = z.infer<typeof ProjectDTOSchema>`. Hindari duplikasi. | `API_CONTRACT.md 8` |
-| Type dari Drizzle | `type Project = typeof projects.$inferSelect`. `type NewProject = typeof projects.$inferInsert`. | `DATABASE_SCHEMA.md 8.3` (ASUMSI Drizzle) |
-| `readonly` untuk immutable | Props komponen React `readonly`, konstanta `readonly`. | ASUMSI |
-| Non-null assertion `!` hindari | Hanya bila sudah validated (mis `process.env.X!` setelah check). Prefer guard `if (!env) throw`. | ASUMSI |
-| `unknown` bukan `any` untuk parse eksternal | Hasil `JSON.parse`, `req.json()`, response LLM = `unknown` → Zod parse. | ASUMSI |
+| `strict: true` wajib | Semua strict check aktif. | ASUMSI |
+| `no any` | Hindari `any`. Pakai `unknown` + Zod narrow. Pengecualian: third-party tanpa type (komentar `// eslint-disable` + alasan). | ASUMSI |
+| Explicit return type | Function publik wajib return type eksplisit. | ASUMSI |
+| `interface` vs `type` | `interface` untuk object extendable. `type` untuk union/mapped. | ASUMSI |
+| `as const` | Literal yang harus narrow pakai `as const`. | ASUMSI |
+| Discriminated union | Untuk state/action bercabang. | ASUMSI |
+| `z.infer` untuk DTO | Tipe DTO diderivasi dari Zod schema. | `API_CONTRACT.md V2.0 8` |
+| Type dari Drizzle | `type Project = typeof projects.$inferSelect`. | `DATABASE_SCHEMA.md V2.0 8.3` |
+| `readonly` untuk immutable | Props komponen `readonly`. | ASUMSI |
+| `unknown` bukan `any` untuk parse | `JSON.parse`, `req.json()`, response LLM = `unknown` → Zod parse. | ASUMSI |
 
 **DO:**
 
@@ -347,22 +318,15 @@ Sitasi: `PROJECT_ARCHITECTURE.md 3.2, 4` ; `SRS.md 3.2`.
 // DTO dari Zod
 export type ProjectDTO = z.infer<typeof ProjectDTOSchema>;
 
-// Drizzle infer
-type Project = typeof projects.$inferSelect;
-type NewProject = typeof projects.$inferInsert;
+// V2: ClassificationResult type dari Zod
+export type ClassificationResult = z.infer<typeof ClassificationResultSchema>;
 
-// Discriminated union
+// Discriminated union untuk SSE events
 type GenerateEvent =
-  | { type: 'progress'; stage: string; delta: string }
-  | { type: 'done'; result: PromptPackage; warnings: Warning[] }
+  | { type: 'stage'; stage: string; message: string }
+  | { type: 'log'; level: 'info'|'warn'|'error'; message: string; timestamp: string }
+  | { type: 'done'; result: PromptPackage; warnings: Warning[]; logs: LogEntry[] }
   | { type: 'error'; code: string; message: string };
-
-// as const + satisfies
-const PROVIDER_PRESETS = {
-  ollama: 'https://ollama.com/v1',
-  openrouter: 'https://openrouter.ai/api/v1',
-  '9router': 'http://localhost:20128/v1',
-} as const satisfies Record<string, string>;
 
 // Parse eksternal via unknown + Zod
 const raw: unknown = await req.json();
@@ -379,454 +343,146 @@ function build(x: any): any { ... }
 function handler(req) { ... }
 
 // ❌ type duplikasi (harus infer dari Zod)
-type ProjectDTO = { id: number; title: string; ... }; // duplikat ProjectDTOSchema
-
-// ❌ non-null tanpa guard
-const key = process.env.ENCRYPTION_KEY!;
+type ProjectDTO = { id: number; title: string; ... };
 ```
 
 ### 4.2 Next.js App Router
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Server Component default | Page/layout default RSC (tidak pakai `'use client'`). Hanya bila butuh interaksi (`useState`, `useEffect`, event handler) tambah `'use client'` di atas file. | `SRS.md 3.2 Layer 1` ; `PROJECT_ARCHITECTURE.md 1.3 #1` |
-| `'use client'` minimal | Hanya komponen interaktif (form, streaming display, toggle). Data fetch tetap RSC. Jangan bubuh `'use client'` di root layout bila tidak perlu. | `SRS.md 3.2` ; `UIUX_SPEC.md 3.2` |
-| Server Actions untuk mutation | Form submit / save / delete dari Client Component pakai Server Action (`'use server'` function). Bukan `fetch('/api/...')` manual bila internal. | `SRS.md 3.2 Layer 2` ; `API_CONTRACT.md 1.1` |
-| Route Handler untuk SSE/external | `/api/v1/generate` SSE, `/api/v1/upload` multipart, `/api/v1/export` file download, webhooks. Pakai `route.ts` + named `GET/POST/...`. | `SRS.md 7.1` ; `API_CONTRACT.md 1.1, 6` |
-| Dynamic params | `[id]` → `params: { id: string }`. Convert ke number di handler: `const id = Number(params.id); if (Number.isNaN(id)) return 400`. | `PROJECT_ARCHITECTURE.md 5` |
-| `metadata` export | Setiap page wajib `export const metadata: Metadata = { title, description }`. i18n title via `generateMetadata` + `getTranslations`. | ASUMSI (Next.js convention) |
-| `error.tsx` | Wajib di route group `(dashboard)` + root. Client Component (`'use client'`), terima `error` + `reset`. | ASUMSI (Next.js convention) |
-| `loading.tsx` | Wajib di route group + page berat (project list, detail). Skeleton UIUX_SPEC. | ASUMSI (Next.js convention) |
-| `not-found.tsx` | Wajib root + `(dashboard)`. | ASUMSI |
-| `middleware.ts` | `src/middleware.ts` gabungan NextAuth + i18n + rate limit. Export `middleware` default + `config.matcher`. | `SRS.md 9.1 SEC-11` ; `PROJECT_ARCHITECTURE.md 5, 9` |
-| `revalidatePath` / `revalidateTag` | Setelah mutation via Server Action, panggil `revalidatePath('/projects')` supaya RSC re-fetch. | ASUMSI (Next.js best practice) |
-| `cookies()` / `headers()` server-only | Baca session NextAuth di RSC/route handler via `auth()` helper. | ASUMSI NextAuth |
-| Suspense boundary | Streaming display (`ResultTabs` partial) bungkus `<Suspense fallback={<Skeleton/>}>`. | `SRS.md 7.2` ; `UIUX_SPEC.md 7.5` |
-| Edge vs Node runtime | Default Node (DB + crypto butuh Node). `export const runtime = 'nodejs'` bila eksplisit. Edge hanya untuk middleware ringan. | ASUMSI (Vercel + Turso) |
-| `export const dynamic = 'force-dynamic'` | Halaman yang baca session/cookie (dashboard list) agar tidak di-cache static. | ASUMSI |
+| Server Component default | Page/layout default RSC. Hanya `'use client'` bila butuh interaksi. | `SRS.md V2.0 3.2` |
+| `'use client'` minimal | Hanya komponen interaktif (form, streaming, toggle). | `SRS.md V2.0 3.2` |
+| Server Actions untuk mutation | Form submit dari Client Component pakai Server Action. | `SRS.md V2.0 3.2` |
+| Route Handler untuk SSE/external | `/api/v1/generate` SSE, `/api/v1/upload` multipart, `/api/v1/upload/classify` (V2). | `API_CONTRACT.md V2.0 1.1, 6` |
+| Dynamic params | `[id]` → `params: { id: string }`. Convert ke number. | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| `metadata` export | Setiap page wajib `export const metadata`. | ASUMSI |
+| `error.tsx` | **V2: Wajib di route group `(dashboard)` + root.** Client Component, terima `error` + `reset`. | `SRS.md V2.0 6.7 FR-V2-07` |
+| `loading.tsx` | **V2: Wajib di setiap page group: `/generate`, `/projects`, `/projects/[id]`, `/dashboard`, `/settings`.** | `SRS.md V2.0 6.7 FR-V2-07` |
+| Suspense boundary | **V2: wajib di projects list, dashboard, generate.** | `SRS.md V2.0 6.9 FR-V2-09` |
+| `export const dynamic = 'force-dynamic'` | Halaman yang baca session/cookie. | ASUMSI |
 
 **DO:**
 
 ```tsx
-// src/app/(dashboard)/projects/page.tsx (RSC)
-import { listProjects } from '@/lib/db/repositories/project.repo';
-import { auth } from '@/lib/auth/config';
-import { redirect } from 'next/navigation';
-import { ProjectList } from '@/components/projects/project-list';
-
-export const dynamic = 'force-dynamic';
-
-export default async function ProjectsPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect('/login');
-  const projects = await listProjects({ userId: session.user.id });
-  return <ProjectList projects={projects} />;
+// V2: loading.tsx
+export default function DashboardLoading() {
+  return <PageLoadingSkeleton variant="dashboard" />;
 }
 
-export const metadata: Metadata = { title: 'Proyek Saya | PromptFlow' };
-```
-
-```ts
-// src/app/api/v1/projects/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth/config';
-import { createProject } from '@/lib/db/repositories/project.repo';
-import { CreateProjectInputSchema, errorResponse } from '@/lib/validation/schemas';
-
-export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return errorResponse('UNAUTHORIZED', 401);
-  const raw: unknown = await req.json();
-  const parsed = CreateProjectInputSchema.safeParse(raw);
-  if (!parsed.success) return errorResponse('VALIDATION_ERROR', 400, parsed.error);
-  const project = await createProject({ ...parsed.data, userId: session.user.id });
-  return NextResponse.json({ data: project }, { status: 201 });
-}
-```
-
-**DON'T:**
-
-```tsx
-// ❌ 'use client' di page data-fetch
+// V2: error.tsx
 'use client';
-export default function ProjectsPage() {
-  const [projects, setProjects] = useState([]);
-  useEffect(() => { fetch('/api/projects').then(...) }, []);
-  return <ul>{projects.map(...)}</ul>;
+export default function DashboardError({ error, reset }: { error: Error; reset: () => void }) {
+  return <PageErrorBoundary error={error} onRetry={reset} />;
 }
-
-// ❌ fetch manual untuk internal mutation (harus Server Action)
-'use client';
-<form onSubmit={async () => { await fetch('/api/projects', { method: 'POST', body: ... }) }}>
 ```
-
----
 
 ### 4.3 React
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Function component | Hanya function component (bukan class). `function Foo() {}` atau `const Foo = () => {}`. | ASUMSI (React 19) |
-| Hooks rules | Hook hanya di top-level component/hook custom. Tidak di loop/condition/nested function. | ASUMSI (React rules) |
-| Custom hook prefix `use` | `useGenerateStream`, `useTheme`, `useProjects`. Wajib return object/array/value. | ASUMSI |
-| `useMemo` untuk expensive | Memoize derive expensive (filter sort besar). Tidak memo primitive. | ASUMSI |
-| `useCallback` untuk handler stabil | Handler yang pass ke child memoized. | ASUMSI |
-| `key` stabil & unik | List render wajib `key` stabil (id, bukan index). `key={item.id}`. | ASUMSI |
-| Effect cleanup | `useEffect` yang subscribe/timer wajib cleanup return. Hindari memory leak. | ASUMSI |
-| `useEffect` minimal | Prefer derived state / event handler. Effect = sync dengan eksternal (SSE, DOM API). | ASUMSI |
-| Props readonly | Props komponen `readonly` (via TS). | ASUMSI |
-| Composability | Komponen kecil + compose, bukan god komponen. Maks ~200 baris per komponen. | ASUMSI |
-| Server vs Client component split | Komponen berat statis = RSC. Interaktif = Client. Pisah file. | `SRS.md 3.2` |
-| `React.memo` selektif | Hanya bila profil menunjukkan re-render mahal. Default tidak memo. | ASUMSI |
-
-**DO:**
-
-```tsx
-// Komponen kecil + compose
-function SceneCard({ scene, streaming }: { scene: SceneDTO; streaming?: boolean }) {
-  return (
-    <Collapsible>
-      <CollapsibleTrigger>
-        <Badge>{scene.orderNo}</Badge>
-        <span>{scene.description}</span>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <VoiceoverBlock text={scene.voiceoverScript} />
-        <ImagePromptList items={scene.imagePrompts.characters} tipe="tokoh" />
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-```
+| Function component | Hanya function component. | ASUMSI |
+| Hooks rules | Hook hanya di top-level. | ASUMSI |
+| Custom hook prefix `use` | `useGenerateStream`, `useClassification`. | ASUMSI |
+| `useMemo`/`useCallback` selektif | Hanya expensive. | ASUMSI |
+| `key` stabil & unik | `key={item.id}`. | ASUMSI |
+| Effect cleanup | `useEffect` subscribe/timer wajib cleanup. | ASUMSI |
+| Composability | Komponen kecil + compose. Maks ~200 baris. | ASUMSI |
 
 ### 4.4 Tailwind CSS v4
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Utility-first | Susun style via class utility. Hindari CSS custom kecuali token. | `UIUX_SPEC.md 2.10` |
-| `@theme` tokens dari UIUX_SPEC | `globals.css` pakai `@theme { --color-primary: #7c3aed; ... }` sesuai UIUX_SPEC §2.10. TIDAK hardcode `bg-[#7c3aed]`. | `UIUX_SPEC.md 2.1, 2.10` |
-| Responsive prefix mobile-first | Default mobile, `sm:` `md:` `lg:` `xl:` untuk breakpoint naik. Tidak pakai `max-md:`. | `UIUX_SPEC.md 2.7, 4.1` |
-| Dark mode class | `.dark` class toggle (bukan `@media prefers-color-scheme` saja, agar user bisa override). | `UIUX_SPEC.md 2.1, 2.10` |
-| No inline style kecuali dynamic | Hindari `style={{ color: '...' }}`. Pengecualian: nilai dynamic (mis `style={{ '--progress': '${pct}%' }}`). | ASUMSI |
-| `cn()` utility | Merge class conditional pakai `cn()` (shadcn `lib/utils.ts`, `clsx` + `tailwind-merge`). | `UIUX_SPEC.md 3.1` (shadcn default) |
-| Spacing scale konsisten | `space-1` (4px) ... `space-24` (96px). Hindari arbitrary `p-[13px]`. | `UIUX_SPEC.md 2.5` |
-| Container responsif | `max-w-[1280px]` dashboard, `max-w-[768px]` wizard, `max-w-[640px]` auth, `max-w-[1536px]` landing. | `UIUX_SPEC.md 4.4` |
-| Variants via `cva` (shadcn) | Komponen shadcn pakai `cva` untuk variant (`buttonVariants`, `badgeVariants`). | `UIUX_SPEC.md 3.1` |
-| Z-index token | Pakai `z-dropdown` (1000), `z-toast` (1200), `z-modal` (1300), `z-tooltip` (1400). Hindari `z-[9999]`. | `UIUX_SPEC.md 2.9` |
-| Motion token | Durasi via `--motion-fast` (120ms), `--motion-base` (200ms), `--motion-slow` (320ms). | `UIUX_SPEC.md 2.8` |
-| `prefers-reduced-motion` | Nonaktifkan animasi non-esensial via `motion-reduce:` Tailwind variant. | `UIUX_SPEC.md 2.8, 9.5` |
-| Radius token | `rounded-sm` (4px), `rounded-md` (6px), `rounded-lg` (8px), `rounded-xl` (12px), `rounded-full`. | `UIUX_SPEC.md 2.6` |
-
-**DO:**
-
-```css
-/* globals.css */
-@import "tailwindcss";
-
-@theme {
-  --color-background: #ffffff;
-  --color-primary: #7c3aed;
-  --color-primary-foreground: #ffffff;
-  /* ... dari UIUX_SPEC 2.10 ... */
-  --radius: 6px;
-  --font-sans: Inter, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-}
-
-.dark {
-  --color-background: #0a0a0a;
-  --color-foreground: #fafafa;
-  /* ... */
-}
-```
-
-```tsx
-// cn() utility
-import { cn } from '@/lib/utils';
-<Button className={cn('w-full', isActive && 'bg-primary text-primary-foreground')} />
-```
+| Utility-first | Susun style via class utility. | `UIUX_SPEC.md V2.0 2.10` |
+| `@theme` tokens dari UIUX_SPEC | TIDAK hardcode hex. **V2: tambah token log + confidence.** | `UIUX_SPEC.md V2.0 2.1, 2.10` |
+| Responsive mobile-first | Default mobile, `sm:` `md:` `lg:` `xl:`. | `UIUX_SPEC.md V2.0 2.7` |
+| `cn()` utility | Merge class pakai `cn()`. | `UIUX_SPEC.md V2.0 3.1` |
+| Spacing scale konsisten | `space-1` (4px)...`space-24` (96px). | `UIUX_SPEC.md V2.0 2.5` |
+| Z-index/motion/radius token | Pakai token dari UIUX_SPEC. | `UIUX_SPEC.md V2.0 2.6, 2.8, 2.9` |
 
 **DON'T:**
 
 ```tsx
 // ❌ hardcode hex
 <div className="bg-[#7c3aed] text-white">
-
 // ❌ inline style statis
 <div style={{ backgroundColor: '#7c3aed' }}>
-
 // ❌ arbitrary spacing
 <div className="p-[13px]">
-
-// ❌ max- prefix (bukan mobile-first)
-<div className="max-md:flex-col">
 ```
 
 ### 4.5 shadcn/ui
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Copy-paste component | shadcn/ui = copy-paste ke `components/ui/`. Edit hanya untuk className tuning, JANGAN rubah API fundamental. | `RAG-CONTEXT.md 2.1` ; `UIUX_SPEC.md 3.1` |
-| Radix primitive | shadcn/ui dibangun di Radix UI. Pakai primitive (`@radix-ui/react-dialog`, dll) via wrapper shadcn. | ASUMSI (shadcn) |
-| Variants via `cva` | Variant (size, color) definisikan di `cva`. Jangan if/else class berantai. | `UIUX_SPEC.md 3.1` |
-| Form: react-hook-form + Zod resolver | Form pakai `react-hook-form` + `@hookform/resolvers/zod`. Schema dari `lib/validation/schemas.ts`. | `UIUX_SPEC.md 3.1 (Form)` |
-| Toast: sonner | Toast pakai `sonner` (shadcn wrapper). Panggil `toast.success(...)`, `toast.error(...)` dengan variant. | `UIUX_SPEC.md 3.1 (Toast/Sonner)` |
-| Accessibility built-in | shadcn/Radix sudah a11y (focus trap, ARIA). Jangan override `outline: none` tanpa pengganti. | `UIUX_SPEC.md 9` |
-| Icon: Lucide React | Konsisten Lucide. TIDAK campur library icon. | `UIUX_SPEC.md 8.1, 8.4` |
-| Jangan duplikasi shadcn | Bila shadcn sudah punya komponen, pakai. Jangan tulis custom Button/Input/Card baru. | ASUMSI |
-| Komponen domain custom | Komponen PromptFlow (`PromptCard`, `SceneCard`) di `components/{domain}/`, bukan `ui/`. | `UIUX_SPEC.md 3.2, 3.3` |
-
-**DO:**
-
-```tsx
-// Form dengan react-hook-form + Zod
-'use client';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateProjectInputSchema } from '@/lib/validation/schemas';
-import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-
-export function NewProjectForm({ onSubmit }: { onSubmit: (data: CreateProjectInput) => void }) {
-  const form = useForm<z.infer<typeof CreateProjectInputSchema>>({
-    resolver: zodResolver(CreateProjectInputSchema),
-    defaultValues: { title: '', durationType: 'shorts', durationTargetSeconds: 60, styleType: '3D', aspectRatio: '16:9' },
-  });
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <FormField name="title" render={({ field }) => (
-          <FormItem>
-            <FormControl><Input {...field} placeholder="Judul animasi" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-        <Button type="submit">Generate</Button>
-      </form>
-    </Form>
-  );
-}
-```
-
----
+| Copy-paste component | Edit hanya className tuning. | `RAG-CONTEXT.md V2.0 2.1` |
+| Variants via `cva` | Definisikan di `cva`. | `UIUX_SPEC.md V2.0 3.1` |
+| Form: react-hook-form + Zod resolver | `react-hook-form` + `@hookform/resolvers/zod`. | `UIUX_SPEC.md V2.0 3.1` |
+| Toast: sonner | `sonner` wrapper. | `UIUX_SPEC.md V2.0 3.1` |
+| Icon: Lucide React | Konsisten Lucide. | `UIUX_SPEC.md V2.0 8.1` |
+| V2: Komponen baru | `Switch`, `Collapsible`, `ScrollArea`, `Progress`. | `UIUX_SPEC.md V2.0 3.1` |
 
 ### 4.6 Drizzle ORM
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| `schema.ts` single source | Semua 9 tabel definisikan di `src/lib/db/schema.ts`. TIDAK ada definisi tabel tersebar. | `DATABASE_SCHEMA.md 8.1, 8.3` |
-| Repository pattern | Akses DB lewat `lib/db/repositories/*.repo.ts`. Route handler/action panggil repo, BUKAN query Drizzle mentah. | `PROJECT_ARCHITECTURE.md 4.2, 5` |
-| Transaction | Operasi multi-tabel (generate → save project + characters + scenes + image_prompts) pakai `db.transaction(async (tx) => { ... })`. | ASUMSI (Drizzle) |
-| Select explicit column | Hindari `select()` semua bila tidak perlu. `db.select({ id, title }).from(projects)`. | `DATABASE_SCHEMA.md 7.2` (result_json denormalisasi sadar) |
-| Prepared statement | Opsional untuk query panas. `db.select(...).prepare('list_projects')`. | ASUMSI |
-| Migration via `drizzle-kit` | `drizzle-kit generate` buat SQL migration di `drizzle/`. `drizzle-kit push` dev. Prod: SQL manual via `turso db shell`. | `DATABASE_SCHEMA.md 8.4` |
-| Type inference | `typeof projects.$inferSelect` / `$inferInsert`. Jangan duplikasi interface. | `DATABASE_SCHEMA.md 8.3` (ASUMSI) |
-| Ownership filter wajib | Semua query project/provider WAJIB filter `user_id`. Helper scope di repo. | `SRS.md 9.1 SEC-07` ; `DATABASE_SCHEMA.md 11.3` |
-| Soft delete filter | Query project WAJIB `WHERE deleted_at IS NULL`. Helper `listActiveProjects()`. | `DATABASE_SCHEMA.md 10.1` |
-| Tipe SQLite | `integer`, `text`, `real`, `blob`. Hindari fitur PostgreSQL-specific. Timestamp = `integer` unix epoch second (ASUMSI). | `DATABASE_SCHEMA.md 1.3` |
-| Kolom snake_case + properti TS camelCase | `integer('user_id')` → `userId`. Mapping eksplisit. | `DATABASE_SCHEMA.md 8.3` |
-| Index eksplisit | Pakai index komposit dari DATABASE_SCHEMA §5 (`idx_projects_user_created`, `idx_characters_project_nama`, dll). | `DATABASE_SCHEMA.md 5` |
-| FK + cascade | `references(() => users.id, { onDelete: 'cascade' })`. Sesuai DATABASE_SCHEMA §3.1. | `DATABASE_SCHEMA.md 3.1, 8.3` |
-| `sql` template untuk default | `default(sql\`(unixepoch())\`)` untuk timestamp. | `DATABASE_SCHEMA.md 8.3` |
+| `schema.ts` single source | **V2: 9 tabel + 3 kolom nullable baru.** | `DATABASE_SCHEMA.md V2.0 8.1` |
+| Repository pattern | Akses DB lewat `lib/db/repositories/*.repo.ts`. | `PROJECT_ARCHITECTURE.md V2.0 4.2` |
+| Transaction | Multi-tabel pakai `db.transaction()`. | ASUMSI |
+| Migration via `drizzle-kit` | `drizzle-kit generate` → `drizzle/`. | `DATABASE_SCHEMA.md V2.0 8.4` |
+| Type inference | `typeof projects.$inferSelect`. Jangan duplikasi. | `DATABASE_SCHEMA.md V2.0 8.3` |
+| Ownership filter wajib | WAJIB filter `user_id`. | `SRS.md V2.0 10.1 SEC-07` |
+| Soft delete filter | WAJIB `WHERE deleted_at IS NULL`. | `DATABASE_SCHEMA.md V2.0 10.1` |
+| Tipe SQLite | `integer`, `text`, `real`, `blob`. Timestamp = `integer` unix epoch. | `DATABASE_SCHEMA.md V2.0 1.3` |
+| Kolom snake_case + properti TS camelCase | Mapping eksplisit. | `DATABASE_SCHEMA.md V2.0 8.3` |
+| Index eksplisit | 17 indexes dari DATABASE_SCHEMA §6. | `DATABASE_SCHEMA.md V2.0 6` |
+| FK + cascade | `references(() => users.id, { onDelete: 'cascade' })`. | `DATABASE_SCHEMA.md V2.0 3.1` |
+| V2: Kolom nullable additive | `story_description`, `ai_classification`, `logs_json`. | `DATABASE_SCHEMA.md V2.0 7.2` |
+| V2: Pagination helper | `paginate({userId, page, limit})` di project.repo.ts. | `SRS.md V2.0 6.9 FR-V2-09` |
 
-**DO:**
-
-```ts
-// src/lib/db/schema.ts (excerpt)
-import { sql } from 'drizzle-orm';
-import { integer, text, sqliteTable, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
-
-export const projects = sqliteTable('projects', {
-  id: integer('id').primaryKey().autoincrement(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  durationType: text('duration_type').notNull(),
-  durationTargetSeconds: integer('duration_target_seconds').notNull(),
-  styleType: text('style_type').notNull(),
-  aspectRatio: text('aspect_ratio').notNull(),
-  resultJson: text('result_json'),
-  status: text('status').notNull().default('draft'),
-  createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
-  updatedAt: integer('updated_at').default(sql`(unixepoch())`).notNull(),
-  deletedAt: integer('deleted_at'),
-}, (t) => ({
-  userIdx: index('idx_projects_user_id').on(t.userId),
-  userCreatedIdx: index('idx_projects_user_created').on(t.userId, t.createdAt),
-}));
-```
-
-```ts
-// src/lib/db/repositories/project.repo.ts
-import 'server-only';
-import { db } from '@/lib/db/client';
-import { projects } from '@/lib/db/schema';
-import { eq, and, isNull, desc, sql } from 'drizzle-orm';
-
-export async function listActiveProjects({ userId, page = 1, limit = 20 }: {
-  userId: number; page?: number; limit?: number;
-}) {
-  const offset = (page - 1) * limit;
-  const rows = await db.select({ id: projects.id, title: projects.title, status: projects.status, createdAt: projects.createdAt })
-    .from(projects)
-    .where(and(eq(projects.userId, userId), isNull(projects.deletedAt)))
-    .orderBy(desc(projects.createdAt))
-    .limit(limit)
-    .offset(offset);
-  const total = await db.select({ count: sql<number>`count(*)` }).from(projects)
-    .where(and(eq(projects.userId, userId), isNull(projects.deletedAt)));
-  return { data: rows, pagination: { page, limit, total: total[0]?.count ?? 0, totalPages: Math.ceil((total[0]?.count ?? 0) / limit) } };
-}
-
-export async function createProject(input: { userId: number; title: string; durationType: string; durationTargetSeconds: number; styleType: string; aspectRatio: string }) {
-  const [row] = await db.insert(projects).values({ ...input, status: 'draft' }).returning();
-  return row;
-}
-```
-
-**DON'T:**
-
-```ts
-// ❌ query Drizzle mentah di route handler
-export async function POST() {
-  const rows = await db.select().from(projects).where(eq(projects.userId, 1));
-  // harus pakai repo
-}
-
-// ❌ tidak filter ownership
-const rows = await db.select().from(projects); // semua user!
-
-// ❌ tidak filter soft delete
-const rows = await db.select().from(projects).where(eq(projects.userId, userId));
-// harus: and(isNull(projects.deletedAt))
-```
-
-### 4.7 Vercel AI SDK v6
+### 4.7 Vercel AI SDK v4 (GROUND TRUTH)
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| `createOpenAICompatible` untuk multi-provider | Init via `createOpenAICompatible({ name, apiKey, baseURL, headers })`. Semua provider (Ollama cloud/OpenRouter/9router/custom). | `RAG-CONTEXT.md 5.1` ; `SRS.md 5 (FR-13)` ; `PROJECT_ARCHITECTURE.md 7.1` |
-| `generateObject` + Zod default | Structured output via `generateObject({ model, schema: PromptPackageSchema, system, messages })`. Bila provider dukung `supportsStructuredOutputs: true`. | `SRS.md 4.2 #2, 8.7` ; `API_CONTRACT.md 8.4` |
-| Fallback `streamText` + parse manual | Bila provider tidak dukung structured output → `streamText` → kumpul full text → `JSON.parse` → Zod validate. | `SRS.md 4.2 #2, 8.3` ; `PROJECT_ARCHITECTURE.md 4.1 (response-parser)` |
-| `streamObject` untuk SSE partial | Streaming partial ke client via `streamObject` → ReadableStream → SSE response. | `SRS.md 7.2` ; `API_CONTRACT.md 7` |
-| System prompt terstruktur | Template di `lib/ai/prompts/*.system.ts` per komponen (scenes, voiceover, character, image_prompts, moral). Assemble di `prompt-builder.ts`. | `SRS.md 3.2 (lib/ai/prompts)` ; `PROJECT_ARCHITECTURE.md 4.1` |
-| Inject parameter ke prompt | `reference_filename`, `style`, `aspect_ratio`, `duration_target` di-inject ke system prompt via template literal. | `SRS.md 5 (FR-06, FR-17)` ; `PROJECT_ARCHITECTURE.md 6` |
-| Server-only | `lib/ai/*` wajib `import 'server-only'`. TIDAK ada panggilan LLM dari Client Component. | `SRS.md 9.1 SEC-03` |
-| Decrypt key server-side | API key user di-decrypt di `provider-registry.ts` sebelum pass ke `createOpenAICompatible`. Plaintext hanya in-memory. | `SRS.md 5 (FR-14), 9.1 SEC-03` ; `PROJECT_ARCHITECTURE.md 7.1` |
-| Retry 3x backoff (ASUMSI) | LLM call retry 3x exponential backoff bila error transient (network, rate limit provider). | ASUMSI SRS-A14 `SRS.md 12` ; `PROJECT_ARCHITECTURE.md 10` |
-| Header provider khusus | OpenRouter: `HTTP-Referer`, `X-OpenRouter-Title` opsional via `headers` option. | `RAG-CONTEXT.md 5.3` ; `PROJECT_ARCHITECTURE.md 7.1` |
-| 9router localhost only | `http://localhost:20128/v1` hanya dev lokal. TIDAK reachable Vercel prod. Server-side only. | ASUMSI SRS-A7 `RAG-CONTEXT.md 5.2, 9 G4` |
-| Error handling provider | Catch error provider → map ke error envelope `PROVIDER_ERROR` (502) atau `TIMEOUT` (504). | `API_CONTRACT.md 9.2` |
-| Timeout stream disimpan partial | Bila timeout mid-stream, partial disimpan + warning (ASUMSI NFR-R2). | `SRS.md 7.3, 8.1` ; ASUMSI NFR-R2 |
-
-**DO:**
-
-```ts
-// src/lib/ai/provider-registry.ts
-import 'server-only';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { decrypt } from '@/lib/crypto/aes';
-import type { LanguageModel } from 'ai';
-
-export function buildProvider(cfg: {
-  provider: string; baseUrl: string; model: string;
-  apiKeyEncrypted: { iv: string; ciphertext: string; tag: string } | null;
-}): LanguageModel {
-  const apiKey = cfg.apiKeyEncrypted ? decrypt(cfg.apiKeyEncrypted) : '';
-  const headers: Record<string, string> = {};
-  if (cfg.provider === 'openrouter') {
-    headers['HTTP-Referer'] = process.env.NEXT_PUBLIC_APP_URL ?? 'https://promptflow.app';
-    headers['X-OpenRouter-Title'] = 'PromptFlow';
-  }
-  const provider = createOpenAICompatible({
-    name: cfg.provider, apiKey, baseURL: cfg.baseUrl, headers,
-  });
-  return provider(cfg.model);
-}
-```
-
-```ts
-// src/lib/ai/llm-client.ts
-import 'server-only';
-import { generateObject, streamObject } from 'ai';
-import { PromptPackageSchema } from '@/lib/validation/schemas';
-import { buildProvider } from './provider-registry';
-
-export async function generatePromptPackage(cfg, system, messages) {
-  const model = buildProvider(cfg);
-  return generateObject({
-    model,
-    schema: PromptPackageSchema,
-    system,
-    messages,
-  });
-}
-```
+| `createOpenAICompatible` | Init via `createOpenAICompatible({ name, apiKey, baseURL, headers })`. | `RAG-CONTEXT.md V2.0 5.1` |
+| `generateObject` + Zod default | `generateObject({ model, schema, system, messages })`. | `SRS.md V2.0 4.2 #2, 8.7` |
+| Fallback `streamText` + parse | Provider tidak dukung structured output → parse manual. | `SRS.md V2.0 4.2 #2` |
+| V2: Inject storyDescription | `buildUserMessage()` inject `storyDescription`. | `SRS.md V2.0 6.4 FR-V2-04` |
+| V2: Inject 6-tipe refs | Format: `hero-ref.png (tokoh), meja.jpg (prop)`. | `SRS.md V2.0 6.3 FR-V2-03` |
+| Server-only | `lib/ai/*` wajib `import 'server-only'`. | `SRS.md V2.0 10.1 SEC-03` |
+| Decrypt key server-side | Plaintext in-memory only. | `SRS.md V2.0 10.1 SEC-03` |
+| Retry 2x backoff (dari kode) | `llm-client.ts:14` | `RAG-CONTEXT.md 5.2` |
+| V2: Vision LLM = direct HTTP | `lib/ai/image-classifier.ts`. BUKAN AI SDK. Zod parse. | `SRS.md V2.0 6.2 FR-V2-02` |
 
 ### 4.8 Zod
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Zod sebagai source of truth | Schema input + DTO + LLM output di `lib/validation/schemas.ts`. Tipe diderivasi via `z.infer`. | `SRS.md 8.7` ; `API_CONTRACT.md 8` |
-| Infer type, jangan duplikasi | `type ProjectDTO = z.infer<typeof ProjectDTOSchema>`. | `API_CONTRACT.md 8` |
-| `.refine` untuk validasi custom | Business rule (shorts ≤180s) via `.refine` atau `.superRefine`. | `API_CONTRACT.md 9.2 (422)` |
-| `.transform` untuk coerce | Trim whitespace, lowercase email, convert string→number. | ASUMSI |
-| Parse input di boundary | `req.json()` → `unknown` → `Schema.safeParse(raw)`. Bila fail → 400 `VALIDATION_ERROR`. | `SRS.md 5 (FR-01)` ; `API_CONTRACT.md 9.2` |
-| Parse LLM output | LLM response → `PromptPackageSchema.safeParse(raw)`. Bila fail → fallback parse manual atau error. | `SRS.md 8.3, 8.7` ; `PROJECT_ARCHITECTURE.md 4.1 (response-parser)` |
-| Error message i18n (ASUMSI) | Pesan error bahasa aktif (ID/EN, FR-19). Map Zod error code → i18n key. | `PRD.md 5 (FR-19)` ; `UIUX_SPEC.md 1.4` |
-| `.nullable()` vs `.optional()` | `nullable` = boleh null. `optional` = boleh undefined. Sesuai DB schema. | `DATABASE_SCHEMA.md 4` |
-| `z.enum` untuk enum terbatas | `z.enum(['shorts','tutorial'])`, `z.enum(['tokoh','background'])`. | `API_CONTRACT.md 8` |
-| `.or()` untuk union | `z.enum(['16:9','9:16','1:1']).or(z.string())` (custom allowed). | `SRS.md 5 (FR-10)` |
-| Export schema + DTO | `export const FooSchema = z.object(...)` + `export type FooDTO = z.infer<typeof FooSchema>`. | ASUMSI |
-
-**DO:**
-
-```ts
-// lib/validation/schemas.ts
-import { z } from 'zod';
-
-export const CreateProjectInputSchema = z.object({
-  title: z.string().min(3).max(200).trim(),
-  durationType: z.enum(['shorts', 'tutorial']),
-  durationTargetSeconds: z.number().int().positive(),
-  styleType: z.enum(['3D', '2D']),
-  aspectRatio: z.enum(['16:9', '9:16', '1:1']).or(z.string()),
-}).refine(
-  (d) => d.durationType !== 'shorts' || d.durationTargetSeconds <= 180,
-  { message: 'shorts_max_180', path: ['durationTargetSeconds'] }
-);
-
-export type CreateProjectInput = z.infer<typeof CreateProjectInputSchema>;
-```
+| Zod sebagai source of truth | Schema di `lib/validation/schemas.ts`. Tipe via `z.infer`. | `SRS.md V2.0 8.7` |
+| Parse input di boundary | `req.json()` → `unknown` → `Schema.safeParse(raw)`. | `SRS.md V2.0 5` |
+| V2: ClassificationResultSchema | `{role: enum[6], name, description, confidence}`. | `SRS.md V2.0 6.2` |
+| V2: GenerateInputSchema extended | +`storyDescription`, +`references[].aiClassification`. | `API_CONTRACT.md V2.0 8.2` |
+| V2: 6-tipe enum | `z.enum(['tokoh','background','prop','accessory','environment','other'])`. | `SRS.md V2.0 6.3 FR-V2-03` |
 
 ### 4.9 NextAuth.js
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Config di `lib/auth/config.ts` | Providers, callbacks, session strategy. Export `auth`, `handlers`, `signIn`, `signOut`. | `PROJECT_ARCHITECTURE.md 5, 7.4` ; ASUMSI SRS-A1 |
-| Credentials provider (ASUMSI) | Fase awal credentials sederhana. Bisa ekstensi OAuth nanti. | ASUMSI SRS-A1 `RAG-CONTEXT.md 9 G2` |
-| Session JWT cookie (ASUMSI) | `session: { strategy: 'jwt' }`. Bisa Turso adapter bila DB session. | ASUMSI ARCH-A13 `PROJECT_ARCHITECTURE.md 7.4` |
-| Callbacks secure | `jwt` callback inject `user.id` ke token. `session` callback expose `user.id` ke client. | ASUMSI NextAuth |
-| `NEXTAUTH_SECRET` env wajib | Secret untuk JWT. Vercel env. | `SRS.md 9.1 SEC-12` |
-| Middleware protected routes | `lib/auth/middleware.ts` (atau gabung di `src/middleware.ts`). Protected: `/projects`, `/settings`, `/generate`, `/api/v1/*` (kecuali `/api/v1/auth/*`, `/api/v1/health`). Redirect `/login?callbackUrl=<asli>`. | `SRS.md 9.1 SEC-11` ; `API_CONTRACT.md 2.2` |
-| `auth()` helper di server | RSC + route handler baca session via `await auth()`. | ASUMSI NextAuth |
-| `useSession()` client | Client Component baca session via `useSession()` + `SessionProvider`. | ASUMSI NextAuth |
-| Password hash | Pakai `bcryptjs` (ASUMSI) atau argon2. Hash sebelum save `users.password_hash`. | `DATABASE_SCHEMA.md 9.3` |
-| Role field | `users.role` = `'user'` fase awal, ekstensi `'admin'` nanti. | `DATABASE_SCHEMA.md 4.1` |
+| Config di `lib/auth/config.ts` | Providers, callbacks, session strategy. | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| Credentials provider | Fase awal credentials. | ASUMSI SRS-A1 |
+| Session JWT cookie | `session: { strategy: 'jwt' }`. | ASUMSI |
+| `NEXTAUTH_SECRET` env wajib | Secret untuk JWT. | `SRS.md V2.0 10.1 SEC-12` |
+| Middleware protected routes | Protected: `/projects`, `/settings`, `/generate`, `/dashboard`, `/api/v1/*` (kecuali auth/health). | `SRS.md V2.0 10.1 SEC-11` |
+| Password hash | `bcryptjs` hash sebelum save. | `DATABASE_SCHEMA.md V2.0 9.3` |
 
-### 4.10 next-intl (ASUMSI)
+### 4.10 next-intl
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Message key namespaced | `common.save`, `generate.wizard.step1Title`, `settings.provider.apiKey`, `error.validation.titleMin`. Hindari flat key. | `UIUX_SPEC.md 1.4` ; ASUMSI next-intl convention |
-| `messages/id.json`, `messages/en.json` | Bundel per locale di root `messages/`. | `PROJECT_ARCHITECTURE.md 5` ; `SRS.md 5 (FR-19)` |
-| `getTranslations` server | RSC + route handler pakai `getTranslations(namespace)`. | ASUMSI next-intl |
-| `useTranslations` client | Client Component pakai `useTranslations(namespace)`. | ASUMSI next-intl |
-| Locale routing | `/[locale]/...` atau cookie-based + middleware. ASUMSI: cookie-based (TIDAK ada prefix URL). | ASUMSI SRS-A2 |
-| Locale persisten | Cookie `NEXT_LOCALE`. Toggle di header (`LanguageToggle`). | `UIUX_SPEC.md 1.3, 3.2 (LanguageToggle)` |
-| `lang` attribute | `<html lang={locale}>` ikut locale aktif. | `UIUX_SPEC.md 9.6` |
-| Konten LLM bahasa ikut judul | UI label i18n, tapi konten generate LLM bahasa sesuai input/judul (ASUMSI NFR-I2). | `SRS.md 5 (FR-19)` ; ASUMSI NFR-I2 |
-| Default locale | `id` default, `en` toggle. | `UIUX_SPEC.md 1.3` |
+| Message key namespaced | `common.*`, `generate.*`, `dashboard.*`, `error.*`. | `UIUX_SPEC.md V2.0 1.4` |
+| `messages/id.json`, `messages/en.json` | Bundel per locale. | `PROJECT_ARCHITECTURE.md V2.0 5` |
+| `getTranslations` server | RSC + route handler. | ASUMSI |
+| `useTranslations` client | Client Component. | ASUMSI |
+| Default locale | `id` default, `en` toggle. | `UIUX_SPEC.md V2.0 1.3` |
 
 ---
 
@@ -834,208 +490,162 @@ export type CreateProjectInput = z.infer<typeof CreateProjectInputSchema>;
 
 ### 5.1 Error Envelope (API)
 
-Semua error response (REST) pakai envelope:
-
 ```json
 {
-  "error": { "code": "VALIDATION_ERROR", "message": "...", "details": { } },
+  "error": { "code": "VALIDATION_ERROR", "message": "...", "details": {} },
   "traceId": "req_abc123"
 }
 ```
 
-Sitasi: `API_CONTRACT.md 3.3, 9.1`.
+Sitasi: `API_CONTRACT.md V2.0 3.3, 9.1`.
 
-| Code | HTTP | Kapan | Bukti |
-|---|---|---|---|
-| `VALIDATION_ERROR` | 400/422 | Zod fail / business validation | `API_CONTRACT.md 9.2` |
-| `UNAUTHORIZED` | 401 | No session | `API_CONTRACT.md 9.2` |
-| `FORBIDDEN` | 403 | Ownership fail | `SRS.md 9.1 SEC-07` |
-| `NOT_FOUND` | 404 | Resource tidak ada / soft deleted | `API_CONTRACT.md 9.2` |
-| `CONFLICT` | 409 | Unique constraint | `DATABASE_SCHEMA.md 4.2` |
-| `RATE_LIMITED` | 429 | Rate limit terlampaui | `SRS.md 12 SRS-A15` |
-| `PROVIDER_ERROR` | 502 | LLM gagal | `API_CONTRACT.md 9.2` |
-| `TIMEOUT` | 504 | LLM timeout | `API_CONTRACT.md 9.2` |
-| `INTERNAL` | 500 | Error tak terduga | `API_CONTRACT.md 9.2` |
-| `BAD_GATEWAY` | 502 | Blob/Turso gagal | `API_CONTRACT.md 9.2` |
-| `SERVICE_UNAVAILABLE` | 503 | Health degraded | `API_CONTRACT.md 9.2` |
+| Code | HTTP | Kapan | V1/V2 | Bukti |
+|---|---|---|---|---|
+| `VALIDATION_ERROR` | 400/422 | Zod fail / business validation | V1 | `API_CONTRACT.md V2.0 9.2` |
+| `UNAUTHORIZED` | 401 | No session | V1 | `API_CONTRACT.md V2.0 9.2` |
+| `FORBIDDEN` | 403 | Ownership fail | V1 | `SRS.md V2.0 10.1 SEC-07` |
+| `NOT_FOUND` | 404 | Resource tidak ada | V1 | `API_CONTRACT.md V2.0 9.2` |
+| `CONFLICT` | 409 | Unique constraint | V1 | `DATABASE_SCHEMA.md V2.0 4.2` |
+| `RATE_LIMITED` | 429 | Rate limit terlampaui | V1 | `SRS.md V2.0 12` |
+| `PROVIDER_ERROR` | 502 | LLM gagal | V1 | `API_CONTRACT.md V2.0 9.2` |
+| `TIMEOUT` | 504 | LLM timeout | V1 | `API_CONTRACT.md V2.0 9.2` |
+| **`CLASSIFICATION_ERROR`** | **502** | **Vision LLM gagal** | **V2** | `PRD.md V2.0 9.3` |
+| `INTERNAL` | 500 | Error tak terduga | V1 | `API_CONTRACT.md V2.0 9.2` |
 
-### 5.2 Pola try/catch per Boundary
+### 5.2 Pola try/catch
 
-| Layer | Pola | Bukti |
-|---|---|---|
-| Route handler | `try { ... } catch (e) { return errorResponse(...) }`. Jangan swallow. | ASUMSI |
-| Server Action | `try { ... return { ok: true, data } } catch (e) { return { ok: false, error: '...' } }`. | ASUMSI |
-| Lib (ai, db, crypto) | Throw typed error (`AppError`), jangan catch di sini kecuali retry. | ASUMSI |
-| Client Component | Catch fetch/Server Action result → toast error (`sonner`). | `UIUX_SPEC.md 3.1 (Toast)` |
+| Layer | Pola |
+|---|---|
+| Route handler | `try { ... } catch (e) { return errorResponse(...) }` |
+| Server Action | `try { return { ok: true, data } } catch { return { ok: false, error } }` |
+| Lib | Throw typed `AppError`. |
+| Client Component | Catch → toast error (`sonner`). |
 
-### 5.3 Custom Error Class (ASUMSI)
-
-```ts
-// src/lib/errors.ts
-export class AppError extends Error {
-  constructor(
-    public code: string,
-    public status: number,
-    message: string,
-    public details?: Record<string, unknown>,
-  ) { super(message); this.name = 'AppError'; }
-}
-
-export function errorResponse(code: string, status: number, zodError?: unknown) {
-  const message = mapCodeToMessage(code);
-  const details = zodError ? { fields: zodError } : undefined;
-  return NextResponse.json({ error: { code, message, details }, traceId: crypto.randomUUID() }, { status });
-}
-```
-
-### 5.4 Tidak Boleh Swallow
+### 5.3 Tidak Boleh Swallow
 
 - ❌ `catch (e) {}` kosong.
-- ❌ `catch (e) { console.log(e) }` tanpa rethrow / return error.
-- ✅ `catch (e) { console.error('[generate]', e); throw new AppError('INTERNAL', 500, '...') }`.
+- ❌ `catch (e) { console.log(e) }` tanpa rethrow.
+- ✅ `catch (e) { console.error('[scope]', e); throw new AppError('INTERNAL', 500, '...') }`.
 
-### 5.5 Logging
+### 5.4 Logging
 
 | Konteks | Pola | Bukti |
 |---|---|---|
-| Structured log | `console.error('[scope]', { ...context })` JSON-friendly. | ASUMSI |
-| `generation_logs` DB | Log tiap generate: provider, model, duration_ms, status, error_message. KPI K5. | `DATABASE_SCHEMA.md 4.8` ; `BRD.md 3.2` |
-| Tidak bocor data sensitif | ❌ `console.log(apiKey)`, `console.log(user.password_hash)`. ✅ `console.log('[auth] user id:', userId)`. | `SRS.md 9.1 SEC-01/02` |
-| Trace ID | `crypto.randomUUID()` per request, pass ke `traceId` error envelope + log. | `API_CONTRACT.md 3.3` |
-| `error.tsx` UI | Route group `(dashboard)` + root wajib `error.tsx` (Client Component). Tampilkan fallback + retry button. | ASUMSI Next.js |
-| Toast client | Error client → `toast.error(t('error.generic'))` (sonner). | `UIUX_SPEC.md 3.1, 13` |
-| `aria-live` error | Toast error `aria-live="assertive"`, status `role="alert"`. | `UIUX_SPEC.md 9.3` |
+| Structured log | `console.error('[scope]', { ...context })`. | ASUMSI |
+| `generation_logs` DB | **V2: +`logs_json` array.** | `DATABASE_SCHEMA.md V2.0 4.8` |
+| Tidak bocor data sensitif | ❌ `console.log(apiKey)`. | `SRS.md V2.0 10.1 SEC-01` |
+| **V2: Log buffer** | In-memory array per request. Drain ke SSE `log` event. Persist saat `done`. | `SRS.md V2.0 6.5 FR-V2-05` |
+| **V2: Log sanitization** | Log lines di-escape HTML sebelum render di LogViewer. | `PROJECT_ARCHITECTURE.md V2.0 10 SB-16` |
 
 ---
 
 ## 6. Keamanan Koding
 
-### 6.1 Tabel Keamanan Koding
+### 6.1 Tabel Keamanan Koding (V1 + V2)
 
-| ID | Aturan | Implementasi | Bukti |
+| ID | Aturan | V1/V2 | Bukti |
 |---|---|---|---|
-| SEC-C01 | API key user encrypt at rest | AES-256-GCM `lib/crypto/aes.ts`. `encrypt()` sebelum save DB, `decrypt()` server-side only di `provider-registry.ts`. | `SRS.md 9.1 SEC-01` ; `DATABASE_SCHEMA.md 11.1` |
-| SEC-C02 | API key TIDAK expose ke client | Response API `apiKeyMasked` = `****` + 4 char terakhir (`mask()` helper). TIDAK return ciphertext/plaintext. | `SRS.md 9.1 SEC-02` ; `API_CONTRACT.md 6.5` |
-| SEC-C03 | Server-only provider call | `lib/ai/*` wajib `import 'server-only'`. TIDAK ada panggilan LLM dari Client Component. | `SRS.md 9.1 SEC-03` ; `PROJECT_ARCHITECTURE.md 9 SB-01` |
-| SEC-C04 | Server-only crypto | `lib/crypto/aes.ts` `import 'server-only'`. Decrypt hanya di `provider-registry.ts`. | `SRS.md 9.1 SEC-03` ; `PROJECT_ARCHITECTURE.md 9 SB-02` |
-| SEC-C05 | No hardcoded secret | API key, JWT secret, encryption key WAJIB dari env (`process.env.*`). TIDAK ada literal di kode. `.env.example` dokumentasi tanpa value. | `SRS.md 9.1 SEC-08` |
-| SEC-C06 | Env wajib ada + check | `if (!process.env.ENCRYPTION_KEY) throw new Error('Missing ENCRYPTION_KEY')` di init. | ASUMSI (fail fast) |
-| SEC-C07 | Parameterized query | Drizzle ORM bawaan parameterized. TIDAK ada string concat SQL (`db.run(\`SELECT * WHERE id=${x}\`)`). | `DATABASE_SCHEMA.md 8.3` (ASUMSI) |
-| SEC-C08 | Input validation Zod | Semua input dari client (`req.json()`, form, query) WAJIB Zod parse di boundary. Bila fail → 400. | `SRS.md 9.1 SEC-06` ; `API_CONTRACT.md 8` |
-| SEC-C09 | Output sanitization (XSS) | `title` & field teks: escape HTML (`<>"'&`) sebelum inject ke prompt LLM atau render. React auto-escape JSX, tapi hati-hati `dangerouslySetInnerHTML` (hindari). | `SRS.md 9.1 SEC-06` |
-| SEC-C10 | RBAC ownership check | Semua query project/provider WAJIB filter `user_id = session.user.id`. Server check di repo + route handler. | `SRS.md 9.1 SEC-07` ; `DATABASE_SCHEMA.md 11.3` |
-| SEC-C11 | Protected routes middleware | `src/middleware.ts` proteksi `/projects`, `/settings`, `/generate`, `/api/v1/*` (kecuali auth/health). Redirect `/login`. | `SRS.md 9.1 SEC-11` ; `API_CONTRACT.md 2.2` |
-| SEC-C12 | CSRF protection | Next.js built-in Server Actions CSRF + NextAuth CSRF token. Jangan disable. | `SRS.md 9.1 SEC-05` |
-| SEC-C13 | HTTPS only | Vercel default. TIDAK ada `http://` di prod (kecuali 9router localhost dev). | `SRS.md 9.1 SEC-09` |
-| SEC-C14 | 9router localhost only | `http://localhost:20128/v1` hanya dev. Server-side only. Validasi: bila prod, reject 9router config. | ASUMSI SRS-A7 `RAG-CONTEXT.md 5.2` |
-| SEC-C15 | No secret in client bundle | `NEXT_PUBLIC_*` = boleh expose. Selain itu TIDAK boleh di Client Component. Periksa `next build` tidak leak. | ASUMSI (Next.js) |
-| SEC-C16 | Rate limit generate | ASUMSI 10 req/min/user via middleware. Header `X-RateLimit-*`. | `SRS.md 12 SRS-A15` ; `API_CONTRACT.md 10` |
-| SEC-C17 | File upload validation | `/api/v1/upload` validasi mime `image/*`, max size 10MB (ASUMSI). TIDAK trust `Content-Type` saja — cek magic bytes bila perlu. | `SRS.md 5 (FR-17)` ; ASUMSI |
-| SEC-C18 | Dependency audit | `npm audit` / Dependabot. Fix vuln high+ sebelum release. | ASUMSI (best practice) |
-| SEC-C19 | Password hash | `bcryptjs` hash (10 rounds) sebelum save `users.password_hash`. TIDAK plaintext. | `DATABASE_SCHEMA.md 9.3` |
-| SEC-C20 | Session expiry | NextAuth JWT refresh. ASUMSI 30 hari idle. | ASUMSI `API_CONTRACT.md 2.1` |
-| SEC-C21 | CORS same-origin | Fase awal same-origin (app fullstack). TIDAK enable cross-origin API. | `API_CONTRACT.md 11.3` |
+| SEC-C01 | API key encrypt at rest (AES-256-GCM) | V1 | `SRS.md V2.0 10.1 SEC-01` |
+| SEC-C02 | API key TIDAK expose ke client (`****` + 4 char) | V1 | `SRS.md V2.0 10.1 SEC-02` |
+| SEC-C03 | Server-only provider call (`import 'server-only'`). **V2: +`image-classifier.ts`** | V1+V2 | `SRS.md V2.0 10.1 SEC-03` |
+| SEC-C04 | Server-only crypto | V1 | `SRS.md V2.0 10.1 SEC-03` |
+| SEC-C05 | No hardcoded secret (env only) | V1 | `SRS.md V2.0 10.1 SEC-08` |
+| SEC-C06 | Env wajib ada + check di init | V1 | ASUMSI |
+| SEC-C07 | Parameterized query (Drizzle) | V1 | `DATABASE_SCHEMA.md V2.0 8.3` |
+| SEC-C08 | Input validation Zod di boundary | V1 | `SRS.md V2.0 10.1 SEC-06` |
+| SEC-C09 | Output sanitization (XSS). **V2: +`storyDescription`** | V1+V2 | `SRS.md V2.0 10.1 SEC-06` |
+| SEC-C10 | RBAC ownership check (`user_id`). **V2: +asset_references** | V1+V2 | `SRS.md V2.0 10.1 SEC-07` |
+| SEC-C11 | Protected routes middleware | V1 | `SRS.md V2.0 10.1 SEC-11` |
+| SEC-C12 | CSRF protection | V1 | `SRS.md V2.0 10.1 SEC-05` |
+| SEC-C13 | HTTPS only | V1 | `SRS.md V2.0 10.1 SEC-09` |
+| SEC-C14 | 9router localhost only (dev) | V1 | ASUMSI SRS-A7 |
+| SEC-C15 | No secret in client bundle | V1 | ASUMSI |
+| SEC-C16 | Rate limit generate (10 req/min) | V1 | `SRS.md V2.0 12` |
+| SEC-C17 | File upload validation (mime + size) | V1 | `SRS.md V2.0 9.1` |
+| SEC-C18 | Dependency audit | V1 | ASUMSI |
+| SEC-C19 | Password hash (bcryptjs) | V1 | `DATABASE_SCHEMA.md V2.0 9.3` |
+| SEC-C20 | Session expiry | V1 | ASUMSI |
+| SEC-C21 | CORS same-origin | V1 | `API_CONTRACT.md V2.0 11.3` |
+| **SEC-C22** | **Vision LLM key env-only (bukan user input)** | **V2** | `PROJECT_ARCHITECTURE.md V2.0 10 SB-14` |
+| **SEC-C23** | **Story description max 500 char validated** | **V2** | `SRS.md V2.0 6.4 FR-V2-04` |
+| **SEC-C24** | **Log buffer sanitization (escape HTML)** | **V2** | `PROJECT_ARCHITECTURE.md V2.0 10 SB-16` |
+| **SEC-C25** | **Orphan asset cleanup** | **V2** | `API_CONTRACT.md V2.0 6.6` |
 
 ### 6.2 Checklist Keamanan per PR
 
-- [ ] Tidak ada `any` yang leak input mentah ke LLM/DB
+- [ ] Tidak ada `any` leak input ke LLM/DB
 - [ ] Semua input via Zod parse
 - [ ] Semua query filter `user_id`
-- [ ] API key di encrypt sebelum save, mask di response
+- [ ] API key encrypt sebelum save, mask di response
 - [ ] Tidak ada `console.log` secret
-- [ ] `import 'server-only'` di `lib/ai/*`, `lib/crypto/*`, `lib/db/*`
+- [ ] `import 'server-only'` di lib server
 - [ ] Tidak ada hardcoded secret
 - [ ] File upload validasi mime + size
 - [ ] Error envelope konsisten
-- [ ] CSRF (Server Action / NextAuth) aktif
+- [ ] CSRF aktif
+- [ ] **V2: Vision LLM key dari env, bukan user input**
+- [ ] **V2: `storyDescription` max 500 char validated**
+- [ ] **V2: Log lines escaped sebelum render**
 
 ---
 
 ## 7. Testing
 
-### 7.1 Strategi Test
+### 7.1 Strategi Test (V2)
 
-| Level | Tool | Scope | Target coverage | Bukti |
+| Level | Tool | Scope | Target | Bukti |
 |---|---|---|---|---|
-| Unit | Vitest | `lib/ai`, `lib/db`, `lib/crypto`, `lib/validation`, `lib/storage`, `lib/export` | >= 80% (ASUMSI) | `SRS.md 11.1` |
-| Integration | Vitest + Turso test DB | API route handlers + Server Actions + DB query | >= 70% (ASUMSI) | `SRS.md 11.1` |
-| E2E | Playwright | Flow: login → set provider → generate Shorts → save → export JSON; upload referensi → generate Tutorial → export markdown | Critical path 100% | `SRS.md 11.1` |
-| Lint | ESLint + tsc | Seluruh `src/` | 0 error, 0 warning (ASUMSI strict) | `SRS.md 11.1` |
+| Unit | Vitest | `lib/ai`, `lib/db`, `lib/crypto`, `lib/validation`, `lib/storage`, `lib/export` | >= 80% | `SRS.md V2.0 11.1` |
+| Integration | Vitest + Turso test DB | API route handlers + Server Actions | >= 70% | `SRS.md V2.0 11.1` |
+| E2E | Playwright | login → set provider → upload + classify → generate → save → export | 100% critical | `SRS.md V2.0 11.1` |
+| Lint | ESLint + tsc | `src/` | 0 error, 0 warning | `SRS.md V2.0 11.1` |
+| a11y | axe (Playwright) | WCAG 2.1 AA | 0 violation | `UIUX_SPEC.md V2.0 9` |
 
 ### 7.2 Aturan Test
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| Co-located unit test | `*.test.ts` / `*.test.tsx` di samping file (atau `__tests__/`). `aes.test.ts` di `lib/crypto/`. | ASUMSI (Vitest convention) |
-| E2E folder `e2e/` | `e2e/<flow>.spec.ts` di root. Playwright config `playwright.config.ts`. | ASUMSI (Playwright convention) |
-| Mocking | Mock Drizzle (`vi.mock('@/lib/db/client')`) + AI SDK (`vi.mock('ai')`) di unit. Pakai Turso test DB di integration. | ASUMSI |
-| AAA pattern | Arrange-Act-Assert. Satu test satu perilaku. | ASUMSI |
-| Test naming | `describe('encrypt')` + `it('should encrypt and decrypt roundtrip', ...)` atau `it('mengembalikan ciphertext berbeda dari plaintext', ...)`. | ASUMSI |
-| Snapshot selektif | Snapshot hanya untuk output stabil (markdown template). Hindari snapshot komponen (mudah false positive). | ASUMSI |
-| `beforeEach` reset | Reset mock + DB test state di `beforeEach`. | ASUMSI |
-| Coverage gate | CI gagal bila coverage < 80% (ASUMSI). Lapor via `vitest --coverage`. | `SRS.md 11.1` |
-| Test i18n | Unit test validasi i18n key ada di kedua locale (id/en). | ASUMSI |
-| Test a11y | E2E Playwright + axe-playwright untuk critical flow. Target 0 violation AA. | `UIUX_SPEC.md 9.1, 9.7` |
-| Test data | Factory functions (`factories.ts`) untuk User, Project, ProviderConfig. Hindari duplikasi setup. | ASUMSI |
-| No skip test | `it.skip` wajib alasan + issue link. Jangan akumulasi. | ASUMSI |
-| Stream test | Mock `streamObject` return ReadableStream fake. Assert SSE event sequence. | ASUMSI |
+| Co-located | `*.test.ts` di samping file. | ASUMSI |
+| E2E folder `e2e/` | `e2e/<flow>.spec.ts`. | ASUMSI |
+| Mocking | Mock Drizzle + AI SDK di unit. Turso test DB di integration. **V2: mock Vision LLM.** | ASUMSI |
+| AAA pattern | Arrange-Act-Assert. | ASUMSI |
+| Coverage gate | CI gagal bila < 80%. | `SRS.md V2.0 11.1` |
+| No skip test | `it.skip` wajib alasan + issue link. | ASUMSI |
+| Stream test | Mock `streamObject`. Assert SSE event sequence. **V2: assert `log` event.** | ASUMSI |
+| **V2: Classification test** | Unit `classifyImage()` round-trip. Mock Vision LLM. | `SRS.md V2.0 13.2 AC-V2-02` |
+| **V2: Log buffer test** | Unit push/drain/persist. | `SRS.md V2.0 13.2 AC-V2-05` |
+| **V2: Pagination test** | Unit paginate. E2E page navigation. | `SRS.md V2.0 13.2 AC-V2-09` |
+| **V2: Dashboard test** | Unit `dashboard.repo.ts`. E2E load <= 1.5s. | `SRS.md V2.0 13.2 AC-V2-06` |
 
 ### 7.3 Contoh Test
 
 ```ts
-// lib/crypto/aes.test.ts
-import { describe, it, expect, beforeAll } from 'vitest';
-import { encrypt, decrypt, mask } from './aes';
-
-describe('aes', () => {
-  beforeAll(() => { process.env.ENCRYPTION_KEY = Buffer.alloc(32, 1).toString('base64'); });
-
-  it('roundtrips encrypt → decrypt', () => {
-    const enc = encrypt('sk-or-v1-xxxxx');
-    expect(enc.ciphertext).not.toBe('sk-or-v1-xxxxx');
-    expect(decrypt(enc)).toBe('sk-or-v1-xxxxx');
-  });
-
-  it('mask returns **** + last 4', () => {
-    expect(mask('sk-or-v1-abcde')).toBe('****bcde');
-    expect(mask('ab')).toBe('****');
-  });
-});
-```
-
-```ts
-// lib/validation/schemas.test.ts
+// V2: image-classifier.test.ts
 import { describe, it, expect } from 'vitest';
-import { CreateProjectInputSchema } from './schemas';
+import { classifyImage } from './image-classifier';
 
-describe('CreateProjectInputSchema', () => {
-  it('rejects title < 3', () => {
-    const r = CreateProjectInputSchema.safeParse({ title: 'ab', durationType: 'shorts', durationTargetSeconds: 60, styleType: '3D', aspectRatio: '16:9' });
-    expect(r.success).toBe(false);
-  });
-
-  it('rejects shorts > 180s', () => {
-    const r = CreateProjectInputSchema.safeParse({ title: 'Valid Title', durationType: 'shorts', durationTargetSeconds: 250, styleType: '3D', aspectRatio: '16:9' });
-    expect(r.success).toBe(false);
+describe('classifyImage', () => {
+  it('should classify character image', async () => {
+    const result = await classifyImage('https://blob.example/hero.png');
+    expect(result.role).toBe('tokoh');
+    expect(result.confidence).toBeGreaterThan(0.7);
   });
 });
 ```
 
 ```ts
-// e2e/generate-shorts.spec.ts
-import { test, expect } from '@playwright/test';
+// V2: log-buffer.test.ts
+import { describe, it, expect } from 'vitest';
+import { LogBuffer } from './log-buffer';
 
-test('generate shorts flow', async ({ page }) => {
-  await page.goto('/login');
-  await page.fill('[name=email]', 'demo@promptflow.local');
-  await page.fill('[name=password]', 'demo123');
-  await page.click('button[type=submit]');
-  await page.waitForURL('/generate');
-  await page.fill('[name=title]', 'Petualangan Hutan');
-  await page.click('text=Lanjut');
-  // ... step wizard ...
-  await page.click('text=Generate');
-  await expect(page.locator('[data-testid=result-tabs]')).toBeVisible({ timeout: 60000 });
+describe('LogBuffer', () => {
+  it('should push and drain logs', () => {
+    const buf = new LogBuffer();
+    buf.push('info', '[generate] Starting...');
+    const logs = buf.drain();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].level).toBe('info');
+  });
 });
 ```
 
@@ -1047,117 +657,54 @@ test('generate shorts flow', async ({ page }) => {
 
 | Branch | Tujuan | Bukti |
 |---|---|---|
-| `main` | Production-ready. Deploy Vercel prod. Hanya via PR merge. TIDAK push langsung. | ASUMSI (best practice) |
-| `feature/<scope>` | Fitur baru (`feature/provider-config`, `feature/sse-generate`). | ASUMSI |
-| `fix/<scope>` | Bug fix (`fix/sse-stream`, `fix/crypto-mask`). | ASUMSI |
-| `chore/<scope>` | Non-feature (`chore/deps`, `chore/lint-config`). | ASUMSI |
-| `docs/<scope>` | Dokumen (`docs/coding-rules`). | ASUMSI |
-| `refactor/<scope>` | Refactor tanpa behavior change. | ASUMSI |
-| `test/<scope>` | Test only. | ASUMSI |
-| `ci/<scope>` | CI/CD config. | ASUMSI |
-| `perf/<scope>` | Performance. | ASUMSI |
-| `style/<scope>` | Formatting/style only. | ASUMSI |
+| `main` | Production-ready. Hanya via PR. | ASUMSI |
+| `feature/<scope>` | Fitur baru. **V2: `feat/v2-upload`, `feat/v2-classification`, `feat/v2-logs`, `feat/v2-dashboard`, `feat/v2-navigation`, `feat/v2-github`.** | `SRS.md V2.0 6.10` |
+| `fix/<scope>` | Bug fix. | ASUMSI |
+| `chore/<scope>` | Non-feature. | ASUMSI |
 
 ### 8.2 Conventional Commits
 
-Format: `type(scope): subject\n\nbody\n\nfooter`
+Format: `type(scope): subject`
 
-| Type | Penggunaan | Bukti |
-|---|---|---|
-| `feat` | Fitur baru | ASUMSI (Conventional Commits) |
-| `fix` | Bug fix | ASUMSI |
-| `docs` | Dokumen | ASUMSI |
-| `refactor` | Refactor tanpa behavior change | ASUMSI |
-| `test` | Test only | ASUMSI |
-| `chore` | Build, deps, config, tooling | ASUMSI |
-| `perf` | Performance | ASUMSI |
-| `style` | Formatting, whitespace, typo | ASUMSI |
-| `ci` | CI/CD config | ASUMSI |
-| `build` | Build system | ASUMSI |
-| `revert` | Revert commit | ASUMSI |
-
-- `scope` opsional tapi disarankan (`feat(generate):`, `fix(crypto):`).
+- `scope` opsional tapi disarankan.
 - `subject` imperative mood, lowercase, ≤72 char, no period.
-- `body` opsional, jelaskan why (bukan what).
-- `footer` `BREAKING CHANGE:` untuk breaking, atau `Closes #123` issue link.
+- `body` opsional, jelaskan why.
 
 **Contoh:**
 
 ```
-feat(generate): add SSE streaming for prompt package
+feat(generate): add story description field to generate form
 
-Pakai streamObject untuk partial output ke client. Token mulai mengalir <10s
-sesuai NFR-P3. Fallback streamText + parse JSON bila provider tidak dukung
-structured output.
-
+Tambah field storyDescription (opsional, max 500 char) di
+GenerateInputSchema dan generate form. Inject ke buildUserMessage().
 Closes #42
-```
-
-```
-fix(crypto): mask api key on provider update
-
-PATCH provider tanpa apiKey field tidak boleh overwrite. Tambah guard bila
-apiKey kosong skip encrypt.
-
-BREAKING CHANGE: response field apiKeyEncrypted diganti apiKeyMasked
 ```
 
 ### 8.3 Atomic Commit
 
-- Satu commit = satu perubahan logis. Jangan campur fitur + formatting + deps.
-- Bila perubahan besar, pecah jadi beberapa commit kecil.
-- Stage hanya file relevan (`git add <file>`), hindari `git add .` kecuali clean.
+- Satu commit = satu perubahan logis.
+- Stage hanya file relevan (`git add <file>`).
 
-### 8.4 PR Template (ASUMSI)
+### 8.4 PR Template
 
 ```markdown
 ## Deskripsi
-
 [apa yang diubah + why]
 
-## Tipe
-
-- [ ] feat
-- [ ] fix
-- [ ] refactor
-- [ ] docs
-- [ ] test
-- [ ] chore
-
 ## Checklist
-
 - [ ] Type-safe (tsc --noEmit pass)
 - [ ] No `any`
 - [ ] Input validation (Zod)
-- [ ] Ownership check (`user_id`)
+- [ ] Ownership check (user_id)
 - [ ] No hardcoded secret
 - [ ] Test added (coverage >= 80%)
-- [ ] Doc updated
 - [ ] A11y (WCAG AA)
 - [ ] i18n key (id + en)
-- [ ] Lint pass (ESLint 0 warning)
-
-## Test
-
-[cara test, hasil]
-
-## Breaking Change
-
-- [ ] Tidak ada
-- [ ] Ada (sebut)
+- [ ] Lint pass
 
 ## Issue
-
 Closes #...
 ```
-
-### 8.5 Review
-
-- Minimal 1 review approval sebelum merge `main` (ASUMSI).
-- Reviewer cek §10 checklist.
-- Squash merge (ASUMSI) ke `main`, conventional commit subject dipertahankan.
-
-Sitasi: ASUMSI (Conventional Commits + best practice GitHub).
 
 ---
 
@@ -1167,169 +714,102 @@ Sitasi: ASUMSI (Conventional Commits + best practice GitHub).
 
 | Aturan | Detail | Bukti |
 |---|---|---|
-| `next lint` | Next.js default ESLint config (`@next/eslint-config-next`). | `SRS.md 4.1, 11.1` (ASUMSI) |
-| TypeScript rules | `@typescript-eslint/no-explicit-any` (error), `@typescript-eslint/no-unused-vars` (error, except `_` prefix), `@typescript-eslint/consistent-type-imports` (warn). | ASUMSI |
-| Import order | `eslint-plugin-import` sort: external → internal (`@/`) → relative → type. Sesuaikan §3.2. | ASUMSI |
-| Accessibility | `eslint-plugin-jsx-a11y` (Next.js bundel). 0 violation. | `UIUX_SPEC.md 9` |
-| React hooks | `eslint-plugin-react-hooks` (rules-of-hooks, exhaustive-deps). | ASUMSI (React) |
-| Strict | 0 error, 0 warning (ASUMSI). CI fail bila ada. | `SRS.md 11.1` |
+| `next lint` | Next.js default ESLint. | `SRS.md V2.0 4.1` |
+| TypeScript rules | `no-explicit-any` (error), `no-unused-vars` (error, `_` prefix), `consistent-type-imports` (warn). | ASUMSI |
+| Accessibility | `eslint-plugin-jsx-a11y`. 0 violation. | `UIUX_SPEC.md V2.0 9` |
+| Strict | 0 error, 0 warning. CI fail bila ada. | `SRS.md V2.0 11.1` |
 
-**`.eslintrc.json` rekomendasi (ASUMSI):**
+### 9.2 Prettier
 
 ```json
-{
-  "extends": ["next/core-web-vitals", "next/typescript", "plugin:jsx-a11y/strict"],
-  "plugins": ["import"],
-  "rules": {
-    "@typescript-eslint/no-explicit-any": "error",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "@typescript-eslint/consistent-type-imports": "warn",
-    "import/order": ["warn", { "groups": ["builtin", "external", "internal", "parent", "sibling", "type"], "pathGroups": [{ "pattern": "@/**", "group": "internal" }], "newlines-between": "always" }]
-  }
-}
-```
-
-### 9.2 Biome (opsional, ASUMSI)
-
-Paket konteks sebut Biome opsional. Bila dipakai:
-
-```json
-// biome.json
-{
-  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
-  "organizeImports": { "enabled": true },
-  "linter": { "enabled": true, "rules": { "recommended": true, "suspicious/noExplicitAny": "error" } },
-  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 }
-}
-```
-
-Hindari pakai Biome + ESLint bersamaan (konflik). Pilih satu. ASUMSI default: ESLint (Next.js native).
-
-### 9.3 Prettier (opsional, ASUMSI)
-
-Bila pakai Prettier (bukan Biome):
-
-```json
-// .prettierrc
 {
   "semi": true,
   "singleQuote": true,
   "trailingComma": "all",
   "printWidth": 100,
   "tabWidth": 2,
-  "arrowParens": "always"
+  "arrowParens": "always",
+  "plugins": ["prettier-plugin-tailwindcss"]
 }
 ```
 
-### 9.4 husky + lint-staged (ASUMSI)
+Pilih Prettier ATAU Biome, jangan campur.
 
-Pre-commit hook:
+### 9.3 Type Check
 
-```json
-// package.json
-{
-  "scripts": { "lint": "next lint", "typecheck": "tsc --noEmit", "test": "vitest run" },
-  "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{json,md,css}": ["prettier --write"]
-  }
-}
-```
-
-```bash
-# .husky/pre-commit
-npx lint-staged
-```
-
-### 9.5 Type Check
-
-- `tsc --noEmit` wajib pass sebelum commit/PR.
-- CI jalankan `tsc --noEmit` + `next lint` + `vitest run` + `playwright test`.
-- 0 error. Sitasi: `SRS.md 11.1`.
-
-### 9.6 Format Command
-
-```bash
-# Format semua
-npx prettier --write .
-# atau bila Biome
-npx biome format --write .
-```
+- `tsc --noEmit` wajib pass sebelum commit/PR. 0 error.
 
 ---
 
 ## 10. PR Review Checklist (Definition of Done Koding)
 
-Sebelum PR dianggap selesai, semua checklist WAJIB ✓:
-
 ### 10.1 Type & Lint
 
 - [ ] `tsc --noEmit` pass (0 error)
 - [ ] `next lint` pass (0 error, 0 warning)
-- [ ] Tidak ada `any` (atau ada `// eslint-disable` + alasan kuat)
+- [ ] Tidak ada `any`
 - [ ] Import order sesuai §3.2
-- [ ] Format konsisten (Prettier/Biome)
+- [ ] Format konsisten (Prettier)
 
 ### 10.2 Validasi & Security
 
-- [ ] Semua input via Zod parse di boundary
-- [ ] Tidak ada query DB tanpa filter `user_id` (ownership)
-- [ ] Tidak ada hardcoded secret (env only)
-- [ ] `import 'server-only'` di `lib/ai/*`, `lib/crypto/*`, `lib/db/*`, `lib/storage/*`
-- [ ] API key di encrypt sebelum save, mask di response
+- [ ] Semua input via Zod parse
+- [ ] Semua query filter `user_id`
+- [ ] Tidak ada hardcoded secret
+- [ ] `import 'server-only'` di lib server
+- [ ] API key encrypt + mask
 - [ ] Tidak ada `console.log` secret
-- [ ] Error envelope konsisten (§5.1)
-- [ ] File upload validasi mime + size (bila touch upload)
+- [ ] Error envelope konsisten
+- [ ] File upload validasi mime + size
+- [ ] **V2: Vision LLM key dari env**
+- [ ] **V2: `storyDescription` max 500 char**
+- [ ] **V2: Log lines escaped**
 
 ### 10.3 Test
 
-- [ ] Unit test added untuk logic baru
-- [ ] Coverage >= 80% (ASUMSI)
-- [ ] E2E test untuk critical flow baru
-- [ ] Test pass (`vitest run` + `playwright test`)
+- [ ] Unit test added
+- [ ] Coverage >= 80%
+- [ ] E2E test critical flow
+- [ ] Test pass
 - [ ] No `it.skip` tanpa alasan
 
 ### 10.4 Dokumen & i18n
 
-- [ ] Doc update (README, AGENTS.md bila ada, JSDoc di function publik)
-- [ ] i18n key di kedua locale (`messages/id.json` + `messages/en.json`) untuk label baru
-- [ ] Tidak ada teks hardcode di UI (harus i18n key)
+- [ ] JSDoc function publik
+- [ ] i18n key kedua locale
+- [ ] Tidak ada teks hardcode di UI
 
 ### 10.5 Aksesibilitas
 
-- [ ] WCAG 2.1 AA (kontras, keyboard, ARIA, focus visible)
-- [ ] `aria-label` di icon-only button
-- [ ] `aria-live` di region streaming/toast
+- [ ] WCAG 2.1 AA
+- [ ] `aria-label` icon-only button
+- [ ] `aria-live` streaming/toast
 - [ ] `lang` attribute ikut locale
+- [ ] **V2: LogViewer `role="log"`, `aria-live="polite"`**
+- [ ] **V2: Pagination `aria-current="page"`**
+- [ ] **V2: MetricCard `aria-label`**
 
 ### 10.6 Design Tokens
 
-- [ ] Pakai token dari `UIUX_SPEC.md 2` (warna, spacing, radius, motion, z-index)
-- [ ] Tidak hardcode hex/px (kecuali dynamic via CSS var)
-- [ ] `cn()` utility untuk merge class
+- [ ] Pakai token dari UIUX_SPEC §2
+- [ ] Tidak hardcode hex/px
+- [ ] `cn()` utility
 
 ### 10.7 Performance
 
-- [ ] Tidak ada N+1 query (eager/`with` relation bila perlu)
-- [ ] `useMemo`/`useCallback` selektif (hanya expensive)
-- [ ] RSC untuk data fetch (hindari `useEffect` + `fetch`)
-- [ ] Streaming SSE untuk generate (anti-timeout)
-- [ ] Index DB sesuai `DATABASE_SCHEMA.md 5` untuk query baru
-
-### 10.8 Konsistensi
-
-- [ ] Penamaan sesuai §2
-- [ ] Struktur folder sesuai §3.1
-- [ ] Layer tanggung jawab sesuai §3.4
-- [ ] Conventional commit message
+- [ ] Tidak ada N+1 query
+- [ ] RSC untuk data fetch
+- [ ] Streaming SSE untuk generate
+- [ ] Index DB sesuai DATABASE_SCHEMA §6
+- [ ] **V2: Pagination di list endpoint**
+- [ ] **V2: Dashboard load <= 1.5s**
+- [ ] **V2: Page transition <= 200ms**
 
 ---
 
 ## 11. CI/CD
 
-### 11.1 GitHub Actions (ASUMSI)
-
-Workflow `.github/workflows/ci.yml`:
+### 11.1 GitHub Actions
 
 ```yaml
 name: CI
@@ -1345,15 +825,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
-      - run: npm run typecheck   # tsc --noEmit
-      - run: npm run lint        # next lint
-      - run: npm run test:unit   # vitest run --coverage
-      - run: npm run build       # next build
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: coverage, path: coverage/ }
+        with: { node-version: '20', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test --coverage
+      - run: pnpm build
 
   e2e:
     runs-on: ubuntu-latest
@@ -1361,29 +838,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm ci
+        with: { node-version: '20', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
       - run: npx playwright install --with-deps
-      - run: npm run test:e2e    # playwright test
+      - run: pnpm test:e2e
 ```
 
-### 11.2 Deploy Vercel (ASUMSI)
+### 11.2 Deploy Vercel
 
-| Event | Target | Env | Bukti |
-|---|---|---|---|
-| PR dibuka/diupdate | Vercel preview deployment per PR | preview env (Turso test, mock LLM) | `RAG-CONTEXT.md 2.1` (ASUMSI) |
-| Push/merge `main` | Vercel production | prod env (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_APP_URL`) | `PROJECT_ARCHITECTURE.md 8` |
+| Event | Target | Env |
+|---|---|---|
+| PR | Vercel preview | preview env |
+| Push `main` | Vercel production | prod env |
 
 ### 11.3 Migration Prod
 
 - Dev: `drizzle-kit push`.
-- Prod: SQL migration file manual via `turso db shell <db-name> < drizzle/000X_<name>.sql`. ASUMSI.
-- Sitasi: `DATABASE_SCHEMA.md 8.4`.
-
-### 11.4 Health Check
-
-- `GET /api/v1/health` public. Return status + DB + env. ASUMSI.
-- Sitasi: `API_CONTRACT.md 6.2`.
+- Prod: SQL manual via `turso db shell`.
+- **V2: 3 ALTER TABLE additive nullable.** `DATABASE_SCHEMA.md V2.0 9.3`.
 
 ---
 
@@ -1391,169 +863,174 @@ jobs:
 
 ### 12.1 Design Tokens WAJIB dari UIUX_SPEC
 
-Token di `src/app/globals.css` (`@theme` Tailwind v4 + CSS vars shadcn). Agent
-eksekutor frontend WAJIB pakai token, TIDAK hardcode nilai yang sudah
-didefinisikan token.
-
 | Kategori | Token | Sumber |
 |---|---|---|
-| Warna | `--color-background`, `--color-foreground`, `--color-primary` (`#7c3aed`), `--color-primary-foreground`, `--color-secondary`, `--color-muted`, `--color-accent`, `--color-destructive`, `--color-success`, `--color-warning`, `--color-info`, `--color-border`, `--color-input`, `--color-ring` | `UIUX_SPEC.md 2.1, 2.10` |
-| Tipografi | `--font-sans` (Inter), `--font-mono` (JetBrains Mono); size scale `text-xs`...`text-5xl` | `UIUX_SPEC.md 2.3, 2.4` |
-| Spacing | `space-1` (4px)...`space-24` (96px) | `UIUX_SPEC.md 2.5` |
-| Radius | `--radius-sm` (4px), `--radius-md` (6px), `--radius-lg` (8px), `--radius-xl` (12px), `--radius-full` | `UIUX_SPEC.md 2.6` |
-| Shadow | `--shadow-xs`...`--shadow-xl` | `UIUX_SPEC.md 2.6` |
-| Container | `--container-sm` (640px)...`--container-2xl` (1536px), `--container-gutter` | `UIUX_SPEC.md 2.7` |
-| Motion | `--motion-fast` (120ms), `--motion-base` (200ms), `--motion-slow` (320ms), `--motion-skeleton` (1500ms), `--motion-progress` (800ms) | `UIUX_SPEC.md 2.8` |
-| Z-index | `--z-base` (0), `--z-dropdown` (1000), `--z-sticky` (1100), `--z-toast` (1200), `--z-modal` (1300), `--z-tooltip` (1400) | `UIUX_SPEC.md 2.9` |
+| Warna | `--color-primary` (`#7c3aed`), success, warning, info, dll | `UIUX_SPEC.md V2.0 2.1, 2.10` |
+| V2: Warna log | `--color-log-info-bg`, `--color-log-warn-bg`, `--color-log-error-bg` | `UIUX_SPEC.md V2.0 2.1` |
+| V2: Confidence | `--color-confidence-low`, `--color-confidence-mid`, `--color-confidence-high` | `UIUX_SPEC.md V2.0 2.2` |
+| V2: Role badge | tokoh=primary, background=info, prop=warning, accessory=accent-foreground, environment=success, other=muted-foreground | `UIUX_SPEC.md V2.0 2.2` |
+| Tipografi | `--font-sans` (Inter), `--font-mono` (JetBrains Mono) | `UIUX_SPEC.md V2.0 2.3` |
+| Spacing | `space-1` (4px)...`space-24` (96px) | `UIUX_SPEC.md V2.0 2.5` |
+| Radius | `--radius-sm` (4px)...`--radius-full` | `UIUX_SPEC.md V2.0 2.6` |
+| Motion | `--motion-fast` (120ms)...`--motion-slow` (320ms) | `UIUX_SPEC.md V2.0 2.8` |
+| V2: Motion log | `--motion-log-entry` (200ms) | `UIUX_SPEC.md V2.0 2.8` |
+| Z-index | `--z-dropdown` (1000)...`--z-tooltip` (1400) | `UIUX_SPEC.md V2.0 2.9` |
 
-### 12.2 Komponen WAJIB dari UIUX_SPEC
+### 12.2 Komponen WAJIB
 
-- shadcn/ui (`components/ui/*`): Button, Input, Textarea, Select, Form, Card,
-  Dialog, Tabs, Toast/Sonner, Table, Badge, Skeleton, Alert, Label, Tooltip,
-  Avatar, DropdownMenu, Separator, ScrollArea, Progress, Checkbox, Switch,
-  Collapsible, Breadcrumb. Jangan tulis ulang. Sitasi: `UIUX_SPEC.md 3.1`.
-- Custom domain (`components/{generate,projects,settings,common}/*`):
-  `PromptCard`, `SceneCard`, `CharacterCard`, `ImagePromptList`,
-  `ProviderConfigForm`, `WizardStep`, `ResultTabs`, `DropzoneUploader`,
-  `CopyButton`, `ExportMenu`, `GenerateProgress`, `EmptyState`,
-  `ErrorBoundary`, `LanguageToggle`, `ThemeToggle`, `AppHeader`, `AppFooter`.
-  Sitasi: `UIUX_SPEC.md 3.2, 3.3`.
+**shadcn/ui (V2: 18):** Button, Input, Textarea, Select, Card, Dialog, Tabs, Sonner, Table, Badge, Skeleton, Alert, Label, Tooltip, Switch, Collapsible, ScrollArea, Progress. Sitasi: `UIUX_SPEC.md V2.0 3.1`.
 
-### 12.3 Struktur Komponen Ikut PROJECT_ARCHITECTURE
+**Custom V2 baru:** LogViewer, LogEntry, ClassificationResult, ConfidenceBar, RoleBadge, AssetPreviewList, StoryDescriptionTextarea, MetricCard, WeeklyTrendChart, SuccessFailBarChart, PerProviderBreakdownTable, RecentActivityTable, StorageUsageCard, Pagination, PageLoadingSkeleton, PageErrorBoundary. Sitasi: `UIUX_SPEC.md V2.0 3.3`.
 
-- `src/components/ui/` = shadcn/ui (copy-paste, minim edit).
-- `src/components/common/` = shared (header, footer, copy, empty, error,
-  toggle).
-- `src/components/generate/` = wizard + result.
-- `src/components/projects/` = list + detail.
-- `src/components/settings/` = provider form.
-- Sitasi: `PROJECT_ARCHITECTURE.md 5` ; `UIUX_SPEC.md 3.3`.
+### 12.3 Struktur Komponen
+
+- `src/components/ui/` = shadcn/ui
+- `src/components/common/` = shared + **Pagination V2, PageLoadingSkeleton V2, PageErrorBoundary V2**
+- `src/components/generate/` = V1 + **LogViewer, ClassificationResult, AssetPreviewList, RoleBadge, ConfidenceBar, StoryDescriptionTextarea**
+- `src/components/dashboard/` = **V2 BARU: MetricCard, charts, tables**
+- `src/components/projects/` = list + **ProjectsPagination V2**
+
+Sitasi: `PROJECT_ARCHITECTURE.md V2.0 5` ; `UIUX_SPEC.md V2.0 3.3`.
 
 ### 12.4 Aksesibilitas (WCAG 2.1 AA)
 
-- Kontras >= 4.5:1 body, >= 3:1 large/UI border. Verifikasi Axe/Lighthouse.
-- Keyboard nav: semua interaktif reachable Tab. Skip link "Lewati ke konten".
-- Focus visible: outline `--ring` 2px solid, offset 2px. TIDAK `outline: none`
-  tanpa pengganti.
-- Modal: focus trap, Tab sirkular, Esc tutup.
-- `aria-label` icon-only button, `aria-expanded` Collapsible/Dropdown,
-  `aria-selected` Tabs, `aria-live="polite"` streaming, `aria-live="assertive"`
-  toast error, `role="alert"` Alert, `role="status"` toast success.
-- Form: `<label htmlFor>` + `aria-invalid` + `aria-describedby` ke pesan error.
+- Kontras >= 4.5:1 body, >= 3:1 large/UI border.
+- Keyboard nav: semua interaktif reachable Tab. Skip link.
+- Focus visible: outline `--ring` 2px solid.
+- Modal: focus trap, Esc tutup.
+- ARIA: `aria-label`, `aria-expanded`, `aria-selected`, `aria-live`, `role="alert"`.
+- **V2: LogViewer `role="log"`, `aria-live="polite"`**
+- **V2: Pagination `aria-current="page"`**
+- **V2: MetricCard `aria-label`**
+- **V2: Chart `aria-label`**
+- **V2: error.tsx `role="alert"`, `aria-live="assertive"`**
 - `lang` attribute ikut locale.
-- `prefers-reduced-motion: reduce` nonaktifkan animasi non-esensial.
-- Sitasi: `UIUX_SPEC.md 9` ; `PRD.md 6.6`.
+- `prefers-reduced-motion` nonaktifkan animasi.
 
 ### 12.5 i18n Key WAJIB
 
-- Semua teks UI (label, placeholder, tombol, pesan error, empty state) WAJIB
-  via i18n key (`useTranslations` / `getTranslations`). TIDAK hardcode teks
-  ID/EN di JSX.
-- Key namespaced: `common.*`, `generate.*`, `projects.*`, `settings.*`,
-  `error.*`.
-- Bundel `messages/id.json` + `messages/en.json` sinkron (unit test verify).
-- Sitasi: `SRS.md 5 (FR-19)` ; `UIUX_SPEC.md 1.4`.
+- Semua teks UI via i18n key. TIDAK hardcode teks ID/EN di JSX.
+- Key namespaced: `common.*`, `generate.*`, `dashboard.*`, `projects.*`, `settings.*`, `error.*`.
+- **V2: Tambah key:** `generate.role.tokoh/background/prop/accessory/environment/other`, `generate.log.title/toggle`, `dashboard.metric.*`, dll.
+- Bundel kedua locale sinkron.
 
 ---
 
-## 13. Larangan Umum
+## 13. Larangan Umum (V1 L01-L30 + V2 L31-L38)
+
+### V1 Larangan (dipertahankan)
 
 | # | Larangan | Alasan |
 |---|---|---|
-| L01 | Mutasi langsung state React (`state.x = y`) | Gunakan `setState` / immutable update |
-| L02 | Magic number tanpa konstanta | Ekstrak ke konstanta named (`MAX_CHARACTERS_PER_PROJECT = 10`) |
-| L03 | Nesting > 3 level (if/for/switch) | Pecah ke function/helper |
-| L04 | `console.log` tertinggal di prod | Pakai logger atau hapus sebelum commit (kecuali `console.error` structured) |
-| L05 | Dependency tidak dipin (dead code) | Hapus import/variabel tidak terpakai (`@typescript-eslint/no-unused-vars`) |
-| L06 | `any` tanpa alasan | Pakai `unknown` + Zod narrow |
+| L01 | Mutasi langsung state React (`state.x = y`) | `setState` / immutable update |
+| L02 | Magic number tanpa konstanta | Ekstrak ke konstanta named |
+| L03 | Nesting > 3 level | Pecah ke function/helper |
+| L04 | `console.log` tertinggal di prod | Hapus atau structured logger |
+| L05 | Dependency tidak dipin (dead code) | Hapus import/variabel |
+| L06 | `any` tanpa alasan | `unknown` + Zod narrow |
 | L07 | Hardcoded secret | Env only |
-| L08 | Hardcode hex/px di className | Pakai token (UIUX_SPEC §2) |
-| L09 | Hardcode teks UI (bukan i18n key) | Pakai `useTranslations` / `getTranslations` |
-| L10 | `useEffect` untuk derived state | Pakai compute saat render / `useMemo` |
-| L11 | `index` sebagai `key` list | Pakai id stabil |
+| L08 | Hardcode hex/px di className | Pakai token UIUX_SPEC §2 |
+| L09 | Hardcode teks UI (bukan i18n key) | `useTranslations` / `getTranslations` |
+| L10 | `useEffect` untuk derived state | Compute saat render / `useMemo` |
+| L11 | `index` sebagai `key` list | Id stabil |
 | L12 | Query DB tanpa filter `user_id` | Ownership wajib |
-| L13 | `select()` semua kolom tanpa perlu | Explicit column select |
+| L13 | `select()` semua kolom | Explicit column select |
 | L14 | String concat SQL | Drizzle parameterized |
-| L15 | `dangerouslySetInnerHTML` tanpa sanitasi | Hindari, atau sanitasi strict |
+| L15 | `dangerouslySetInnerHTML` tanpa sanitasi | Hindari atau sanitasi |
 | L16 | `eval` / `new Function` | Tidak pernah |
-| L17 | `process.env.X!` tanpa guard | Guard `if (!env) throw` di init |
+| L17 | `process.env.X!` tanpa guard | Guard di init |
 | L18 | `outline: none` tanpa pengganti | Focus visible wajib |
-| L19 | `git add .` tanpa cek status | Stage file relevan saja |
+| L19 | `git add .` tanpa cek status | Stage file relevan |
 | L20 | Commit langsung ke `main` | Lewat PR + review |
-| L21 | `it.skip` tanpa alasan + issue link | Hapus atau selesaikan |
-| L22 | Snapshot komponen UI (false positive mudah) | Snapshot hanya output stabil (markdown) |
-| L23 | `any` di Zod schema output LLM | Schema WAJIB explicit (`z.object`, `z.string`, dll) |
-| L24 | Panggilan LLM dari Client Component | Server-only (`lib/ai/*`) |
-| L25 | Decrypt API key di Client Component | Server-only (`lib/crypto/*`) |
-| L26 | `fetch('/api/...')` manual untuk internal mutation | Pakai Server Action |
+| L21 | `it.skip` tanpa alasan | Hapus atau selesaikan |
+| L22 | Snapshot komponen UI | Snapshot hanya output stabil |
+| L23 | `any` di Zod schema output LLM | Schema WAJIB explicit |
+| L24 | Panggilan LLM dari Client Component | Server-only `lib/ai/*` |
+| L25 | Decrypt API key di Client Component | Server-only `lib/crypto/*` |
+| L26 | `fetch('/api/...')` manual internal mutation | Server Action |
 | L27 | `'use client'` di root layout bila tidak perlu | Hanya komponen interaktif |
-| L28 | `useState` + `useEffect` untuk data fetch SSR | Pakai RSC + `fetch` server-side |
+| L28 | `useState` + `useEffect` untuk data fetch SSR | RSC + fetch server-side |
 | L29 | File > 300 baris | Pecah ke modul |
 | L30 | Function > 60 baris | Pecah ke helper |
+
+### V2 Larangan (baru)
+
+| # | Larangan | Alasan |
+|---|---|---|
+| L31 | Panggilan Vision LLM dari Client Component | Server-only `lib/ai/image-classifier.ts`. Direct HTTP, bukan AI SDK. |
+| L32 | Query Drizzle langsung di route handler/dashboard page | Repository pattern. Dashboard via `dashboard.repo.ts`. |
+| L33 | Upload tanpa validasi mime + size di server | Zod + magic bytes. Max 10MB. |
+| L34 | Log buffer persist ke DB per log line | Buffer in-memory, persist saat `done` saja. |
+| L35 | Hardcode role classification (tokoh/background only) | 6 opsi: tokoh/background/prop/accessory/environment/other. |
+| L36 | `console.log` di production code | Convert ke structured logging atau hapus. |
+| L37 | Direct Drizzle query di dashboard page | Refactor ke `dashboard.repo.ts`. |
+| L38 | Tambah dark mode toggle di V2 | Out of scope V2 (deferred V3). |
 
 ---
 
 ## 14. Asumsi Coding + Referensi
 
-### 14.1 Asumsi Coding
+### 14.1 Asumsi Coding (V1 + V2)
 
-| ID | Asumsi | Status Bukti | Dampak | Sitasi |
-|---|---|---|---|---|
-| CR-A1 | ORM = Drizzle (bukan Prisma/raw libsql) | TIDAK ADA BUKTI preferensi user | RAG menyebut raw/Prisma alternatif | `RAG-CONTEXT.md 9 G7` ; ASUMSI SRS-A3 |
-| CR-A2 | Enkripsi AES-256-GCM via env `ENCRYPTION_KEY` | TIDAK ADA BUKTI mekanisme spesifik | Bisa defer ke secret manager | `RAG-CONTEXT.md 11 #4` ; ASUMSI SRS-A4 |
-| CR-A3 | Storage gambar prod = Vercel Blob | ASUMSI rekomendasi | Bisa S3/R2 | `RAG-CONTEXT.md 9 G3` ; ASUMSI SRS-A5 |
-| CR-A4 | Auth = NextAuth credentials provider | TIDAK ADA BUKTI preferensi | Bisa OAuth nanti | `RAG-CONTEXT.md 9 G2` ; ASUMSI SRS-A1 |
-| CR-A5 | i18n = next-intl | TIDAK ADA BUKTI preferensi lib | Bisa native App Router i18n | `RAG-CONTEXT.md 9 G5` ; ASUMSI SRS-A2 |
-| CR-A6 | Streaming SSE untuk generasi panjang | ASUMSI | Hindari Vercel timeout | `RAG-CONTEXT.md 5.4, 9 G6` ; ASUMSI SRS-A6 |
-| CR-A7 | Retry LLM 3x backoff | ASUMSI | Bisa beda | ASUMSI SRS-A14 |
-| CR-A8 | Rate limit 10 req/min/user endpoint generate | ASUMSI | Middleware | ASUMSI SRS-A15 |
-| CR-A9 | Timestamp = integer unix epoch second | ASUMSI | Bisa ISO-8601 TEXT | `DATABASE_SCHEMA.md 1.3` |
-| CR-A10 | Coverage target 80% unit | ASUMSI | Bisa beda | `SRS.md 11.1` |
-| CR-A11 | Biome/Prettier opsional | ASUMSI | Pilih satu, jangan campur | Paket konteks |
-| CR-A12 | husky + lint-staged pre-commit | ASUMSI | Best practice | ASUMSI |
-| CR-A13 | Conventional commits | ASUMSI | Best practice | ASUMSI |
-| CR-A14 | Versioning `/api/v1` URI prefix | ASUMSI | Bisa `/api/*` murni | `API_CONTRACT.md 1.3` |
-| CR-A15 | Password hash bcryptjs | ASUMSI | Bisa argon2 | `DATABASE_SCHEMA.md 9.3` |
-| CR-A16 | Session strategy JWT cookie | ASUMSI | Bisa Turso adapter | ASUMSI ARCH-A13 |
-| CR-A17 | File upload max 10MB | ASUMSI | Bisa beda | `SRS.md 5 (FR-17)` |
-| CR-A18 | Soft delete window 30 hari, log 90 hari | ASUMSI | Bisa beda | `DATABASE_SCHEMA.md 10.2` |
-| CR-A19 | Batas tokoh 10 per project | ASUMSI | Bisa beda | `DATABASE_SCHEMA.md 12.6` ; ASUMSI SRS-A10 |
-| CR-A20 | ESLint default + plugin (bukan Biome) | ASUMSI | Next.js native | `SRS.md 4.1, 11.1` |
+| ID | Asumsi | Status | Sitasi |
+|---|---|---|---|
+| CR-A1 | ORM = Drizzle | Ground truth `package.json:32` | `package.json:32` |
+| CR-A2 | Enkripsi AES-256-GCM | ASUMSI | `RAG-CONTEXT.md 11 #4` |
+| CR-A3 | Storage prod = Vercel Blob | ASUMSI | `RAG-CONTEXT.md 9 G3` |
+| CR-A4 | Auth = NextAuth credentials | ASUMSI | `RAG-CONTEXT.md 9 G2` |
+| CR-A5 | i18n = next-intl | ASUMSI | `RAG-CONTEXT.md 9 G5` |
+| CR-A6 | Streaming SSE anti-timeout | ASUMSI | `RAG-CONTEXT.md 5.4` |
+| CR-A7 | Retry LLM 2x backoff (dari kode) | Ground truth | `RAG-CONTEXT.md 5.2` |
+| CR-A8 | Rate limit 10 req/min/user | ASUMSI | `SRS.md V2.0 12` |
+| CR-A9 | Timestamp = integer unix epoch | Ground truth | `DATABASE_SCHEMA.md V2.0 1.3` |
+| CR-A10 | Coverage target 80% | ASUMSI | `SRS.md V2.0 11.1` |
+| CR-A11 | Prettier (bukan Biome) | ASUMSI | `package.json:78-79` |
+| CR-A12 | Conventional commits | ASUMSI | Best practice |
+| CR-A13 | Versioning `/api/v1` prefix | ASUMSI | `API_CONTRACT.md V2.0 1.3` |
+| CR-A14 | Password hash bcryptjs | ASUMSI | `DATABASE_SCHEMA.md V2.0 9.3` |
+| CR-A15 | Session JWT cookie | ASUMSI | ASUMSI |
+| CR-A16 | File upload max 10MB | ASUMSI | `SRS.md V2.0 9.1` |
+| CR-A17 | Batas tokoh 10 per project | ASUMSI | ASUMSI SRS-A10 |
+| **CR-V2-1** | Vision LLM = GPT-4o atau Gemini Vision | Perlu konfirmasi | `SRS.md V2.0 6.2` |
+| **CR-V2-2** | Deskripsi cerita = optional, max 500 char | Perlu konfirmasi | `SRS.md V2.0 6.4` |
+| **CR-V2-3** | Real-time logs = Collapsible, default OFF | Perlu konfirmasi | `SRS.md V2.0 6.5` |
+| **CR-V2-4** | Dashboard = cards + tables + charts | Perlu konfirmasi | `SRS.md V2.0 6.6` |
+| **CR-V2-5** | Upload di generate page = pre-submit | Perlu konfirmasi | `SRS.md V2.0 6.1` |
+| **CR-V2-6** | Role = 6 opsi | Perlu konfirmasi | `SRS.md V2.0 6.3` |
+| **CR-V2-7** | Push GitHub = public repo | Perlu konfirmasi | `SRS.md V2.0 6.10` |
+| **CR-V2-8** | AI SDK tetap v4 | Ground truth `package.json:25` | `SRS.md V2.0 5` |
+| **CR-V2-9** | Recharts atau Tremor untuk charts | Perlu konfirmasi | `SRS.md V2.0 6.6` |
+| **CR-V2-10** | Classification auto-trigger saat upload | Perlu konfirmasi | `SRS.md V2.0 6.2` |
 
 ### 14.2 Referensi Internal
 
 | Dokumen | Path |
 |---|---|
-| RAG-CONTEXT (sumber kebenaran) | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
-| SRS | `C:\laragon\www\PromptFlow\product-docs\SRS.md` |
-| DATABASE_SCHEMA | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` |
-| PROJECT_ARCHITECTURE | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` |
-| API_CONTRACT | `C:\laragon\www\PromptFlow\product-docs\API_CONTRACT.md` |
-| UIUX_SPEC | `C:\laragon\www\PromptFlow\product-docs\UIUX_SPEC.md` |
-| GitHub repo | https://github.com/agrianwahab29/promptflow.git |
+| RAG-CONTEXT | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
+| SRS V2.0 | `C:\laragon\www\PromptFlow\product-docs\SRS.md` |
+| DATABASE_SCHEMA V2.0 | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` |
+| PROJECT_ARCHITECTURE V2.0 | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` |
+| API_CONTRACT V2.0 | `C:\laragon\www\PromptFlow\product-docs\API_CONTRACT.md` |
+| UIUX_SPEC V2.0 | `C:\laragon\www\PromptFlow\product-docs\UIUX_SPEC.md` |
+| GitHub | `https://github.com/agrianwahab29/promptflow.git` |
 
 ### 14.3 Sitasi Eksternal Kunci
 
-| Sitasi | Klaim didukung | Bagian |
+| Sitasi | Klaim | Bagian |
 |---|---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | `createOpenAICompatible`, structured output, streaming | 4.7 |
-| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL, Bearer, header opsional | 4.7 |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat `https://ollama.com/v1` | 4.7 |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js setup | 4.6 |
+| https://ai-sdk.dev/providers/openai-compatible-providers | `createOpenAICompatible` | 4.7 |
+| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL | 4.7 |
+| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat | 4.7 |
+| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js | 4.6 |
 | https://turso.tech/blog/serverless | Vercel FS tidak persisten | 4.6 |
-| https://ui.shadcn.com/docs/installation/next | shadcn/ui Next.js | 4.5, 12.2 |
-| https://ui.shadcn.com/docs/tailwind-v4 | shadcn/ui Tailwind v4 | 4.4, 12.1 |
-| https://nextjs.org/docs | Next.js App Router, RSC, Server Actions | 4.2 |
-| https://orm.drizzle.team | Drizzle ORM, repository, migration | 4.6 |
+| https://ui.shadcn.com/docs/installation/next | shadcn/ui Next.js | 4.5 |
+| https://nextjs.org/docs | Next.js App Router, RSC | 4.2 |
+| https://orm.drizzle.team | Drizzle ORM | 4.6 |
 
 ---
 
-**Dokumen ini fokus pada ATURAN KODING konkret siap eksekusi. Tujuan bisnis
-di BRD, pasar di MRD, produk di PRD, spesifikasi teknis di SRS, skema data di
-DATABASE_SCHEMA, arsitektur di PROJECT_ARCHITECTURE, kontrak API di
-API_CONTRACT, design system di UIUX_SPEC. CODING_RULES tidak membangun
-deliverable akhir / menulis kode produk — hanya aturan.**
+**Dokumen ini fokus pada ATURAN KODING konkret siap eksekusi. V2 = V1 rules dipertahankan + V2 rules ditambahkan. Semua 38 larangan (L01-L38) wajib dipatuhi.**
 
 > **Dibuat oleh:** docgen-coding-rules subagent
-> **Tanggal:** 2026-06-19
-> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Versi:** 2.0

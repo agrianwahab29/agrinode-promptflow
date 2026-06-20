@@ -5,6 +5,7 @@
     "settings": "Settings",
     "dashboard": "Dashboard",
     "login": "Log in",
+    "register": "Sign up",
     "logout": "Log out"
   },
   "landing": {
@@ -23,10 +24,15 @@
     "loginTitle": "Log in to PromptFlow",
     "loginSubtitle": "Welcome back",
     "login": "Log in",
-    "register": "Sign up"
+    "register": "Sign up",
+    "registerTitle": "Sign up for PromptFlow",
+    "registerSubtitle": "Create a free account"
   },
   "generate": {
-    "title": "Generate Prompt"
+    "title": "Generate Prompt",
+    "storyDescription": "Story Description (optional, max 500)",
+    "uploadReferences": "Upload Image References (optional)",
+    "extraReferences": "Additional References (file names, one per line)"
   },
   "projects": {
     "title": "My Projects",
@@ -53,7 +59,17 @@
     "kpi5Title": "Successful Generations",
     "kpi5Desc": "Number of successful generates",
     "kpiLatencyTitle": "Average Latency",
-    "kpiLatencyDesc": "Average time per generate"
+    "kpiLatencyDesc": "Average time per generate",
+    "failedTitle": "Failed",
+    "failedDesc": "Generations that failed",
+    "partialTitle": "Partial",
+    "partialDesc": "Generations with warnings",
+    "storageTitle": "Storage",
+    "storageDesc": "Total reference size",
+    "weeklyTrendTitle": "Projects per Week",
+    "successFailTitle": "Success vs Fail",
+    "providerBreakdownTitle": "Per-Provider Breakdown",
+    "recentProjectsTitle": "Recent Projects"
   },
   "settings": {
     "title": "Settings",

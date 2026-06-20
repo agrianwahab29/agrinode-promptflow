@@ -35,6 +35,7 @@ describe('project.repo utilities', () => {
       aspectRatio: '16:9',
       resultJson: null,
       status: 'draft',
+      storyDescription: null, // V2
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

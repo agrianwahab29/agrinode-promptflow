@@ -3,22 +3,24 @@ import { auth } from '@/lib/auth/config';
 import { GenerateInputSchema, PromptPackageSchema } from '@/lib/validation/schemas';
 import { errorResponse } from '@/lib/api/error';
 import { createProject, getProjectById, updateProjectResult } from '@/lib/db/repositories/project.repo';
-import { getActiveProviderConfig, getProviderConfig } from '@/lib/db/repositories/provider-config.repo';
+import { getActiveProviderConfig, getProviderConfig, listProviderConfigs } from '@/lib/db/repositories/provider-config.repo';
 import { bulkCreateCharacters, deleteCharactersByProject } from '@/lib/db/repositories/character.repo';
 import { bulkCreateScenes, deleteScenesByProject } from '@/lib/db/repositories/scene.repo';
 import { bulkCreateImagePrompts, deleteImagePromptsByProject } from '@/lib/db/repositories/image-prompt.repo';
 import { bulkCreateSupportingCharacters, deleteSupportingCharactersByProject } from '@/lib/db/repositories/supporting-character.repo';
 import { createGenerationLog } from '@/lib/db/repositories/generation-log.repo';
+import { attachOrphanedRefs } from '@/lib/db/repositories/asset-reference.repo';
 import { generatePromptPackage } from '@/lib/ai/llm-client';
 import { buildSystemPrompt, buildUserMessage } from '@/lib/ai/prompt-builder';
 import { checkConsistency } from '@/lib/ai/consistency-checker';
+import { createLogBuffer, type LogBuffer } from '@/lib/ai/log-buffer';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 600;
 export const dynamic = 'force-dynamic';
 
 interface SseEvent {
-  event: 'progress' | 'stage' | 'done' | 'error';
+  event: 'progress' | 'stage' | 'done' | 'error' | 'log';
   data: Record<string, unknown>;
 }
 
@@ -40,8 +42,15 @@ export async function POST(req: NextRequest) {
     return errorResponse('VALIDATION_ERROR', 422, 'Shorts maksimal 180 detik', { field: 'seconds', max: 180 });
   }
 
-  const cfg = inp.providerId ? await getProviderConfig(inp.providerId, userId) : await getActiveProviderConfig(userId);
-  if (!cfg) return errorResponse('NOT_FOUND', 404, 'Provider config tidak ditemukan');
+  let cfg = inp.providerId ? await getProviderConfig(inp.providerId, userId) : await getActiveProviderConfig(userId);
+  if (!cfg) {
+    // Fallback: ambil provider pertama user
+    const all = await listProviderConfigs(userId);
+    cfg = all[0] ?? null;
+  }
+  if (!cfg) return errorResponse('NOT_FOUND', 404, 'Provider config tidak ditemukan. Tambah provider di halaman Settings.');
+
+  console.log('[generate] Provider dipakai: id=%d name=%s model=%s baseUrl=%s', cfg.id, cfg.name, cfg.model, cfg.baseUrl);
 
   let projectId: number | undefined = parsed.data.projectId;
   if (projectId === undefined) {
@@ -52,6 +61,7 @@ export async function POST(req: NextRequest) {
       durationTargetSeconds: inp.durationTarget.seconds,
       styleType: inp.style.type,
       aspectRatio: inp.style.ratio,
+      storyDescription: inp.storyDescription ?? null, // V2
     });
     projectId = proj.id;
   } else {
@@ -59,6 +69,13 @@ export async function POST(req: NextRequest) {
     if (!owned) return errorResponse('CONFLICT', 409, 'Project bukan milik user');
   }
   const finalProjectId: number = projectId;
+
+  // V2: attach orphaned refs (uploaded before project existed)
+  const orphanRefIds = (parsed.data as Record<string, unknown>).orphanRefIds;
+  if (Array.isArray(orphanRefIds) && orphanRefIds.length > 0) {
+    const ids = orphanRefIds.filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+    await attachOrphanedRefs(ids, finalProjectId);
+  }
 
   const references = inp.references ?? [];
 
@@ -68,15 +85,27 @@ export async function POST(req: NextRequest) {
       const send = (evt: SseEvent) => controller.enqueue(encoder.encode(sseFormat(evt)));
       const start = Date.now();
       let logId: number | null = null;
+
+      // V2: log buffer for real-time processing logs
+      const logBuffer: LogBuffer = createLogBuffer();
+      const emitLog = (level: 'info' | 'warn' | 'error', message: string) => {
+        const entry = logBuffer.add(level, message);
+        send({ event: 'log', data: entry as unknown as Record<string, unknown> });
+      };
+
       try {
         send({ event: 'stage', data: { stage: 'starting', projectId: finalProjectId } });
+        emitLog('info', `Memulai generate untuk project #${finalProjectId}`);
         send({ event: 'progress', data: { stage: 'character_profiles', delta: '' } });
 
+        emitLog('info', `Provider: ${cfg.name} (${cfg.model})`);
+        console.log('[generate] Mulai LLM call project=%d', finalProjectId);
         const pkg = await generatePromptPackage({
           provider: { provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, apiKeyEncrypted: cfg.apiKeyEncrypted },
           system: buildSystemPrompt(),
           messages: [{ role: 'user', content: buildUserMessage(inp, references) }],
         });
+        console.log('[generate] LLM selesai project=%d scenes=%d chars=%d', finalProjectId, pkg.scenes?.length ?? 0, pkg.character_profiles?.length ?? 0);
 
         const validated = PromptPackageSchema.parse(pkg);
         send({ event: 'progress', data: { stage: 'scenes', delta: '', count: validated.scenes.length } });
@@ -84,6 +113,7 @@ export async function POST(req: NextRequest) {
         send({ event: 'progress', data: { stage: 'supporting_characters', delta: '', count: validated.supporting_characters.length } });
         send({ event: 'progress', data: { stage: 'moral_message', delta: validated.moral_message } });
 
+        console.log('[generate] Menyimpan ke DB project=%d', finalProjectId);
         await updateProjectResult(finalProjectId, userId, JSON.stringify(validated), 'complete');
         await deleteImagePromptsByProject(finalProjectId);
         await deleteSupportingCharactersByProject(finalProjectId);
@@ -124,6 +154,10 @@ export async function POST(req: NextRequest) {
 
         const warnings = checkConsistency(validated);
         const durationMs = Date.now() - start;
+        emitLog('info', `Generate selesai dalam ${durationMs}ms. ${warnings.length} warning(s).`);
+
+        // V2: persist logs to generation_logs
+        const logEntries = logBuffer.drain();
         const log = await createGenerationLog({
           projectId: finalProjectId,
           provider: cfg.provider,
@@ -131,23 +165,29 @@ export async function POST(req: NextRequest) {
           durationMs,
           status: warnings.length > 0 ? 'partial' : 'success',
           errorMessage: null,
+          logsJson: JSON.stringify(logEntries),
         });
         logId = log.id;
 
         send({ event: 'done', data: { result: validated, warnings, generationLogId: logId } });
       } catch (e) {
         const durationMs = Date.now() - start;
+        const errMsg = e instanceof Error ? e.message : String(e);
+        emitLog('error', `Generate gagal: ${errMsg}`);
+
         try {
+          const logEntries = logBuffer.drain();
           await createGenerationLog({
             projectId: finalProjectId,
             provider: cfg.provider,
             model: cfg.model,
             durationMs,
             status: 'fail',
-            errorMessage: e instanceof Error ? e.message.slice(0, 500) : String(e),
+            errorMessage: errMsg.slice(0, 500),
+            logsJson: JSON.stringify(logEntries),
           });
         } catch { /* ignore */ }
-        send({ event: 'error', data: { code: 'PROVIDER_ERROR', message: e instanceof Error ? e.message : 'Generation gagal' } });
+        send({ event: 'error', data: { code: 'PROVIDER_ERROR', message: errMsg } });
       } finally {
         controller.close();
       }

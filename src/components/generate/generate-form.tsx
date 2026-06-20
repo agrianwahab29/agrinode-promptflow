@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,21 +9,49 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { CreateProjectInputSchema, type PromptPackage } from '@/lib/validation/schemas';
 import { ResultTabs } from './result-tabs';
 import { TemplatePicker } from './template-picker';
 import { TEMPLATE_TITLES, type TitleTemplate } from '@/lib/templates/titles';
+import { DropzoneUploader, type AssetRef } from './dropzone-uploader';
+import { LogViewer, type LogEntry } from './log-viewer';
 
 const FormSchema = CreateProjectInputSchema;
 type FormValues = z.infer<typeof FormSchema>;
+
+const STAGE_LABELS: Record<string, string> = {
+  starting: 'Mulai generate...',
+  character_profiles: 'Membuat profil karakter',
+  scenes: 'Menyusun scene',
+  image_prompts: 'Membuat prompt gambar',
+  supporting_characters: 'Membuat karakter pendukung',
+  moral_message: 'Menulis pesan moral',
+};
+const STAGE_ORDER = ['starting', 'character_profiles', 'scenes', 'image_prompts', 'supporting_characters', 'moral_message'];
+
+function ElapsedTimer() {
+  const [sec, setSec] = useState(0);
+  const idRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    idRef.current = setInterval(() => setSec((s) => s + 1), 1000);
+    return () => { if (idRef.current) clearInterval(idRef.current); };
+  }, []);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return <span className="tabular-nums">{String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}</span>;
+}
 
 export function GenerateForm({ locale: _locale }: { locale: string }) {
   const [result, setResult] = useState<PromptPackage | null>(null);
   const [warnings, setWarnings] = useState<Array<{ code: string; message: string }>>([]);
   const [streaming, setStreaming] = useState(false);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [stageMeta, setStageMeta] = useState<Record<string, unknown>>({});
+  const [storyDescription, setStoryDescription] = useState('');
   const [refsText, setRefsText] = useState('');
+  const [uploadedRefs, setUploadedRefs] = useState<AssetRef[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -49,11 +77,20 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
     setStreaming(true);
     setResult(null);
     setWarnings([]);
+    setCurrentStage('starting');
+    setStageMeta({});
+    setLogs([]);
     const refs = refsText
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean)
       .map((name) => ({ name, type: 'tokoh' as const }));
+    // Add uploaded refs as 'tokoh' by default (user can edit JSON before generate)
+    for (const ur of uploadedRefs) {
+      if (!refs.find((r) => r.name === ur.filename)) {
+        refs.push({ name: ur.filename, type: (ur.tipe as 'tokoh') || 'tokoh' });
+      }
+    }
     try {
       const res = await fetch('/api/v1/generate', {
         method: 'POST',
@@ -70,13 +107,17 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
               ratio: values.aspectRatio,
             },
             references: refs,
+            storyDescription: storyDescription.trim() || undefined,
           },
+          // V2: pass orphan ref IDs so server can attach them
+          ...(uploadedRefs.length > 0 ? { orphanRefIds: uploadedRefs.map((r) => r.id) } : {}),
         }),
       });
       if (!res.ok || !res.body) {
         const txt = await res.text();
         toast.error(`Generate gagal: ${txt.slice(0, 200)}`);
         setStreaming(false);
+        setCurrentStage(null);
         return;
       }
       const reader = res.body.getReader();
@@ -99,12 +140,20 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
           if (!evType || !evData) continue;
           try {
             const parsed = JSON.parse(evData);
-            if (evType === 'done') {
+            if (evType === 'stage' || evType === 'progress') {
+              setCurrentStage(parsed.stage ?? evType);
+              setStageMeta(parsed);
+            } else if (evType === 'log') {
+              // V2: append log entry
+              setLogs((prev) => [...prev.slice(-499), parsed as LogEntry]);
+            } else if (evType === 'done') {
               setResult(parsed.result as PromptPackage);
               setWarnings(parsed.warnings ?? []);
+              setCurrentStage(null);
               toast.success('Generate selesai');
             } else if (evType === 'error') {
               toast.error(parsed.message ?? 'Generate gagal');
+              setCurrentStage(null);
             }
           } catch {
             // skip malformed event
@@ -113,6 +162,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Network error');
+      setCurrentStage(null);
     } finally {
       setStreaming(false);
     }
@@ -193,22 +243,83 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             </div>
           </div>
 
+          {/* V2: Story description field (optional, max 500 char) */}
           <div className="space-y-2">
-            <Label htmlFor="refs">Referensi (nama file, satu per baris)</Label>
+            <Label htmlFor="storyDescription">Deskripsi Cerita (opsional, max 500)</Label>
+            <Textarea
+              id="storyDescription"
+              rows={3}
+              maxLength={500}
+              placeholder="Ceritakan gambaran umum cerita untuk konteks yang lebih kaya..."
+              value={storyDescription}
+              onChange={(e) => setStoryDescription(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground text-right">{storyDescription.length}/500</p>
+          </div>
+
+          {/* V2: Upload references inline */}
+          <div className="space-y-2">
+            <Label>Upload Referensi Gambar (opsional)</Label>
+            <DropzoneUploader
+              projectId={0}
+              onUploaded={(refs) => setUploadedRefs((prev) => [...prev, ...refs])}
+            />
+            {uploadedRefs.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {uploadedRefs.map((r) => (
+                  <span key={r.id} className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs">
+                    {r.filename}
+                    <button type="button" onClick={() => setUploadedRefs((prev) => prev.filter((x) => x.id !== r.id))} className="text-destructive hover:text-destructive/80">&times;</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="refs">Referensi Tambahan (nama file, satu per baris)</Label>
             <Textarea
               id="refs"
-              rows={3}
+              rows={2}
               placeholder="hero.png&#10;hutan-bg.png"
               value={refsText}
               onChange={(e) => setRefsText(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">Upload via project detail page. Lalu paste nama file di sini (satu per baris).</p>
           </div>
 
-          {streaming && (
-            <Alert variant="info">
-              <AlertDescription>Sedang generate... mohon tunggu.</AlertDescription>
-            </Alert>
+          {streaming && currentStage && (
+            <div className="rounded-md border bg-muted/50 p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{STAGE_LABELS[currentStage] ?? currentStage}</span>
+                <span className="text-muted-foreground text-xs"><ElapsedTimer /></span>
+              </div>
+              <div className="space-y-1.5">
+                {STAGE_ORDER.map((stage, i) => {
+                  const done = STAGE_ORDER.indexOf(currentStage) > i;
+                  const active = currentStage === stage;
+                  return (
+                    <div key={stage} className="flex items-center gap-2 text-xs">
+                      <span className={`inline-block w-4 text-center ${done ? 'text-green-600' : active ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {done ? '✓' : active ? '●' : '○'}
+                      </span>
+                      <span className={done ? 'text-green-600 line-through' : active ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                        {STAGE_LABELS[stage] ?? stage}
+                      </span>
+                      {active && <span className="ml-auto animate-pulse text-primary text-[10px]">●●●</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {stageMeta.count !== undefined && (
+                <p className="text-xs text-muted-foreground">Ditemukan {String(stageMeta.count)} item...</p>
+              )}
+              {/* V2: Real-time processing logs */}
+              {logs.length > 0 && (
+                <div className="mt-3 border-t pt-3">
+                  <LogViewer logs={logs} />
+                </div>
+              )}
+            </div>
           )}
 
           <Button type="submit" disabled={streaming} className="w-full">

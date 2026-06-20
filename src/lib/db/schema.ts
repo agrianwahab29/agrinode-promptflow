@@ -40,6 +40,7 @@ export const projects = sqliteTable('projects', {
   aspectRatio: text('aspect_ratio').notNull(),
   resultJson: text('result_json'),
   status: text('status').notNull().default('draft'),
+  storyDescription: text('story_description'), // V2: optional story description (max 500 char)
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at').default(sql`(unixepoch())`).notNull(),
   deletedAt: integer('deleted_at'),
@@ -58,6 +59,7 @@ export const assetReferences = sqliteTable('asset_references', {
   label: text('label'),
   mimeType: text('mime_type'),
   sizeBytes: integer('size_bytes'),
+  aiClassification: text('ai_classification'), // V2: JSON result from Vision LLM classification
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_asset_refs_project_id').on(t.projectId),
@@ -122,6 +124,7 @@ export const generationLogs = sqliteTable('generation_logs', {
   durationMs: integer('duration_ms'),
   status: text('status').notNull(),
   errorMessage: text('error_message'),
+  logsJson: text('logs_json'), // V2: JSON array of real-time processing logs
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_gen_logs_project_id').on(t.projectId),

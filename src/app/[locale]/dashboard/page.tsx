@@ -1,9 +1,12 @@
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { count, avg, eq, and, isNull } from 'drizzle-orm';
 import { requireSession } from '@/lib/auth/middleware';
-import { db } from '@/lib/db/client';
-import { projects, generationLogs } from '@/lib/db/schema';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getDashboardStats } from '@/lib/db/repositories/dashboard.repo';
+import { MetricCard } from '@/components/dashboard/metric-card';
+import { WeeklyTrendChart } from '@/components/dashboard/weekly-trend-chart';
+import { SuccessFailBarChart } from '@/components/dashboard/success-fail-bar-chart';
+import { PerProviderBreakdownTable } from '@/components/dashboard/per-provider-breakdown-table';
+import { RecentActivityTable } from '@/components/dashboard/recent-activity-table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,55 +20,57 @@ export default async function DashboardPage({
   const user = await requireSession();
   const t = await getTranslations({ locale, namespace: 'dashboard' });
 
-  const [projectCount] = await db
-    .select({ value: count() })
-    .from(projects)
-    .where(and(eq(projects.userId, user.id), isNull(projects.deletedAt)));
-  const [successCount] = await db
-    .select({ value: count() })
-    .from(generationLogs)
-    .where(
-      and(
-        eq(generationLogs.projectId, projects.id),
-        eq(projects.userId, user.id),
-        eq(generationLogs.status, 'success'),
-      ),
-    );
-  const [avgDuration] = await db
-    .select({ value: avg(generationLogs.durationMs) })
-    .from(generationLogs)
-    .where(
-      and(
-        eq(generationLogs.projectId, projects.id),
-        eq(projects.userId, user.id),
-      ),
-    );
+  // V2: use repository pattern instead of direct Drizzle queries (L32, L37)
+  const stats = await getDashboardStats(user.id);
 
-  const cards: { title: string; value: string; desc: string }[] = [
-    { title: t('kpi1Title'), value: String(projectCount?.value ?? 0), desc: t('kpi1Desc') },
-    { title: t('kpi5Title'), value: String(successCount?.value ?? 0), desc: t('kpi5Desc') },
-    {
-      title: t('kpiLatencyTitle'),
-      value: avgDuration?.value ? `${Math.round(Number(avgDuration.value) / 1000)}s` : '—',
-      desc: t('kpiLatencyDesc'),
-    },
-  ];
+  const storageMB = (stats.storageBytes / (1024 * 1024)).toFixed(1);
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">{t('title')}</h1>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {cards.map((c) => (
-          <Card key={c.title}>
-            <CardHeader>
-              <CardTitle className="text-base">{c.title}</CardTitle>
-              <CardDescription>{c.desc}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{c.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+
+      {/* 6-8 Metric Cards */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <MetricCard title={t('kpi1Title')} value={stats.totalProjects} description={t('kpi1Desc')} />
+        <MetricCard title={t('kpi5Title')} value={stats.successfulGenerations} description={t('kpi5Desc')} />
+        <MetricCard title="Gagal" value={stats.failedGenerations} description="Generate yang gagal" />
+        <MetricCard title="Partial" value={stats.partialGenerations} description="Generate dengan warning" />
+        <MetricCard
+          title={t('kpiLatencyTitle')}
+          value={stats.avgDurationMs ? `${Math.round(stats.avgDurationMs / 1000)}s` : '—'}
+          description={t('kpiLatencyDesc')}
+        />
+        <MetricCard title="Storage" value={`${storageMB} MB`} description="Total ukuran referensi" />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Proyek per Minggu</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WeeklyTrendChart data={stats.weeklyTrend} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Sukses vs Gagal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SuccessFailBarChart
+              success={stats.successfulGenerations}
+              failed={stats.failedGenerations}
+              partial={stats.partialGenerations}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tables Row */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <PerProviderBreakdownTable rows={stats.perProviderBreakdown} />
+        <RecentActivityTable projects={stats.recentProjects} />
       </div>
     </div>
   );

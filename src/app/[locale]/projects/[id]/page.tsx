@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { PromptPackageSchema } from '@/lib/validation/schemas';
 import { ResultTabs } from '@/components/generate/result-tabs';
-import { DropzoneUploader } from '@/components/generate/dropzone-uploader';
+import { DeleteProjectButton } from '@/components/projects/delete-project-button';
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id: idStr } = await params;
@@ -32,11 +32,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">{dto.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-sm text-muted-foreground">
             {dto.durationType} • {dto.durationTargetSeconds}s • {dto.styleType} {dto.aspectRatio}
             {' • '}
             <Badge variant={dto.status === 'complete' ? 'success' : 'secondary'}>{dto.status}</Badge>
-          </p>
+          </div>
+          {/* V2: show story description if present */}
+          {dto.storyDescription && (
+            <p className="mt-2 text-sm text-muted-foreground italic max-w-xl">{dto.storyDescription}</p>
+          )}
         </div>
         <div className="flex gap-2">
           <a href={`/api/v1/projects/${dto.id}/export?format=json`} target="_blank" rel="noreferrer">
@@ -48,9 +52,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Link href={`/${locale}/generate`}>
             <Button size="sm">Generate Baru</Button>
           </Link>
+          <DeleteProjectButton projectId={dto.id} projectTitle={dto.title} />
         </div>
       </div>
 
+      {/* V2: read-only refs (upload moved to generate page) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('references')}</CardTitle>
@@ -68,12 +74,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     <img src={r.blobUrl} alt={r.label ?? r.filename} className="h-full w-full object-cover" />
                   </div>
                   <div className="mt-1 truncate text-xs font-medium" title={r.filename}>{r.filename}</div>
-                  <Badge variant="secondary" className="mt-1 text-[10px]">{r.tipe}</Badge>
+                  <div className="mt-1 flex items-center gap-1">
+                    <Badge variant="secondary" className="text-[10px]">{r.tipe}</Badge>
+                    {/* V2: show AI classification badge if present */}
+                    {r.aiClassification && (
+                      <Badge variant="info" className="text-[10px]">AI</Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          <DropzoneUploader projectId={dto.id} onUploaded={() => {}} />
         </CardContent>
       </Card>
 

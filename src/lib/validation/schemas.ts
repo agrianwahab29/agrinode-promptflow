@@ -103,9 +103,13 @@ export const CreateProviderConfigInputSchema = z.object({
 
 export const UpdateProviderConfigInputSchema = CreateProviderConfigInputSchema.partial().omit({ provider: true });
 
+// V2: 6-tipe role classification
+export const AssetRoleEnum = z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']);
+export type AssetRole = z.infer<typeof AssetRoleEnum>;
+
 export const GenerateReferenceSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(['tokoh', 'background']),
+  type: AssetRoleEnum,
 });
 
 export const GenerateInputSchema = z.object({
@@ -125,6 +129,7 @@ export const GenerateInputSchema = z.object({
     }),
     providerId: z.number().int().positive().optional(),
     references: z.array(GenerateReferenceSchema).optional(),
+    storyDescription: z.string().max(500).optional(), // V2: optional story context
   }),
 });
 
@@ -176,3 +181,22 @@ export const ErrorCodeEnum = z.enum([
   'BAD_GATEWAY',
   'SERVICE_UNAVAILABLE',
 ]);
+
+// ===== V2: AI Classification Schema =====
+export const ClassificationResultSchema = z.object({
+  role: AssetRoleEnum,
+  label: z.string(),
+  confidence: z.number().min(0).max(1),
+  description: z.string().optional(),
+});
+
+export type ClassificationResult = z.infer<typeof ClassificationResultSchema>;
+
+// ===== V2: SSE Log Entry Schema =====
+export const SseLogEntrySchema = z.object({
+  level: z.enum(['info', 'warn', 'error']),
+  message: z.string(),
+  timestamp: z.number(),
+});
+
+export type SseLogEntry = z.infer<typeof SseLogEntrySchema>;

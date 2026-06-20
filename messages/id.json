@@ -5,6 +5,7 @@
     "settings": "Pengaturan",
     "dashboard": "Dasbor",
     "login": "Masuk",
+    "register": "Daftar",
     "logout": "Keluar"
   },
   "landing": {
@@ -23,10 +24,15 @@
     "loginTitle": "Masuk ke PromptFlow",
     "loginSubtitle": "Selamat datang kembali",
     "login": "Masuk",
-    "register": "Daftar"
+    "register": "Daftar",
+    "registerTitle": "Daftar Akun PromptFlow",
+    "registerSubtitle": "Buat akun baru gratis"
   },
   "generate": {
-    "title": "Generate Prompt"
+    "title": "Generate Prompt",
+    "storyDescription": "Deskripsi Cerita (opsional, max 500)",
+    "uploadReferences": "Upload Referensi Gambar (opsional)",
+    "extraReferences": "Referensi Tambahan (nama file, satu per baris)"
   },
   "projects": {
     "title": "Proyek Saya",
@@ -53,7 +59,17 @@
     "kpi5Title": "Generate Sukses",
     "kpi5Desc": "Jumlah generate yang berhasil",
     "kpiLatencyTitle": "Latency Rata-rata",
-    "kpiLatencyDesc": "Waktu rata-rata per generate"
+    "kpiLatencyDesc": "Waktu rata-rata per generate",
+    "failedTitle": "Gagal",
+    "failedDesc": "Generate yang gagal",
+    "partialTitle": "Partial",
+    "partialDesc": "Generate dengan warning",
+    "storageTitle": "Storage",
+    "storageDesc": "Total ukuran referensi",
+    "weeklyTrendTitle": "Proyek per Minggu",
+    "successFailTitle": "Sukses vs Gagal",
+    "providerBreakdownTitle": "Per-Provider Breakdown",
+    "recentProjectsTitle": "Proyek Terbaru"
   },
   "settings": {
     "title": "Pengaturan",

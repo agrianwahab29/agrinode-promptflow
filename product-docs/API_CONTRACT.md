@@ -1,13 +1,13 @@
 # API Contract — PromptFlow
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/PRD.md` + `product-docs/SRS.md` + `product-docs/DATABASE_SCHEMA.md` + `product-docs/PROJECT_ARCHITECTURE.md` (bersitasi per klaim penting)
+> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/PRD.md` V2.0 + `product-docs/SRS.md` V2.0 + `product-docs/DATABASE_SCHEMA.md` V2.0
 > **Root proyek:** `C:\laragon\www\PromptFlow`
 > **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Catatan:** Kontrak API diturunkan dari SRS §7 (Interface/API Overview, 13 route, error envelope asumsi, streaming SSE) + PRD §8.2 (PromptPackageSchema) + DATABASE_SCHEMA (entitas & field) + PROJECT_ARCHITECTURE (folder, route, lib/ai, lib/db). Setiap endpoint tertelusur ke fitur PRD (FR-XX) + realisasi SRS. Item tanpa bukti eksplisit ditandai "ASUMSI".
+> **Catatan:** OVERWRITE V1.0. V2 mempertahankan semua 21 endpoint V1 + menambahkan 2 endpoint baru (upload/classify, dashboard/stats) + perubahan backward-compatible pada upload, generate, projects, dashboard, SSE protocol. Semua perubahan V2 ADDITIVE — tidak ada endpoint V1 yang dihapus.
 
 ---
 
@@ -17,17 +17,18 @@
 2. Autentikasi & Otorisasi
 3. Konvensi Umum
 4. Pagination, Sorting, Filtering, Searching
-5. Daftar Endpoint (tabel ringkas)
+5. Daftar Endpoint (Tabel Ringkas)
 6. Detail Endpoint per Grup
-7. SSE Event Protocol (POST /api/v1/generate)
-8. Schemas (Zod)
+7. SSE Event Protocol V2 (POST /api/v1/generate)
+8. Schemas (Zod V2)
 9. Error Envelope
 10. Rate Limiting
 11. Header Standar, CORS, Keamanan
 12. Backward-Compat & Deprecation
 13. Webhook / Async
 14. Daftar Status Code
-15. Asumsi API + Referensi
+15. Changelog V1 to V2
+16. Asumsi API + Referensi
 
 ---
 
@@ -35,41 +36,42 @@
 
 ### 1.1 Ringkasan
 
-PromptFlow = web app fullstack Next.js App Router. API = **Route Handlers** (`src/app/api/*/route.ts`) + **Server Actions** (mutation dari Client Component). Response utama = **JSON** untuk CRUD/setting/upload/export; **SSE (`text/event-stream`)** untuk endpoint generate yang memanggil LLM streaming.
+PromptFlow = web app fullstack Next.js App Router. API = **Route Handlers** (`src/app/api/v1/*/route.ts`) + **Server Actions** (mutation dari Client Component). Response utama = **JSON** untuk CRUD/setting/upload/export/classify; **SSE (`text/event-stream`)** untuk endpoint generate yang memanggil LLM streaming.
 
-- Sitasi: `SRS.md 7` ; `PROJECT_ARCHITECTURE.md 5 (src/app/api)`
+- Sitasi: `SRS.md V2.0 S4.1` ; `RAG-CONTEXT.md S3` ; `API_CONTRACT.md V1 S1.1`
 
 | Aspek | Nilai | Bukti |
 |---|---|---|
-| Tipe API | REST (Route Handlers) + Server Actions + SSE untuk streaming LLM | `SRS.md 3.2 Layer 2, 7` |
-| Format request | `application/json` (CRUD/setting), `multipart/form-data` (upload), `application/json` (generate) | `SRS.md 7` |
-| Format response | `application/json` (CRUD/setting), `text/event-stream` (generate), `application/json` / `text/markdown` (export) | `SRS.md 7.2` |
-| Auth | NextAuth.js session cookie (Bearer token opsional ASUMSI) | `SRS.md 5 (FR-18), 9.1 SEC-11` ; `PROJECT_ARCHITECTURE.md 7.4` |
-| Multi-provider LLM | Server-side only via `createOpenAICompatible` (Ollama cloud/OpenRouter/9router/custom). API key user dienkripsi at rest | `RAG-CONTEXT.md 5.1` ; `SRS.md 5 (FR-13, FR-14), 9.1 SEC-03` |
+| Tipe API | REST (Route Handlers) + Server Actions + SSE untuk streaming LLM | `SRS.md V2.0 S4.1` |
+| Format request | `application/json` (CRUD/setting/generate), `multipart/form-data` (upload), `application/json` (classify) | `SRS.md V2.0 S8` |
+| Format response | `application/json` (CRUD/setting), `text/event-stream` (generate), `application/json`/`text/markdown` (export) | `SRS.md V2.0 S8.4` |
+| Auth | NextAuth.js session cookie (JWT strategy) | `SRS.md V2.0 S10.1 SEC-11` |
+| Multi-provider LLM | Server-side only via `createOpenAICompatible` (Ollama cloud/OpenRouter/9router/custom). API key user dienkripsi at rest | `RAG-CONTEXT.md S5.1` ; `SRS.md V2.0 S10.1 SEC-03` |
+| **V2 Vision LLM** | Auto-trigger saat upload untuk image classification (GPT-4o / Gemini Vision) | `PRD.md V2.0 S5 FR-V2-02` ; `RAG-CONTEXT.md S9 V2-3` |
 
 ### 1.2 Base URL + Environment
 
 | Environment | Base URL | Catatan | Bukti |
 |---|---|---|---|
-| Dev (lokal) | `http://localhost:3000/api/v1` | Next.js dev server. 9router `http://localhost:20128/v1` reachable | ASUMSI `RAG-CONTEXT.md 5.2` |
-| Staging | `https://<staging>.vercel.app/api/v1` | Vercel preview deployment | ASUMSI `RAG-CONTEXT.md 2.1` |
-| Prod | `https://<prod-domain>/api/v1` | Vercel production, HTTPS default | `SRS.md 9.1 SEC-09` |
+| Dev (lokal) | `http://localhost:3000/api/v1` | Next.js dev server. 9router `http://localhost:20128/v1` reachable | `RAG-CONTEXT.md S5.2` |
+| Staging | `https://<staging>.vercel.app/api/v1` | Vercel preview deployment | `RAG-CONTEXT.md S2.1` |
+| Prod | `https://<prod-domain>/api/v1` | Vercel production, HTTPS default | `SRS.md V2.0 S10.1 SEC-09` |
 
-> 9router (`http://localhost:20128/v1`) = **dev/local only**, tidak reachable dari Vercel prod. Prod: user pakai Ollama cloud/OpenRouter/custom. Sitasi: `RAG-CONTEXT.md 5.2, 9 G4` ; `PROJECT_ARCHITECTURE.md 7.1, 8`.
+> 9router (`http://localhost:20128/v1`) = **dev/local only**, tidak reachable dari Vercel prod. Prod: user pakai Ollama cloud/OpenRouter/custom. Sitasi: `RAG-CONTEXT.md S5.2, S9 G4` ; `SRS.md V2.0 S10.1 SEC-04`.
 
 ### 1.3 Versioning
 
 | Strategi | Rekomendasi | Justifikasi | Bukti |
 |---|---|---|---|
-| **URI prefix** `/api/v1/*` | **DIPILIH** (ASUMSI) | Eksplisit, cache-friendly, mudah migrate. Cocok Next.js App Router (folder `/api/v1/projects/route.ts`) | ASUMSI (paket konteks) |
-| Header `Accept-Version: 1` | Alternatif | URL tetap bersih, tapi butuh middleware parse | ASUMSI |
+| **URI prefix** `/api/v1/*` | **DIPILIH** | Eksplisit, cache-friendly, mudah migrate. Locked di REVIEW_REPORT WARN-002. | `REVIEW_REPORT.md S10 WARN-002` |
+| Header `Accept-Version: 1` | Alternatif | URL tetap bersih, tapi butuh middleware parse | — |
 | No versioning | Tidak direkomendasi | Sulit breaking change fase akhir | — |
 
-**Aturan:**
+**Aturan versioning:**
 - Versi mayor di URI: `/api/v1`, `/api/v2` (future).
 - Breaking change = bump mayor. Non-breaking (additive field, new endpoint) tetap v1.
-- Catatan: SRS §7.1 & PROJECT_ARCHITECTURE §5 mendokumentasikan route tanpa prefix (`/api/projects`). Implementasi Route Handler sebaiknya pakai struktur folder `/api/v1/projects/route.ts` agar selaras kontrak ini (ASUMSI — keputusan final bisa di `/api/*` murni bila user prefer).
-- Server Actions (mutation dari Client Component) tidak punya URI version terpisah — ikut versi modul yang memanggilnya. Server Action = internal contract, tidak diekspos ke pihak ketiga.
+- V2 changes = SEMUA additive — tetap di `/api/v1/*`. Tidak perlu `/api/v2/*` untuk V2.
+- Server Actions tidak punya URI version terpisah — internal contract.
 
 ---
 
@@ -79,51 +81,54 @@ PromptFlow = web app fullstack Next.js App Router. API = **Route Handlers** (`sr
 
 | Aspek | Nilai | Bukti |
 |---|---|---|
-| Mekanisme | NextAuth.js (Auth.js v5+) credentials provider | `SRS.md 5 (FR-18), 4.1` ; ASUMSI SRS-A1 `RAG-CONTEXT.md 9 G2` |
-| Token/session | JWT cookie session (atau Turso adapter DB session) | `PROJECT_ARCHITECTURE.md 7.4` ; ASUMSI ARCH-A13 |
-| Cara dapat session | POST `/api/v1/auth/[...nextauth]` (login callback NextAuth) | `SRS.md 7.1` |
-| Masa berlaku | NextAuth default (JWT refresh). ASUMSI 30 hari idle | ASUMSI |
+| Mekanisme | NextAuth.js (Auth.js v5+) credentials provider | `SRS.md V2.0 S4.1, S10.1 SEC-11` ; `RAG-CONTEXT.md S5.3` |
+| Token/session | JWT cookie session | `RAG-CONTEXT.md S5.3` ; `AGENTS.md S10 SEC-16` |
+| Cara dapat session | POST `/api/v1/auth/[...nextauth]` (login callback NextAuth) | `SRS.md V2.0 S7.1` |
+| Masa berlaku | NextAuth default (JWT auto-refresh) | ASUMSI |
 | Refresh | NextAuth JWT auto-refresh bila session active | ASUMSI |
-| Bearer alternatif | Opsional `Authorization: Bearer <nextauth-jwt>` untuk API terprogram (ASUMSI — bila user butuh akses API non-browser) | ASUMSI |
+| Bearer alternatif | Opsional `Authorization: Bearer <nextauth-jwt>` untuk API terprogram (fase akhir) | ASUMSI |
 
 ### 2.2 Protected Routes
 
-Middleware `lib/auth/middleware.ts` proteksi:
-- Pages: `/projects`, `/settings`, `/generate` (redirect ke `/login` bila unauth)
+Middleware `src/middleware.ts` proteksi:
+- Pages: `/projects`, `/projects/[id]`, `/settings`, `/generate`, `/dashboard` (redirect ke `/login` bila unauth)
 - API: `/api/v1/*` kecuali `/api/v1/auth/*` dan `/api/v1/health`
-- Sitasi: `SRS.md 9.1 SEC-11` ; `PROJECT_ARCHITECTURE.md 7.4, 9 SB-06`
+- Public paths: `/login`, `/register`, `/api/auth`, `/api/v1/auth`, `/api/v1/health`, `/_next`, `/favicon.ico`, `/robots.txt`
+- Sitasi: `SRS.md V2.0 S10.1 SEC-11` ; `RAG-CONTEXT.md S5.3`
 
-### 2.3 RBAC / Scope per Endpoint
+### 2.3 RBAC / Scope per Endpoint (V2)
 
-Ownership check: `project.user_id === session.user.id` / `provider_configs.user_id === session.user.id`. User hanya akses resource miliknya. Sitasi: `SRS.md 9.1 SEC-07` ; `DATABASE_SCHEMA.md 11.3`.
+Ownership check: `project.user_id === session.user.id` / `provider_configs.user_id === session.user.id` / `asset_references.project_id -> projects.user_id`. User hanya akses resource miliknya. Sitasi: `SRS.md V2.0 S10.1 SEC-07` ; `DATABASE_SCHEMA.md V2.0 S5.2`.
 
-| Endpoint | Auth | Scope/Ownership | Bukti |
-|---|---|---|---|
-| `POST /api/v1/auth/[...nextauth]` | Public | NextAuth handler | `SRS.md 7.1` |
-| `GET /api/v1/auth/session` | Session | Ambil session sendiri | ASUMSI |
-| `GET /api/v1/health` | Public | Health check | ASUMSI |
-| `GET /api/v1/projects` | wajib | Filter `user_id = session.user.id` | `SRS.md 5 (FR-15), 9.1 SEC-07` |
-| `POST /api/v1/projects` | wajib | Bind `user_id = session.user.id` | `SRS.md 5 (FR-15)` |
-| `GET /api/v1/projects/[id]` | wajib | Ownership check | `SRS.md 5 (FR-15)` |
-| `PATCH /api/v1/projects/[id]` | wajib | Ownership check | `SRS.md 5 (FR-15)` |
-| `DELETE /api/v1/projects/[id]` | wajib | Ownership check (soft delete) | `SRS.md 5 (FR-15)` |
-| `POST /api/v1/generate` | wajib | Provider config milik user | `SRS.md 5 (FR-03..FR-12)` |
-| `GET /api/v1/settings/providers` | wajib | Filter `user_id` | `SRS.md 5 (FR-13)` |
-| `POST /api/v1/settings/providers` | wajib | Bind `user_id` | `SRS.md 5 (FR-13, FR-14)` |
-| `PATCH /api/v1/settings/providers/[id]` | wajib | Ownership check | `SRS.md 5 (FR-13)` |
-| `DELETE /api/v1/settings/providers/[id]` | wajib | Ownership check | `SRS.md 5 (FR-13)` |
-| `POST /api/v1/settings/providers/[id]/test` | wajib | Ownership check | ASUMSI |
-| `POST /api/v1/upload` | wajib | Bind file ke project milik user | `SRS.md 5 (FR-17)` |
-| `DELETE /api/v1/upload` | wajib | Ownership project | `SRS.md 5 (FR-17)` |
-| `GET /api/v1/projects/[id]/export` | wajib | Ownership check | `SRS.md 5 (FR-16)` |
-| `GET /api/v1/projects/[id]/characters` | wajib | Ownership check | `DATABASE_SCHEMA.md 4.5` |
-| `GET /api/v1/projects/[id]/scenes` | wajib | Ownership check | `DATABASE_SCHEMA.md 4.6` |
-| `GET /api/v1/projects/[id]/image-prompts` | wajib | Ownership check | `DATABASE_SCHEMA.md 4.7` |
-| `GET /api/v1/projects/[id]/logs` | wajib | Ownership check | `DATABASE_SCHEMA.md 4.8` |
+| Endpoint | Auth | Scope/Ownership | V2 Change | Bukti |
+|---|---|---|---|---|
+| `POST /api/v1/auth/[...nextauth]` | Public | NextAuth handler | Tetap | `SRS.md V2.0 S7.1` |
+| `GET /api/v1/auth/session` | Session | Ambil session sendiri | Tetap | ASUMSI |
+| `GET /api/v1/health` | Public | Health check | Tetap | ASUMSI |
+| `GET /api/v1/projects` | wajib | Filter `user_id` | **Pagination enhanced** | `PRD.md V2.0 S9.2` |
+| `POST /api/v1/projects` | wajib | Bind `user_id` | **Tambah `storyDescription`** | `PRD.md V2.0 S9.2` |
+| `GET /api/v1/projects/[id]` | wajib | Ownership check | Tetap | `SRS.md V2.0 S7.1` |
+| `PATCH /api/v1/projects/[id]` | wajib | Ownership check | Tetap | `SRS.md V2.0 S7.1` |
+| `DELETE /api/v1/projects/[id]` | wajib | Ownership (soft delete) | Tetap | `SRS.md V2.0 S7.1` |
+| `POST /api/v1/generate` | wajib | Provider config milik user | **Tambah `storyDescription`. SSE tambah `log` event.** | `PRD.md V2.0 S9.2` |
+| `GET /api/v1/settings/providers` | wajib | Filter `user_id` | Tetap | `SRS.md V2.0 S7.1` |
+| `POST /api/v1/settings/providers` | wajib | Bind `user_id` | Tetap | `SRS.md V2.0 S7.1` |
+| `PATCH /api/v1/settings/providers/[id]` | wajib | Ownership check | Tetap | `SRS.md V2.0 S7.1` |
+| `DELETE /api/v1/settings/providers/[id]` | wajib | Ownership check | Tetap | `SRS.md V2.0 S7.1` |
+| `POST /api/v1/settings/providers/[id]/test` | wajib | Ownership check | Tetap | ASUMSI |
+| `POST /api/v1/upload` | wajib | Bind ke project atau pre-submit | **MAJOR: projectId OPSIONAL. tipe 6 opsi. Response +aiClassification.** | `PRD.md V2.0 S9.2` |
+| **`POST /api/v1/upload/classify`** | wajib | Ownership via asset ref | **NEW V2** | `PRD.md V2.0 S9.3` |
+| `DELETE /api/v1/upload` | wajib | Ownership project | Tetap | `SRS.md V2.0 S7.1` |
+| `GET /api/v1/projects/[id]/export` | wajib | Ownership check | Tetap | `SRS.md V2.0 S7.1` |
+| `GET /api/v1/projects/[id]/characters` | wajib | Ownership check | Tetap | `DATABASE_SCHEMA.md V2.0 S4.5` |
+| `GET /api/v1/projects/[id]/scenes` | wajib | Ownership check | Tetap | `DATABASE_SCHEMA.md V2.0 S4.6` |
+| `GET /api/v1/projects/[id]/image-prompts` | wajib | Ownership check | Tetap | `DATABASE_SCHEMA.md V2.0 S4.7` |
+| `GET /api/v1/projects/[id]/logs` | wajib | Ownership check | Response +`logsJson` | `DATABASE_SCHEMA.md V2.0 S4.8` |
+| **`GET /api/v1/dashboard/stats`** | wajib | Filter `user_id` | **NEW V2** | `PRD.md V2.0 S9.2` |
 
 ### 2.4 API Key User (LLM Provider) — Server-Side Only
 
-API key user untuk LLM provider (Ollama/OpenRouter/9router/custom) **TIDAK** dipakai client untuk autentikasi PromptFlow API. Disimpan terenkripsi (AES-256-GCM) di `provider_configs.api_key_encrypted`, di-decrypt hanya server-side di `lib/ai/provider-registry.ts` saat panggil LLM. Response API = mask `****`. Sitasi: `SRS.md 5 (FR-14), 9.1 SEC-01/SEC-02/SEC-03` ; `DATABASE_SCHEMA.md 11.1`.
+API key user untuk LLM provider **TIDAK** dipakai client untuk autentikasi PromptFlow API. Disimpan terenkripsi (AES-256-GCM) di `provider_configs.api_key_encrypted`, di-decrypt hanya server-side. Response API = mask `****`. Sitasi: `SRS.md V2.0 S10.1 SEC-01/SEC-02/SEC-03` ; `DATABASE_SCHEMA.md V2.0 S12.1`.
 
 ---
 
@@ -133,68 +138,58 @@ API key user untuk LLM provider (Ollama/OpenRouter/9router/custom) **TIDAK** dip
 
 | Aspek | Nilai | Bukti |
 |---|---|---|
-| Content-Type request | `application/json; charset=utf-8` (CRUD/setting/generate), `multipart/form-data` (upload) | `SRS.md 7` |
-| Content-Type response | `application/json; charset=utf-8` (CRUD/setting), `text/event-stream; charset=utf-8` (generate), `application/json` / `text/markdown` (export, dengan `Content-Disposition: attachment`) | `SRS.md 7.2` |
-| Casing field JSON | **camelCase** untuk request body + response JSON (konvensi JS/Next.js). Catatan: kolom DB snake_case (`DATABASE_SCHEMA.md`), mapping di repository layer | ASUMSI (best practice Next.js) |
-| Casing field PromptPackageSchema (LLM output) | **snake_case-ish native**: `character_profiles`, `image_prompts`, `voiceover_script`, `moral_message`, `deskripsi_latar`, `alas_kaki`, `pakaian_atas`, `pakaian_bawah`, `wajah_asal`, `gayarambut` (sesuai PRD §8.2 + SRS §8.7) | `PRD.md 8.2` ; `SRS.md 8.7` |
+| Content-Type request | `application/json; charset=utf-8` (CRUD/setting/generate/classify), `multipart/form-data` (upload) | `SRS.md V2.0 S8` |
+| Content-Type response | `application/json` (CRUD/setting/classify/dashboard), `text/event-stream` (generate), `text/markdown` (export) | `SRS.md V2.0 S8.4` |
+| Casing field JSON | **camelCase** untuk request/response. DB snake_case, mapping di repository | ASUMSI |
+| Casing PromptPackageSchema | **snake_case-ish native**: `character_profiles`, `image_prompts`, `voiceover_script`, `moral_message`, `deskripsi_latar`, `alas_kaki`, `pakaian_atas`, `pakaian_bawah`, `wajah_asal`, `gayarambut` | `PRD.md V2.0 S8.2` |
 | Encoding | UTF-8 | ASUMSI |
-| Date/time | ISO-8601 string (`2026-06-19T12:00:00Z`) di JSON response. DB simpan unix epoch integer (`DATABASE_SCHEMA.md 1.3`) — mapping di repository | ASUMSI |
-| ID | integer auto-increment (DB) → return sebagai number di JSON | `DATABASE_SCHEMA.md 4` |
+| Date/time | ISO-8601 string di JSON. DB simpan unix epoch integer — mapping di repository | ASUMSI |
+| ID | integer auto-increment (DB) -> return sebagai number di JSON | `DATABASE_SCHEMA.md V2.0 S4` |
 
 ### 3.2 Envelope Respons Sukses
 
-**CRUD / Setting (single resource):**
+**CRUD / Setting / Classify / Dashboard (single resource):**
 ```json
-{
-  "data": { }
-}
+{ "data": { } }
 ```
 
 **CRUD / Setting (list paginated):**
 ```json
-{
-  "data": [ ],
-  "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 }
-}
+{ "data": [ ], "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 } }
 ```
 
-**Generate (SSE):** Lihat §7 SSE Event Protocol. Bukan JSON envelope, tapi event stream.
+**Generate (SSE):** Lihat §7 SSE Event Protocol V2.
+**Export:** Body = file content, header `Content-Disposition: attachment`.
 
-**Export:** Body = file content (JSON/markdown), header `Content-Disposition: attachment`. Bukan envelope.
-
-> Catatan: ASUMSI envelope `data` + `pagination`. Bisa disederhanakan ke flat object bila user prefer. SRS §7.3 hanya definisikan error envelope, tidak sukses envelope.
-
-### 3.3 Error Envelope (ASUMSI)
+### 3.3 Error Envelope
 
 ```json
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Title minimal 3 karakter",
-    "details": { "field": "title", "min": 3, "received": 2 }
-  },
+  "error": { "code": "VALIDATION_ERROR", "message": "Title minimal 3 karakter", "details": { "field": "title", "min": 3, "received": 2 } },
   "traceId": "req_abc123"
 }
 ```
 
 | Field | Tipe | Wajib | Deskripsi | Bukti |
 |---|---|---|---|---|
-| `error.code` | string | YA | Kode error stabil (lihat §9) | `SRS.md 7.3` |
-| `error.message` | string | YA | Pesan bahasa aktif (ID/EN, FR-19) | `SRS.md 7.3` ; `PRD.md 5 (FR-19)` |
-| `error.details` | object | TIDAK | Detail tambahan (field Zod error, provider error context) | `SRS.md 7.3` |
-| `traceId` | string | TIDAK | ID trace untuk debugging (ASUMSI) | ASUMSI |
+| `error.code` | string | YA | Kode error stabil (lihat §9) | `SRS.md V2.0 S8.5` |
+| `error.message` | string | YA | Pesan bahasa aktif (ID/EN) | `SRS.md V2.0 S8.5` |
+| `error.details` | object | TIDAK | Detail tambahan | `SRS.md V2.0 S8.5` |
+| `traceId` | string | TIDAK | ID trace untuk debugging | ASUMSI |
+
+**V2 tambahan code:** `CLASSIFICATION_ERROR`. Lihat §9.
 
 ### 3.4 Idempotency
 
 | Endpoint | Idempotent? | Mekanisme | Bukti |
 |---|---|---|---|
 | GET, PATCH, DELETE | Ya (by design) | Resource by id | ASUMSI |
-| POST /api/v1/projects | Tidak | Setiap create = record baru. Tidak ada natural key unik per user | ASUMSI |
-| POST /api/v1/generate | Tidak | Setiap generate = log baru + overwrite `result_json` bila projectId ada | ASUMSI |
-| POST /api/v1/upload | Tidak | Setiap upload = `asset_references` baru. Filename bisa sama (overwrite Blob ASUMSI) | ASUMSI |
-| POST /api/v1/settings/providers | Tidak, tapi unique constraint | Unique (`user_id`, `name`) → 409 bila duplikat | `DATABASE_SCHEMA.md 4.2` |
-
-Header idempotency-key (`Idempotency-Key: <uuid>`) tidak diimplementasi fase awal (ASUMSI — bisa ditambah fase akhir untuk retry aman).
+| POST /api/v1/projects | Tidak | Setiap create = record baru | ASUMSI |
+| POST /api/v1/generate | Tidak | Setiap generate = log baru + overwrite `result_json` | ASUMSI |
+| POST /api/v1/upload | Tidak | Setiap upload = `asset_references` baru. **V2: projectId opsional** | `SRS.md V2.0 S6.1` |
+| POST /api/v1/upload/classify | Ya (by assetReferenceId) | Cached | `PRD.md V2.0 S5 FR-V2-02` |
+| POST /api/v1/settings/providers | Tidak, tapi unique constraint | Unique (`user_id`, `name`) -> 409 | `DATABASE_SCHEMA.md V2.0 S4.2` |
+| GET /api/v1/dashboard/stats | Ya (read-only) | Cache bisa dipakai | ASUMSI |
 
 ### 3.5 Timezone
 
@@ -204,20 +199,16 @@ Semua timestamp di JSON response = ISO-8601 UTC (`Z` suffix). DB simpan unix epo
 
 ## 4. Pagination, Sorting, Filtering, Searching
 
-### 4.1 Pagination
+### 4.1 Pagination (V2 Enhanced)
 
-Query parameter standar untuk endpoint list (`GET /api/v1/projects`, `GET /api/v1/projects/[id]/logs`, dll).
-
-| Param | Tipe | Default | Validasi | Bukti |
-|---|---|---|---|---|
-| `page` | integer | 1 | `>= 1` | ASUMSI (paket konteks) |
-| `limit` | integer | 20 | `1..100` (ASUMSI max 100) | ASUMSI |
+| Param | Tipe | Default | Validasi | V2 Change | Bukti |
+|---|---|---|---|---|---|
+| `page` | integer | 1 | `>= 1` | Tetap | ASUMSI |
+| `limit` | integer | 20 | `1..100` | **V2: enforced di server** | `PRD.md V2.0 S9.2` |
 
 Response metadata:
 ```json
-{
-  "pagination": { "page": 1, "limit": 20, "total": 47, "totalPages": 3 }
-}
+{ "pagination": { "page": 1, "limit": 20, "total": 47, "totalPages": 3 } }
 ```
 
 ### 4.2 Sorting
@@ -226,88 +217,73 @@ Response metadata:
 |---|---|---|---|---|
 | `sort` | string | per endpoint | `<field>:asc|desc` | `sort=createdAt:desc` |
 
-Contoh: `GET /api/v1/projects?sort=createdAt:desc` → list project terbaru. Default project: `createdAt:desc` (via index `idx_projects_user_created`). Sitasi: `DATABASE_SCHEMA.md 5 #4`.
-
 ### 4.3 Filtering
 
-| Endpoint | Param filter | Contoh | Bukti |
-|---|---|---|---|
-| `GET /api/v1/projects` | `status`, `durationType` | `?status=complete&durationType=shorts` | `DATABASE_SCHEMA.md 4.3` |
-| `GET /api/v1/projects/[id]/image-prompts` | `tipe`, `sceneId` | `?tipe=tokoh&sceneId=5` (varian per scene) | `DATABASE_SCHEMA.md 4.7, 6.2 #2` |
-| `GET /api/v1/projects/[id]/characters` | `peran` | `?peran=utama` | `DATABASE_SCHEMA.md 4.5` |
-
-> Filter selalu scoped per `user_id` (ownership) + `project_id` (path param). Tidak ada filter lintas user.
+| Endpoint | Param filter | Contoh | V2 Change | Bukti |
+|---|---|---|---|---|
+| `GET /api/v1/projects` | `status`, `durationType` | `?status=complete&durationType=shorts` | Tetap | `DATABASE_SCHEMA.md V2.0 S4.3` |
+| `GET /api/v1/projects/[id]/image-prompts` | `tipe`, `sceneId` | `?tipe=tokoh&sceneId=5` | **V2: `tipe` 6 opsi** | `DATABASE_SCHEMA.md V2.0 S4.7` |
+| `GET /api/v1/projects/[id]/characters` | `peran` | `?peran=utama` | Tetap | `DATABASE_SCHEMA.md V2.0 S4.5` |
+| `GET /api/v1/projects/[id]/logs` | `status`, `provider` | `?status=success&provider=openrouter` | **V2: tambah `provider` filter** | ASUMSI |
+| `GET /api/v1/dashboard/stats` | `range` | `?range=30d` | **NEW V2** | `PRD.md V2.0 S5 FR-V2-06` |
 
 ### 4.4 Searching
 
 | Endpoint | Param | Behavior | Bukti |
 |---|---|---|---|
-| `GET /api/v1/projects` | `q` | LIKE search di `title` (ASUMSI). Contoh `?q=anak` | ASUMSI |
-
-> Search di endpoint lain (characters, scenes) = fase akhir (COULD). Fase awal: list + filter saja.
+| `GET /api/v1/projects` | `q` | LIKE search di `title` | ASUMSI |
 
 ---
 
 ## 5. Daftar Endpoint (Tabel Ringkas)
 
-Total **20 endpoint** (ASUMSI — termasuk health, auth session, test connection, sub-resource list).
+Total **23 endpoint** (21 V1 + 2 V2 baru):
 
-| # | Method | Path | Nama | Auth | Ringkasan | Fitur PRD / SRS |
-|---|---|---|---|---|---|---|
-| 1 | GET/POST | `/api/v1/auth/[...nextauth]` | NextAuth handler | Public | Login/logout/session/callback NextAuth | `FR-18` ; `SRS.md 7.1` |
-| 2 | GET | `/api/v1/auth/session` | Get session | Session | Ambil session user aktif | ASUMSI |
-| 3 | GET | `/api/v1/health` | Health check | Public | Status app + DB + env | ASUMSI |
-| 4 | GET | `/api/v1/projects` | List projects | wajib | Paginate project per user | `FR-15` ; `SRS.md 7.1` |
-| 5 | POST | `/api/v1/projects` | Create project | wajib | Simpan metadata + result generate | `FR-15` ; `SRS.md 7.1` |
-| 6 | GET | `/api/v1/projects/[id]` | Detail project | wajib | By id + ownership | `FR-15` ; `SRS.md 7.1` |
-| 7 | PATCH | `/api/v1/projects/[id]` | Update project | wajib | Update metadata + re-generate overwrite | `FR-15` ; `SRS.md 7.1` |
-| 8 | DELETE | `/api/v1/projects/[id]` | Delete project | wajib | Soft delete (`deleted_at`) + cascade child | `FR-15` ; `SRS.md 7.1` |
-| 9 | POST | `/api/v1/generate` | Generate prompt package | wajib | Streaming SSE, body input → PromptPackage | `FR-03..FR-12` ; `SRS.md 7.2` |
-| 10 | GET | `/api/v1/settings/providers` | List providers | wajib | Provider config per user (key mask) | `FR-13, FR-14` ; `SRS.md 7.1` |
-| 11 | POST | `/api/v1/settings/providers` | Add provider | wajib | Save config (encrypt key) | `FR-13, FR-14` ; `SRS.md 7.1` |
-| 12 | PATCH | `/api/v1/settings/providers/[id]` | Update provider | wajib | Update config | `FR-13` ; `SRS.md 7.1` |
-| 13 | DELETE | `/api/v1/settings/providers/[id]` | Delete provider | wajib | Hapus config | `FR-13` ; `SRS.md 7.1` |
-| 14 | POST | `/api/v1/settings/providers/[id]/test` | Test connection | wajib | Test reachability provider + model | ASUMSI |
-| 15 | POST | `/api/v1/upload` | Upload reference | wajib | Multipart → Vercel Blob → AssetReference | `FR-17` ; `SRS.md 7.1` |
-| 16 | DELETE | `/api/v1/upload` | Delete reference | wajib | Hapus Blob + AssetReference by `?name=` | `FR-17` ; `SRS.md 5 (FR-17)` |
-| 17 | GET | `/api/v1/projects/[id]/export` | Export project | wajib | `?format=json\|markdown` file download | `FR-16` ; `SRS.md 7.1` |
-| 18 | GET | `/api/v1/projects/[id]/characters` | List characters | wajib | Master karakter per project | `FR-07, FR-12` ; `DATABASE_SCHEMA.md 4.5` |
-| 19 | GET | `/api/v1/projects/[id]/scenes` | List scenes | wajib | Adegan berurut per project | `FR-03, FR-09` ; `DATABASE_SCHEMA.md 4.6` |
-| 20 | GET | `/api/v1/projects/[id]/image-prompts` | List image prompts | wajib | Master + varian per scene | `FR-06` ; `DATABASE_SCHEMA.md 4.7` |
-| 21 | GET | `/api/v1/projects/[id]/logs` | List generation logs | wajib | History generate per project | `DATABASE_SCHEMA.md 4.8` ; `BRD.md 3.2 K5` |
-
-> Catatan: SRS §7.1 daftar 13 route inti. Endpoint #2, #3, #14, #18-21 = tambahan asumsi dari paket konteks / DATABASE_SCHEMA untuk kelengkapan kontrak. PATCH dipakai (bukan PUT) untuk update partial metadata project — konsisten REST. SRS §7.1 menyebut PUT; implementasi bebas PUT/PATCH asal dokumentasi konsisten.
+| # | Method | Path | Nama | Auth | V1/V2 | Ringkasan | Fitur PRD |
+|---|---|---|---|---|---|---|---|
+| 1 | GET/POST | `/api/v1/auth/[...nextauth]` | NextAuth handler | Public | V1 | Login/logout/session/callback | FR-18 |
+| 2 | GET | `/api/v1/auth/session` | Get session | Session | V1 | Ambil session user aktif | ASUMSI |
+| 3 | GET | `/api/v1/health` | Health check | Public | V1 | Status app + DB + env | ASUMSI |
+| 4 | GET | `/api/v1/projects` | List projects | wajib | V1+V2 | Paginate `?page=&limit=` per user | FR-15, FR-V2-09 |
+| 5 | POST | `/api/v1/projects` | Create project | wajib | V1+V2 | Tambah `storyDescription` opsional | FR-15, FR-V2-04 |
+| 6 | GET | `/api/v1/projects/[id]` | Detail project | wajib | V1 | By id + ownership | FR-15 |
+| 7 | PATCH | `/api/v1/projects/[id]` | Update project | wajib | V1 | Update metadata | FR-15 |
+| 8 | DELETE | `/api/v1/projects/[id]` | Delete project | wajib | V1 | Soft delete | FR-15 |
+| 9 | POST | `/api/v1/generate` | Generate prompt package | wajib | V1+V2 | SSE extended: `log` event + `storyDescription` | FR-03..FR-12, FR-V2-04, FR-V2-05 |
+| 10 | GET | `/api/v1/settings/providers` | List providers | wajib | V1 | Provider config per user (key mask) | FR-13, FR-14 |
+| 11 | POST | `/api/v1/settings/providers` | Add provider | wajib | V1 | Save config (encrypt key) | FR-13, FR-14 |
+| 12 | PATCH | `/api/v1/settings/providers/[id]` | Update provider | wajib | V1 | Update config | FR-13 |
+| 13 | DELETE | `/api/v1/settings/providers/[id]` | Delete provider | wajib | V1 | Hapus config | FR-13 |
+| 14 | POST | `/api/v1/settings/providers/[id]/test` | Test connection | wajib | V1 | Test reachability | ASUMSI |
+| 15 | POST | `/api/v1/upload` | Upload reference | wajib | **V2 MAJOR** | **projectId OPSIONAL. tipe 6 opsi. +aiClassification. Auto-classify.** | FR-17, FR-V2-01, FR-V2-02, FR-V2-03 |
+| 16 | **POST** | **`/api/v1/upload/classify`** | **AI classify** | wajib | **NEW V2** | **Trigger Vision LLM classification** | FR-V2-02 |
+| 17 | DELETE | `/api/v1/upload` | Delete reference | wajib | V1 | Hapus Blob + AssetReference | FR-17 |
+| 18 | GET | `/api/v1/projects/[id]/export` | Export project | wajib | V1 | `?format=json|markdown` | FR-16 |
+| 19 | GET | `/api/v1/projects/[id]/characters` | List characters | wajib | V1 | Master karakter per project | FR-07, FR-12 |
+| 20 | GET | `/api/v1/projects/[id]/scenes` | List scenes | wajib | V1 | Adegan berurut | FR-03, FR-09 |
+| 21 | GET | `/api/v1/projects/[id]/image-prompts` | List image prompts | wajib | V1 | Master + varian per scene | FR-06 |
+| 22 | GET | `/api/v1/projects/[id]/logs` | List generation logs | wajib | V1+V2 | Response +`logsJson` | FR-V2-05 |
+| 23 | **GET** | **`/api/v1/dashboard/stats`** | **Dashboard stats** | wajib | **NEW V2** | **Enriched dashboard data** | FR-V2-06 |
 
 ---
 
 ## 6. Detail Endpoint per Grup
 
-### 6.1 Auth — `/api/v1/auth/*`
+### 6.1 Auth — `/api/v1/auth/*` (V1 — tetap)
 
 #### 6.1.1 GET/POST `/api/v1/auth/[...nextauth]`
 
-NextAuth handler (catch-all). Tangani login, logout, session, callback, signin, signout.
+NextAuth handler (catch-all).
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | GET/POST (NextAuth routing internal) | `SRS.md 7.1` |
+| Method | GET/POST (NextAuth routing internal) | `SRS.md V2.0 S7.1` |
 | Auth | Public | — |
-| Path param | `[...nextauth]` = action NextAuth (`signin`, `signout`, `session`, `callback/credentials`) | `PROJECT_ARCHITECTURE.md 7.4` |
-| Request body | Form NextAuth credentials: `email`, `password` (provider credentials ASUMSI) | ASUMSI SRS-A1 |
-| Response sukses | Redirect / JSON session (NextAuth default) | `PROJECT_ARCHITECTURE.md 7.4` |
+| Request body | Form NextAuth credentials: `email`, `password` | `SRS.md V2.0 S4.1` |
+| Response sukses | Redirect / JSON session (NextAuth default) | `RAG-CONTEXT.md S5.3` |
 | Response error | 401 `{ error: { code: "UNAUTHORIZED", message: "Email atau password salah" } }` | ASUMSI |
-| Relasi | `users` tabel (`DATABASE_SCHEMA.md 4.1`) | — |
-| Fitur PRD | FR-18 | `PRD.md 5` |
-
-Contoh request (login form):
-```http
-POST /api/v1/auth/callback/credentials HTTP/1.1
-Content-Type: application/x-www-form-urlencoded
-
-email=demo%40promptflow.local&password=demo123
-```
-
-Contoh response sukses: redirect 302 ke `/generate` + set cookie `next-auth.session-token`.
+| Relasi | `users` tabel | `DATABASE_SCHEMA.md V2.0 S4.1` |
+| Fitur PRD | FR-18 | `PRD.md V2.0 S5` |
 
 #### 6.1.2 GET `/api/v1/auth/session`
 
@@ -315,14 +291,10 @@ Contoh response sukses: redirect 302 ke `/generate` + set cookie `next-auth.sess
 |---|---|
 | Method | GET |
 | Auth | Session (return null bila unauth) |
-| Response sukses 200 | `{ "data": { "user": { "id": 1, "email": "demo@promptflow.local", "name": "Demo User" }, "expires": "2026-07-19T00:00:00.000Z" } }` |
-| Response unauth 200 | `{ "data": null }` (ASUMSI — NextAuth default return null session) |
-| Relasi | `users` tabel |
-| Bukti | ASUMSI (NextAuth `/api/auth/session` convention) |
+| Response 200 | `{ "data": { "user": { "id": 1, "email": "demo@promptflow.local", "name": "Demo User" }, "expires": "2026-07-20T00:00:00.000Z" } }` |
+| Response unauth 200 | `{ "data": null }` |
 
----
-
-### 6.2 Health — `/api/v1/health`
+### 6.2 Health — `/api/v1/health` (V1 — tetap)
 
 #### 6.2.1 GET `/api/v1/health`
 
@@ -330,30 +302,24 @@ Contoh response sukses: redirect 302 ke `/generate` + set cookie `next-auth.sess
 |---|---|---|
 | Method | GET | ASUMSI |
 | Auth | Public | ASUMSI |
-| Response 200 | `{ "data": { "status": "ok", "db": "ok", "time": "2026-06-19T12:00:00Z" } }` | ASUMSI |
-| Response 503 | `{ "data": { "status": "degraded", "db": "fail", "time": "..." } }` bila Turso unreachable | ASUMSI |
-| Fitur PRD | — (operasional) | — |
-
----
+| Response 200 | `{ "data": { "status": "ok", "db": "ok", "time": "2026-06-20T12:00:00Z" } }` | ASUMSI |
+| Response 503 | `{ "data": { "status": "degraded", "db": "fail", "time": "..." } }` | ASUMSI |
 
 ### 6.3 Projects CRUD — `/api/v1/projects`
 
-#### 6.3.1 GET `/api/v1/projects` — List
+#### 6.3.1 GET `/api/v1/projects` — List (V2 ENHANCED PAGINATION)
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Method | GET | `SRS.md 7.1` |
-| Auth | wajib (ownership filter `user_id`) | `SRS.md 5 (FR-15), 9.1 SEC-07` |
-| Query | `page`, `limit`, `sort` (`createdAt:desc` default), `status`, `durationType`, `q` (search title) | §4 |
-| Response 200 | `{ "data": [ ProjectDTO ], "pagination": {...} }` | §3.2 |
-| Response 401 | UNAUTHORIZED | §9 |
-| Rate limit | 60 req/min/user (ASUMSI umum) | §10 |
-| Relasi | `projects` (`DATABASE_SCHEMA.md 4.3`) | — |
-| Fitur PRD | FR-15 | `PRD.md 5` |
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Method | GET | Tetap | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership filter `user_id`) | Tetap | `SRS.md V2.0 S10.1 SEC-07` |
+| Query | `page`, `limit`, `sort`, `status`, `durationType`, `q` | **V2: `page` & `limit` dipakai** | `PRD.md V2.0 S9.2` |
+| Response 200 | `{ "data": [ ProjectDTO ], "pagination": {...} }` | Tambah `storyDescription` | `DATABASE_SCHEMA.md V2.0 S4.3` |
+| Fitur PRD | FR-15 | `PRD.md V2.0 S5` |
 
 Contoh request:
 ```http
-GET /api/v1/projects?page=1&limit=20&sort=createdAt:desc&status=complete HTTP/1.1
+GET /api/v1/projects?page=2&limit=10&sort=createdAt:desc&status=complete HTTP/1.1
 Cookie: next-auth.session-token=eyJ...
 ```
 
@@ -371,30 +337,27 @@ Contoh response 200:
       "aspectRatio": "16:9",
       "status": "complete",
       "resultJson": null,
-      "createdAt": "2026-06-19T10:00:00Z",
-      "updatedAt": "2026-06-19T10:05:00Z",
+      "storyDescription": "Anak kecil petualang di hutan tropis",
+      "createdAt": "2026-06-20T10:00:00Z",
+      "updatedAt": "2026-06-20T10:05:00Z",
       "deletedAt": null
     }
   ],
-  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+  "pagination": { "page": 2, "limit": 10, "total": 47, "totalPages": 5 }
 }
 ```
 
-> Catatan: `resultJson` di list = ringkas (null atau boolean flag `hasResult`) agar payload tidak besar. ASUMSI: list return `resultJson: null` + field `hasResult: true`. Detail endpoint return full `resultJson`. Atau list tidak include `resultJson` sama sekali (lebih hemat). Keputusan final implementasi.
+#### 6.3.2 POST `/api/v1/projects` — Create (V2 EXTENDED)
 
-#### 6.3.2 POST `/api/v1/projects` — Create
-
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Method | POST | `SRS.md 7.1` |
-| Auth | wajib (bind `user_id`) | `SRS.md 5 (FR-15)` |
-| Request body | `CreateProjectInput` (§8.1) | — |
-| Response 201 | `{ "data": ProjectDTO }` | §3.2 |
-| Response 400 | VALIDATION_ERROR (Zod fail) | §9 |
-| Response 401 | UNAUTHORIZED | §9 |
-| Response 422 | VALIDATION_ERROR (shorts >180s) | `PRD.md 7 (AC-02)` |
-| Relasi | `projects` insert | `DATABASE_SCHEMA.md 4.3` |
-| Fitur PRD | FR-15 | `PRD.md 5` |
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Method | POST | Tetap | `SRS.md V2.0 S7.1` |
+| Auth | wajib (bind `user_id`) | Tetap | `SRS.md V2.0 S5 (FR-15)` |
+| Request body | `CreateProjectInput` (§8.1) | **V2: tambah `storyDescription` opsional** | `PRD.md V2.0 S5 FR-V2-04` |
+| Response 201 | `{ "data": ProjectDTO }` | Tetap | §3.2 |
+| Response 400 | VALIDATION_ERROR | §9 | |
+| Response 422 | VALIDATION_ERROR (shorts >180s) | `PRD.md V2.0 S7 AC-02` |
+| Fitur PRD | FR-15, FR-V2-04 | `PRD.md V2.0 S5` |
 
 Contoh request:
 ```http
@@ -407,138 +370,62 @@ Cookie: next-auth.session-token=eyJ...
   "durationType": "shorts",
   "durationTargetSeconds": 60,
   "styleType": "3D",
-  "aspectRatio": "16:9"
+  "aspectRatio": "16:9",
+  "storyDescription": "Anak kecil petualang di hutan tropis bertemu teman baru"
 }
 ```
 
-Contoh response 201:
-```json
-{
-  "data": {
-    "id": 42,
-    "userId": 1,
-    "title": "Petualangan Hutan Anak",
-    "durationType": "shorts",
-    "durationTargetSeconds": 60,
-    "styleType": "3D",
-    "aspectRatio": "16:9",
-    "status": "draft",
-    "resultJson": null,
-    "createdAt": "2026-06-19T10:00:00Z",
-    "updatedAt": "2026-06-19T10:00:00Z",
-    "deletedAt": null
-  }
-}
-```
-
-Contoh error 422 (shorts > 180s):
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Durasi shorts maksimal 180 detik",
-    "details": { "field": "durationTargetSeconds", "max": 180, "received": 250 }
-  },
-  "traceId": "req_abc123"
-}
-```
-
-#### 6.3.3 GET `/api/v1/projects/[id]` — Detail
+#### 6.3.3 GET `/api/v1/projects/[id]` — Detail (V1 — tetap)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | GET | `SRS.md 7.1` |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-15)` |
-| Path param | `id` integer | — |
-| Response 200 | `{ "data": ProjectDetailDTO }` (include full `resultJson` bila ada) | §8.1 |
-| Response 401 | UNAUTHORIZED | §9 |
-| Response 403 | FORBIDDEN (project milik user lain) | §9 |
-| Response 404 | NOT_FOUND (id tidak ada / soft deleted) | §9 |
-| Relasi | `projects` + optional nested `characters`, `scenes`, `image_prompts`, `asset_references` | `DATABASE_SCHEMA.md 4.3` |
-| Fitur PRD | FR-15 | `PRD.md 5` |
+| Method | GET | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-15)` |
+| Response 200 | `{ "data": ProjectDetailDTO }` (include full `resultJson`, `storyDescription`) | §8.1 |
+| Response 401/403/404 | §9 | §9 |
+| Fitur PRD | FR-15, FR-V2-04 | `PRD.md V2.0 S5` |
 
-Contoh response 200 (dengan result):
-```json
-{
-  "data": {
-    "id": 42,
-    "userId": 1,
-    "title": "Petualangan Hutan Anak",
-    "durationType": "shorts",
-    "durationTargetSeconds": 60,
-    "styleType": "3D",
-    "aspectRatio": "16:9",
-    "status": "complete",
-    "resultJson": { },
-    "createdAt": "2026-06-19T10:00:00Z",
-    "updatedAt": "2026-06-19T10:05:00Z",
-    "deletedAt": null,
-    "assetReferences": [],
-    "characters": [],
-    "scenes": []
-  }
-}
-```
-
-#### 6.3.4 PATCH `/api/v1/projects/[id]` — Update
+#### 6.3.4 PATCH `/api/v1/projects/[id]` — Update (V1 — tetap)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | PATCH (partial update metadata) | `SRS.md 7.1` (sebut PUT; PATCH = ASUMSI partial) |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-15)` |
-| Request body | `UpdateProjectInput` (§8.1, semua field opsional) | — |
+| Method | PATCH (partial update) | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-15)` |
+| Request body | `UpdateProjectInput` (semua field opsional termasuk `storyDescription`) | `DATABASE_SCHEMA.md V2.0 S4.3` |
 | Response 200 | `{ "data": ProjectDTO }` | §3.2 |
-| Response 400/401/403/404/422 | lihat §9 | §9 |
-| Catatan | Re-generate = overwrite `resultJson` via endpoint `/api/v1/generate` dengan `projectId`, BUKAN di PATCH. PATCH hanya metadata | `SRS.md 5 (FR-15)` |
-| Fitur PRD | FR-15 | `PRD.md 5` |
+| Catatan | Re-generate = via `/api/v1/generate`, BUKAN di PATCH | `SRS.md V2.0 S5 (FR-15)` |
 
-Contoh request:
-```http
-PATCH /api/v1/projects/42 HTTP/1.1
-Content-Type: application/json
-Cookie: next-auth.session-token=eyJ...
-
-{ "title": "Petualangan Hutan Anak v2" }
-```
-
-#### 6.3.5 DELETE `/api/v1/projects/[id]` — Soft Delete
+#### 6.3.5 DELETE `/api/v1/projects/[id]` — Soft Delete (V1 — tetap)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | DELETE | `SRS.md 7.1` |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-15)` |
-| Response 204 | No Content (sukses soft delete, set `deleted_at`) | `DATABASE_SCHEMA.md 10.1` |
-| Response 401/403/404 | lihat §9 | §9 |
-| Cascade | Soft delete TIDAK cascade child (tetap untuk history). Hard delete (manual/fase akhir) = CASCADE | `DATABASE_SCHEMA.md 10.1` |
-| Fitur PRD | FR-15 | `PRD.md 5` |
+| Method | DELETE | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-15)` |
+| Response 204 | No Content (soft delete, set `deleted_at`) | `DATABASE_SCHEMA.md V2.0 S11.1` |
+| Cascade | Soft delete TIDAK cascade child | `DATABASE_SCHEMA.md V2.0 S11.1` |
 
----
+### 6.4 Generate — `POST /api/v1/generate` (V2 EXTENDED)
 
-### 6.4 Generate — `POST /api/v1/generate` (SSE)
+**Endpoint paling kompleks.** Streaming SSE. Lihat §7 untuk full SSE Event Protocol V2.
 
-**Endpoint paling kompleks.** Streaming SSE. Lihat §7 untuk full SSE Event Protocol.
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Method | POST | Tetap | `SRS.md V2.0 S8.4` |
+| Auth | wajib | Tetap | `SRS.md V2.0 S5 (FR-03..FR-12)` |
+| Content-Type request | `application/json` | Tetap | `SRS.md V2.0 S8.4` |
+| Content-Type response | `text/event-stream; charset=utf-8` | Tetap | `SRS.md V2.0 S8.4` |
+| Request body | `GenerateInput` (§8.2) | **V2: tambah `input.storyDescription` + `input.references[].aiClassification`** | `PRD.md V2.0 S5 FR-V2-04, FR-V2-02` |
+| Response 200 | SSE stream | **V2: tambah `log` event type** | `SRS.md V2.0 S8.4` ; `RAG-CONTEXT.md S9 V2-5` |
+| Response 400 | VALIDATION_ERROR | §9 |
+| Response 429 | RATE_LIMITED (10 req/min/user) | `SRS.md V2.0 S12 SRS-V2-A15` |
+| Response 502 | PROVIDER_ERROR | `SRS.md V2.0 S8.5` |
+| Response 504 | TIMEOUT | `SRS.md V2.0 S8.5` |
+| Rate limit | **10 req/min/user** | `SRS.md V2.0 S12 SRS-V2-A15` |
+| Proses server | load ProviderConfig -> decrypt key -> build prompt (inject storyDescription + aiClassification refs) -> LLM -> SSE -> Zod validate -> consistency check -> persist | **V2: simpan logs ke `generation_logs.logs_json`** | `DATABASE_SCHEMA.md V2.0 S4.8, S7.2` |
+| Relasi | `projects`, `characters`, `scenes`, `image_prompts`, `supporting_characters`, `generation_logs` | `DATABASE_SCHEMA.md V2.0 S4.3-S4.9` |
+| Fitur PRD | FR-03..FR-12, FR-V2-04, FR-V2-05 | `PRD.md V2.0 S5` |
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Method | POST | `SRS.md 7.2` |
-| Auth | wajib | `SRS.md 5 (FR-03..FR-12)` |
-| Content-Type request | `application/json` | `SRS.md 7.2` |
-| Content-Type response | `text/event-stream; charset=utf-8` | `SRS.md 7.2` |
-| Request body | `GenerateInput` (§8.2) | `SRS.md 7.2` |
-| Response 200 | SSE stream: event `progress`, `done`, `error` (§7) | `SRS.md 7.2` |
-| Response 400 | VALIDATION_ERROR (sebelum stream mulai) | §9 |
-| Response 401 | UNAUTHORIZED | §9 |
-| Response 409 | CONFLICT (projectId bukan milik user) | §9 |
-| Response 422 | VALIDATION_ERROR (shorts >180s) | `PRD.md 7 (AC-02)` |
-| Response 429 | RATE_LIMITED (10 req/min/user) | `SRS.md 12 SRS-A15` ; §10 |
-| Response 502 | PROVIDER_ERROR (LLM gagal total) | `SRS.md 7.3` |
-| Response 504 | TIMEOUT (LLM timeout, streaming partial disimpan ASUMSI NFR-R2) | `SRS.md 7.3` |
-| Rate limit | **10 req/min/user** | `SRS.md 12 SRS-A15` |
-| Proses server | load ProviderConfig → decrypt key → createOpenAICompatible → build prompt → streamObject/generateObject → SSE → parse Zod → consistency check → persist | `PROJECT_ARCHITECTURE.md 6` |
-| Relasi | `projects` (overwrite `resultJson`), `characters`, `scenes`, `image_prompts`, `supporting_characters`, `generation_logs` | `DATABASE_SCHEMA.md 4.3-4.9` |
-| Fitur PRD | FR-03, FR-04, FR-05, FR-06, FR-07, FR-08, FR-09, FR-10, FR-11, FR-12 | `PRD.md 5` |
-
-Contoh request:
+Contoh request V2:
 ```http
 POST /api/v1/generate HTTP/1.1
 Content-Type: application/json
@@ -549,119 +436,80 @@ Cookie: next-auth.session-token=eyJ...
   "projectId": 42,
   "input": {
     "title": "Petualangan Hutan Anak",
+    "storyDescription": "Anak kecil petualang di hutan tropis bertemu teman baru",
     "durationTarget": { "type": "shorts", "seconds": 60 },
     "style": { "type": "3D", "ratio": "16:9" },
     "providerId": 7,
     "references": [
-      { "name": "hero-ref.png", "type": "tokoh" },
-      { "name": "hutan-bg.png", "type": "background" }
+      {
+        "name": "hero-ref.png",
+        "type": "tokoh",
+        "aiClassification": {
+          "role": "tokoh",
+          "name": "Wahab",
+          "description": "Anak kecil berusia 8 tahun, rambut hitam pendek",
+          "confidence": 0.92
+        }
+      },
+      {
+        "name": "hutan-bg.png",
+        "type": "background",
+        "aiClassification": {
+          "role": "background",
+          "name": "Hutan Tropis",
+          "description": "Hutan lebat dengan pepohonan tinggi",
+          "confidence": 0.88
+        }
+      }
     ]
   }
 }
 ```
 
-Contoh SSE response (lihat §7 untuk format lengkap):
-```
-event: progress
-data: {"stage":"character_profiles","delta":"..."}
+> **V2 field baru:**
+> - `input.storyDescription`: opsional (max 500 char), inject ke `buildUserMessage()` LLM context
+> - `input.references[].aiClassification`: opsional object hasil Vision LLM, inject ke prompt builder
 
-event: progress
-data: {"stage":"scenes","delta":"..."}
-
-event: done
-data: {"result": { }, "warnings": [], "generationLogId": 101}
-```
-
-> Field input `provider_id` = ID `provider_configs` milik user (select provider aktif). ASUMSI: bila tidak disertakan, pakai provider dengan `is_active=1`. Sitasi: `DATABASE_SCHEMA.md 4.2`.
-
-> Field `references` = array `{name, type}` dari `asset_references.filename` (sudah di-upload via `/api/v1/upload`). Server inject `reference_filename` ke prompt LLM. Sitasi: `SRS.md 5 (FR-06, FR-17)` ; `RAG-CONTEXT.md 6`.
-
----
-
-### 6.5 Settings Providers — `/api/v1/settings/providers`
+### 6.5 Settings Providers — `/api/v1/settings/providers` (V1 — tetap)
 
 #### 6.5.1 GET `/api/v1/settings/providers` — List (masked)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | GET | `SRS.md 7.1` |
-| Auth | wajib | `SRS.md 5 (FR-13)` |
-| Response 200 | `{ "data": [ ProviderConfigDTO ] }` (apiKey = mask `****xxxx`) | `SRS.md 5 (FR-14), 9.1 SEC-02` |
-| Relasi | `provider_configs` | `DATABASE_SCHEMA.md 4.2` |
-| Fitur PRD | FR-13, FR-14 | `PRD.md 5` |
-
-Contoh response 200:
-```json
-{
-  "data": [
-    {
-      "id": 7,
-      "userId": 1,
-      "provider": "openrouter",
-      "name": "OpenRouter Utama",
-      "baseUrl": "https://openrouter.ai/api/v1",
-      "model": "anthropic/claude-3.5-sonnet",
-      "apiKeyMasked": "****sonnet",
-      "isActive": 1,
-      "createdAt": "2026-06-19T09:00:00Z",
-      "updatedAt": "2026-06-19T09:00:00Z"
-    }
-  ]
-}
-```
-
-> Catatan: response field `apiKeyMasked` (bukan `apiKeyEncrypted`) — TIDAK pernah expose ciphertext atau plaintext ke client. Hanya mask display. ASUMSI field name.
+| Method | GET | `SRS.md V2.0 S7.1` |
+| Auth | wajib | `SRS.md V2.0 S5 (FR-13)` |
+| Response 200 | `{ "data": [ ProviderConfigDTO ] }` (apiKey = mask) | `SRS.md V2.0 S10.1 SEC-02` |
+| Fitur PRD | FR-13, FR-14 | `PRD.md V2.0 S5` |
 
 #### 6.5.2 POST `/api/v1/settings/providers` — Add
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | POST | `SRS.md 7.1` |
-| Auth | wajib (bind `user_id`) | `SRS.md 5 (FR-13)` |
+| Method | POST | `SRS.md V2.0 S7.1` |
+| Auth | wajib (bind `user_id`) | `SRS.md V2.0 S5 (FR-13)` |
 | Request body | `CreateProviderConfigInput` (§8.3) | — |
 | Response 201 | `{ "data": ProviderConfigDTO }` (masked) | §3.2 |
-| Response 400 | VALIDATION_ERROR | §9 |
-| Response 409 | CONFLICT (unique `user_id`+`name` sudah ada) | `DATABASE_SCHEMA.md 4.2` |
-| Proses server | encrypt apiKey AES-256-GCM sebelum save | `SRS.md 5 (FR-14)` |
-| Fitur PRD | FR-13, FR-14 | `PRD.md 5` |
-
-Contoh request:
-```http
-POST /api/v1/settings/providers HTTP/1.1
-Content-Type: application/json
-Cookie: next-auth.session-token=eyJ...
-
-{
-  "provider": "openrouter",
-  "name": "OpenRouter Utama",
-  "baseUrl": "https://openrouter.ai/api/v1",
-  "model": "anthropic/claude-3.5-sonnet",
-  "apiKey": "sk-or-v1-xxxxx..."
-}
-```
+| Response 409 | CONFLICT (unique `user_id`+`name`) | `DATABASE_SCHEMA.md V2.0 S4.2` |
+| Proses server | encrypt apiKey AES-256-GCM | `SRS.md V2.0 S10.1 SEC-01` |
 
 #### 6.5.3 PATCH `/api/v1/settings/providers/[id]` — Update
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | PATCH | `SRS.md 7.1` (sebut PUT; PATCH = ASUMSI) |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-13)` |
-| Request body | `UpdateProviderConfigInput` (§8.3, apiKey opsional — bila kosong tidak overwrite) | — |
+| Method | PATCH | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-13)` |
+| Request body | `UpdateProviderConfigInput` (apiKey opsional) | — |
 | Response 200 | `{ "data": ProviderConfigDTO }` (masked) | §3.2 |
-| Response 401/403/404/409 | §9 | §9 |
-| Fitur PRD | FR-13, FR-14 | `PRD.md 5` |
 
-> Catatan: PATCH `isActive: 1` untuk set provider aktif (hanya satu aktif per user ASUMSI — bila set aktif, provider lain jadi `isActive: 0`). ASUMSI.
+> PATCH `isActive: 1` untuk set provider aktif (provider lain jadi `isActive: 0`). ASUMSI.
 
 #### 6.5.4 DELETE `/api/v1/settings/providers/[id]` — Delete
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | DELETE | `SRS.md 7.1` |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-13)` |
+| Method | DELETE | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-13)` |
 | Response 204 | No Content | §3.2 |
-| Response 401/403/404 | §9 | §9 |
-| Fitur PRD | FR-13 | `PRD.md 5` |
 
 #### 6.5.5 POST `/api/v1/settings/providers/[id]/test` — Test Connection
 
@@ -669,36 +517,32 @@ Cookie: next-auth.session-token=eyJ...
 |---|---|---|
 | Method | POST | ASUMSI |
 | Auth | wajib (ownership) | ASUMSI |
-| Request body | opsional `{ "prompt": "ping" }` (ASUMSI default "Hello") | ASUMSI |
+| Request body | opsional `{ "prompt": "ping" }` (default "Hello") | ASUMSI |
 | Response 200 | `{ "data": { "ok": true, "provider": "openrouter", "model": "...", "latencyMs": 340, "sample": "Hi!" } }` | ASUMSI |
-| Response 502 | PROVIDER_ERROR `{ "error": { "code": "PROVIDER_ERROR", "message": "..." } }` | §9 |
-| Proses | decrypt key → createOpenAICompatible → generateText small prompt → return latency | ASUMSI |
-| Fitur PRD | FR-13 (validasi provider sebelum pakai) | `PRD.md 5` |
+| Response 502 | PROVIDER_ERROR | §9 |
 
----
+### 6.6 Upload — `/api/v1/upload` (V2 MAJOR REDESIGN)
 
-### 6.6 Upload — `/api/v1/upload`
+**V2 perubahan signifikan**: upload pindah dari project detail ke generate page. `projectId` jadi **OPSIONAL** (pre-submit = orphan refs). Role classification extended ke 6 opsi. AI classification auto-trigger.
 
-#### 6.6.1 POST `/api/v1/upload` — Multipart
+#### 6.6.1 POST `/api/v1/upload` — Multipart (V2 MAJOR)
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Method | POST | `SRS.md 7.1` |
-| Auth | wajib (bind ke project milik user via query `?projectId=`) | `SRS.md 5 (FR-17)` |
-| Content-Type | `multipart/form-data` | `SRS.md 5 (FR-17)` |
-| Query | `projectId` integer wajib | — |
-| Form fields | `file` (image, mime `image/*`, max 10MB ASUMSI), `tipe` (`tokoh`\|`background`), `label` (string opsional) | `SRS.md 5 (FR-17)` ; `DATABASE_SCHEMA.md 4.4` |
-| Response 201 | `{ "data": { "id": 99, "name": "hero-ref.png", "url": "https://...vercel-storage.com/hero-ref.png", "type": "tokoh", "label": "Hero", "projectId": 42 } }` | §3.2 |
-| Response 400 | VALIDATION_ERROR (mime invalid, size >10MB) | §9 |
-| Response 401/403/404 | §9 (project bukan milik user / not found) | §9 |
-| Proses | Vercel Blob `put()` → simpan `asset_references` (filename, blobUrl, tipe, label, mimeType, sizeBytes) | `SRS.md 5 (FR-17), 8.5` ; `DATABASE_SCHEMA.md 4.4` |
-| Dev fallback | FS `public/references/` (flag `USE_VERCEL_BLOB`, tidak persisten Vercel prod) | ASUMSI SRS-A17 |
-| Relasi | `asset_references` | `DATABASE_SCHEMA.md 4.4` |
-| Fitur PRD | FR-17 | `PRD.md 5` |
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Method | POST | Tetap | `SRS.md V2.0 S7.1` |
+| Auth | wajib | Tetap | `SRS.md V2.0 S5 (FR-17)` |
+| Content-Type | `multipart/form-data` | Tetap | `SRS.md V2.0 S5 (FR-17)` |
+| **Query `projectId`** | **OPSIONAL (V2)** | **Pre-submit = orphan ref (project_id NULL). Di-attach saat generate submit.** | `PRD.md V2.0 S5 FR-V2-01` |
+| Form fields | `file`, `tipe` (V2: 6 opsi), `label` | **V2: `tipe` extended 6 opsi** | `SRS.md V2.0 S9.1` |
+| Response 201 | `{ "data": AssetReferenceDTO }` | **V2: +`aiClassification` nullable** | `PRD.md V2.0 S9.2` |
+| Response 400 | VALIDATION_ERROR (mime invalid, size >10MB, tipe invalid) | §9 |
+| Response 403 | FORBIDDEN (projectId bukan milik user) | §9 |
+| **Proses V2** | 1) Validasi mime+size. 2) Upload ke Blob/FS. 3) Simpan `asset_references` (project_id nullable). 4) **Auto-trigger `/upload/classify`**. 5) Update `ai_classification`. 6) Return response. | `RAG-CONTEXT.md S9 V2-1, V2-3` |
+| Fitur PRD | FR-17, FR-V2-01, FR-V2-02, FR-V2-03 | `PRD.md V2.0 S5` |
 
-Contoh request:
+Contoh request V2 — **pre-submit tanpa projectId**:
 ```http
-POST /api/v1/upload?projectId=42 HTTP/1.1
+POST /api/v1/upload HTTP/1.1
 Content-Type: multipart/form-data; boundary=----Boundary
 Cookie: next-auth.session-token=eyJ...
 
@@ -718,17 +562,77 @@ Hero
 ------Boundary--
 ```
 
-#### 6.6.2 DELETE `/api/v1/upload` — Delete Reference
+Contoh response 201 V2:
+```json
+{
+  "data": {
+    "id": 99,
+    "projectId": null,
+    "name": "hero-ref.png",
+    "url": "https://...vercel-storage.com/hero-ref.png",
+    "type": "tokoh",
+    "label": "Hero",
+    "mimeType": "image/png",
+    "sizeBytes": 245678,
+    "aiClassification": {
+      "role": "tokoh",
+      "name": "Wahab",
+      "description": "Anak kecil berusia 8 tahun, rambut hitam pendek, wajah bulat khas Indonesia",
+      "confidence": 0.92
+    },
+    "createdAt": "2026-06-20T10:00:00Z"
+  }
+}
+```
+
+> **V2 response field baru**: `aiClassification` (nullable object). Null jika Vision LLM tidak aktif, gagal/timeout, confidence < 0.7, atau user disable auto-classify.
+
+#### 6.6.2 POST `/api/v1/upload/classify` (NEW V2)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | DELETE | `SRS.md 5 (FR-17)` |
-| Auth | wajib (ownership via `asset_references.project_id` → `projects.user_id`) | `SRS.md 9.1 SEC-07` |
-| Query | `name` (filename) wajib + `projectId` wajib | ASUMSI |
+| Method | POST | `PRD.md V2.0 S9.3` ; `SRS.md V2.0 S8.3` |
+| Auth | wajib (ownership via asset ref) | `PRD.md V2.0 S5 FR-V2-02` |
+| Request body | `{ "assetReferenceId": 99 }` | `PRD.md V2.0 S9.3` |
+| Response 200 | `{ "data": { "role": "tokoh", "name": "Wahab", "description": "...", "confidence": 0.92 } }` | `PRD.md V2.0 S5 FR-V2-02` |
+| Response 400 | VALIDATION_ERROR | §9 |
+| Response 404 | NOT_FOUND | §9 |
+| Response 502 | CLASSIFICATION_ERROR (Vision LLM gagal) | §9 |
+| **Proses** | 1) Validasi ownership. 2) Baca blob URL gambar. 3) Panggil Vision LLM. 4) Parse response. 5) Update `asset_references.tipe`, `label`, `ai_classification`. 6) Cache result. | `PRD.md V2.0 S5 FR-V2-02` |
+| Rate limit | 30 req/min/user | ASUMSI SRS-V2-A12 |
+| Fitur PRD | FR-V2-02 | `PRD.md V2.0 S5` |
+
+Contoh request:
+```http
+POST /api/v1/upload/classify HTTP/1.1
+Content-Type: application/json
+Cookie: next-auth.session-token=eyJ...
+
+{ "assetReferenceId": 99 }
+```
+
+Contoh response 200:
+```json
+{
+  "data": {
+    "role": "tokoh",
+    "name": "Wahab",
+    "description": "Anak kecil berusia 8 tahun, rambut hitam pendek, wajah bulat khas Indonesia",
+    "confidence": 0.92
+  }
+}
+```
+
+> **Rekomendasi SRS-V2-A11**: auto-trigger saat upload (seamless UX). Endpoint ini untuk retry/manual fallback.
+
+#### 6.6.3 DELETE `/api/v1/upload` — Delete Reference (V1 + V2)
+
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Method | DELETE | Tetap | `SRS.md V2.0 S5 (FR-17)` |
+| Auth | wajib (ownership) | V2: support orphan ref delete | `SRS.md V2.0 S10.1 SEC-07` |
+| Query | `name` wajib + `projectId` OPSIONAL | **V2: `projectId` OPSIONAL** | `PRD.md V2.0 S5 FR-V2-01` |
 | Response 204 | No Content | §3.2 |
-| Response 401/403/404 | §9 | §9 |
-| Proses | Vercel Blob `del(url)` → hapus `asset_references` record | `DATABASE_SCHEMA.md 4.4` |
-| Fitur PRD | FR-17 | `PRD.md 5` |
 
 Contoh:
 ```http
@@ -736,171 +640,255 @@ DELETE /api/v1/upload?name=hero-ref.png&projectId=42 HTTP/1.1
 Cookie: next-auth.session-token=eyJ...
 ```
 
----
-
-### 6.7 Export — `GET /api/v1/projects/[id]/export`
+### 6.7 Export — `GET /api/v1/projects/[id]/export` (V1 — tetap)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Method | GET | `SRS.md 7.1` |
-| Auth | wajib (ownership) | `SRS.md 5 (FR-16)` |
-| Query | `format` (`json`\|`markdown`) wajib | `SRS.md 7.1` |
-| Response 200 (json) | `Content-Type: application/json`, `Content-Disposition: attachment; filename="Petualangan Hutan Anak.json"`, body = PromptPackage (PRD §8.2) | `SRS.md 5 (FR-16)` |
-| Response 200 (markdown) | `Content-Type: text/markdown`, `Content-Disposition: attachment; filename="Petualangan Hutan Anak.md"`, body = markdown (PRD §8.3 struktur) | `SRS.md 5 (FR-16), 8.6` |
-| Response 400 | VALIDATION_ERROR (format invalid) | §9 |
-| Response 401/403/404 | §9 (project tidak ada / belum generate → `resultJson` null → 409 CONFLICT ASUMSI) | §9 |
-| Proses | baca `projects.resultJson` snapshot → transform (markdown via `lib/export/markdown.template.ts`) | `DATABASE_SCHEMA.md 12.3` ; `SRS.md 5 (FR-16)` |
-| Relasi | `projects.result_json` | `DATABASE_SCHEMA.md 4.3` |
-| Fitur PRD | FR-16 | `PRD.md 5` |
+| Method | GET | `SRS.md V2.0 S7.1` |
+| Auth | wajib (ownership) | `SRS.md V2.0 S5 (FR-16)` |
+| Query | `format` (`json`|`markdown`) wajib | `SRS.md V2.0 S7.1` |
+| Response 200 (json) | `Content-Type: application/json`, `Content-Disposition: attachment`, body = PromptPackage | `SRS.md V2.0 S5 (FR-16)` |
+| Response 200 (markdown) | `Content-Type: text/markdown`, `Content-Disposition: attachment`, body = markdown | `SRS.md V2.0 S5 (FR-16)` |
+| Response 409 | CONFLICT (project belum generate) | ASUMSI |
+| Fitur PRD | FR-16 | `PRD.md V2.0 S5` |
 
-Contoh request:
-```http
-GET /api/v1/projects/42/export?format=markdown HTTP/1.1
-Cookie: next-auth.session-token=eyJ...
-```
-
-Contoh response header:
-```http
-HTTP/1.1 200 OK
-Content-Type: text/markdown
-Content-Disposition: attachment; filename="Petualangan Hutan Anak.md"
-
-# Petualangan Hutan Anak
-...
-```
-
----
-
-### 6.8 Sub-resource List — `/api/v1/projects/[id]/*`
-
-Sub-resource query untuk query/filter entitas per project. Ownership check via `projects.user_id`.
+### 6.8 Sub-resource List — `/api/v1/projects/[id]/*` (V1 + V2 ext)
 
 #### 6.8.1 GET `/api/v1/projects/[id]/characters`
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Response 200 | `{ "data": [ CharacterDTO ] }` (master `characters`) | `DATABASE_SCHEMA.md 4.5` |
-| Query | `peran` (`utama`\|`lain`\|`pendamping`) | §4.3 |
-| Fitur PRD | FR-07, FR-12 | `PRD.md 5` |
+| Response 200 | `{ "data": [ CharacterDTO ] }` | `DATABASE_SCHEMA.md V2.0 S4.5` |
+| Query | `peran` (`utama`|`lain`|`pendamping`) | §4.3 |
+| Fitur PRD | FR-07, FR-12 | `PRD.md V2.0 S5` |
 
 #### 6.8.2 GET `/api/v1/projects/[id]/scenes`
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Response 200 | `{ "data": [ SceneDTO ] }` urut `orderNo:asc` | `DATABASE_SCHEMA.md 4.6` |
-| Fitur PRD | FR-03, FR-09 | `PRD.md 5` |
+| Response 200 | `{ "data": [ SceneDTO ] }` urut `orderNo:asc` | `DATABASE_SCHEMA.md V2.0 S4.6` |
+| Fitur PRD | FR-03, FR-09 | `PRD.md V2.0 S5` |
 
 #### 6.8.3 GET `/api/v1/projects/[id]/image-prompts`
 
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Response 200 | `{ "data": [ ImagePromptDTO ] }` | **V2: `tipe` 6 opsi** | `DATABASE_SCHEMA.md V2.0 S4.7` |
+| Query | `tipe`, `sceneId` | **V2: filter `tipe` 6 nilai** | `DATABASE_SCHEMA.md V2.0 S6.2` |
+| Fitur PRD | FR-06, FR-V2-03 | `PRD.md V2.0 S5` |
+
+#### 6.8.4 GET `/api/v1/projects/[id]/logs` (V2 EXTENDED)
+
+| Aspek | Detail | V2 Change | Bukti |
+|---|---|---|---|
+| Response 200 | `{ "data": [ GenerationLogDTO ], "pagination": {...} }` | **V2: +`logsJson` per log** | `DATABASE_SCHEMA.md V2.0 S4.8, S7.2` |
+| Query | `page`, `limit`, `sort`, `status`, `provider` | **V2: +`provider` filter** | §4.3 |
+
+Contoh response 200 V2:
+```json
+{
+  "data": [
+    {
+      "id": 101,
+      "projectId": 42,
+      "provider": "openrouter",
+      "model": "anthropic/claude-3.5-sonnet",
+      "durationMs": 45230,
+      "status": "success",
+      "errorMessage": null,
+      "logsJson": [
+        { "level": "info", "message": "[generate] Resolving provider openrouter...", "timestamp": "2026-06-20T10:00:00.123Z" },
+        { "level": "info", "message": "[llm] Calling GPT-4o...", "timestamp": "2026-06-20T10:00:01.456Z" },
+        { "level": "warn", "message": "[classifier] AI confidence 0.65 di bawah threshold", "timestamp": "2026-06-20T10:00:05.789Z" }
+      ],
+      "createdAt": "2026-06-20T10:00:00Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+### 6.9 Dashboard — `GET /api/v1/dashboard/stats` (NEW V2)
+
+**Endpoint baru V2.** Enriched dashboard data.
+
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Response 200 | `{ "data": [ ImagePromptDTO ] }` | `DATABASE_SCHEMA.md 4.7` |
-| Query | `tipe` (`tokoh`\|`background`), `sceneId` (integer; null = master list root, terisi = varian per scene) | `DATABASE_SCHEMA.md 6.2 #2` |
-| Fitur PRD | FR-06 | `PRD.md 5` |
+| Method | GET | `PRD.md V2.0 S9.2` ; `SRS.md V2.0 S6.6` |
+| Auth | wajib (filter `user_id`) | `SRS.md V2.0 S10.1 SEC-07` |
+| Query | `range` (opsional: `7d`|`30d`|`90d`|`all`, default `30d`) | ASUMSI |
+| Response 200 | `{ "data": DashboardStatsDTO }` | `PRD.md V2.0 S5 FR-V2-06` |
+| Rate limit | 60 req/min/user | §10 |
+| Performance | Dashboard load <= 1.5s | `SRS.md V2.0 S11` |
+| Fitur PRD | FR-V2-06 | `PRD.md V2.0 S5` |
 
-#### 6.8.4 GET `/api/v1/projects/[id]/logs`
+Response schema:
+```ts
+DashboardStatsDTO = {
+  totalProjects: number,
+  successfulGenerations: number,
+  failedGenerations: number,
+  avgDurationMs: number | null,
+  totalUploads: number,
+  successRate: number,
+  activeProviders: number,
+  perProviderBreakdown: Array<{
+    provider: string,
+    totalCalls: number,
+    avgDurationMs: number | null,
+    successRate: number,
+    lastUsed: string | null
+  }>,
+  recentProjects: Array<{
+    id: number,
+    title: string,
+    status: 'draft'|'generating'|'complete'|'failed',
+    durationType: 'shorts'|'tutorial',
+    createdAt: string
+  }>,
+  storageUsage: {
+    totalFiles: number,
+    totalSizeBytes: number
+  },
+  weeklyTrend: Array<{
+    weekStart: string,
+    projectCount: number,
+    generationCount: number
+  }>
+}
+```
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Response 200 | `{ "data": [ GenerationLogDTO ], "pagination": {...} }` | `DATABASE_SCHEMA.md 4.8` |
-| Query | `page`, `limit`, `sort` (`createdAt:desc` default), `status` (`success`\|`fail`\|`partial`) | §4 |
-| Fitur PRD | F-21 (COULD history) | `PRD.md 4` |
+Contoh response 200:
+```json
+{
+  "data": {
+    "totalProjects": 47,
+    "successfulGenerations": 42,
+    "failedGenerations": 5,
+    "avgDurationMs": 38450,
+    "totalUploads": 156,
+    "successRate": 89.36,
+    "activeProviders": 2,
+    "perProviderBreakdown": [
+      { "provider": "openrouter", "totalCalls": 38, "avgDurationMs": 42100, "successRate": 92.11, "lastUsed": "2026-06-20T09:30:00Z" },
+      { "provider": "ollama", "totalCalls": 9, "avgDurationMs": 28400, "successRate": 77.78, "lastUsed": "2026-06-19T14:22:00Z" }
+    ],
+    "recentProjects": [
+      { "id": 47, "title": "Petualangan Hutan Anak", "status": "complete", "durationType": "shorts", "createdAt": "2026-06-20T10:00:00Z" },
+      { "id": 46, "title": "Tutorial Blender Pemula", "status": "complete", "durationType": "tutorial", "createdAt": "2026-06-19T16:30:00Z" },
+      { "id": 45, "title": "Cerita Nabi Yunus", "status": "generating", "durationType": "tutorial", "createdAt": "2026-06-19T14:00:00Z" }
+    ],
+    "storageUsage": { "totalFiles": 156, "totalSizeBytes": 89234560 },
+    "weeklyTrend": [
+      { "weekStart": "2026-06-16", "projectCount": 8, "generationCount": 12 },
+      { "weekStart": "2026-06-09", "projectCount": 11, "generationCount": 15 },
+      { "weekStart": "2026-06-02", "projectCount": 9, "generationCount": 13 }
+    ]
+  }
+}
+```
 
 ---
 
-## 7. SSE Event Protocol (POST /api/v1/generate)
-
-Endpoint generate pakai **Server-Sent Events** (`text/event-stream`) untuk streaming partial output LLM ke client. Token mulai mengalir < 10s (NFR-P3). Sitasi: `SRS.md 7.2, 8.1` ; `PROJECT_ARCHITECTURE.md 6, 10`.
+## 7. SSE Event Protocol V2 (POST /api/v1/generate)
 
 ### 7.1 Format Event
 
 Setiap event = 2 baris: `event: <name>` + `data: <json-string>`, dipisah blank line.
 
-```
-event: progress
-data: {"stage":"character_profiles","delta":"..."}
+### 7.2 Event Types (V2)
 
-event: progress
-data: {"stage":"scenes","delta":"..."}
+| Event | Field `data` | Kapan | V1/V2 | Bukti |
+|---|---|---|---|---|
+| `stage` | `{ "stage": "starting"\|"character_profiles"\|"scenes"\|"image_prompts"\|"supporting_characters"\|"moral_message"\|"done", "message": "..." }` | Perubahan stage | V1 (extended V2) | `SRS.md V2.0 S8.4` |
+| `progress` | `{ "stage": "...", "progress": 0..100, "delta": "<partial>" }` | Streaming partial | V1 | `SRS.md V2.0 S8.4` |
+| **`log`** | **`{ "level": "info"\|"warn"\|"error", "message": "...", "timestamp": "ISO-8601" }`** | **Real-time log line. Frontend LogViewer toggle-controlled. Default OFF.** | **NEW V2** | `RAG-CONTEXT.md S9 V2-5` ; `SRS.md V2.0 S6.5` |
+| `done` | `{ "result": PromptPackage, "warnings": [...], "logs": [...], "generationLogId": 101 }` | Generate selesai | V1 (extended V2) | `SRS.md V2.0 S8.4` |
+| `error` | `{ "code": "PROVIDER_ERROR"\|"TIMEOUT"\|"CLASSIFICATION_ERROR"\|"INTERNAL", "message": "...", "stage": "..." }` | Error mid-stream | V1 (extended V2) | `SRS.md V2.0 S8.5` |
 
-event: done
-data: {"result":{ },"warnings":[],"generationLogId":101}
-```
-
-### 7.2 Event Types
-
-| Event | Field `data` | Kapan | Bukti |
-|---|---|---|---|
-| `progress` | `{ "stage": "character_profiles"\|"scenes"\|"image_prompts"\|"moral_message", "delta": "<partial-text-or-json>" }` | Streaming partial dari LLM. Multiple event per stage. | `SRS.md 7.2` |
-| `done` | `{ "result": PromptPackage, "warnings": [ { "code": "CONSISTENCY_MISMATCH", "message": "...", "target": "Hero" } ], "generationLogId": 101 }` | Generate selesai, full structured JSON valid via Zod. `warnings` dari consistency check FR-12 (tidak block). | `SRS.md 7.2, 5 (FR-12)` |
-| `error` | `{ "code": "PROVIDER_ERROR"\|"TIMEOUT"\|"INTERNAL", "message": "...", "stage": "scenes" }` | Error mid-stream. Stream ditutup setelah event ini. | `SRS.md 7.3` |
-
-### 7.3 Stage List
+### 7.3 Stage List (V2)
 
 | Stage | Isi | FR |
 |---|---|---|
-| `character_profiles` | Master karakter (FR-07) | FR-05, FR-07 |
-| `scenes` | Adegan berurut + voiceover + image_prompts varian (FR-03, FR-04, FR-06, FR-09) | FR-03, FR-04, FR-06, FR-09 |
-| `image_prompts` | Master list root (FR-06) | FR-06 |
-| `moral_message` | Pesan moral penutup (FR-11) | FR-11 |
+| `starting` | Validasi input + resolve provider + setup project | — |
+| `character_profiles` | Master karakter | FR-05, FR-07 |
+| `scenes` | Adegan berurut + voiceover + image_prompts varian | FR-03, FR-04, FR-06, FR-09 |
+| `image_prompts` | Master list root | FR-06 |
+| `supporting_characters` | Karakter pendukung/hewan | FR-08 |
+| `moral_message` | Pesan moral penutup | FR-11 |
 
-> `supporting_characters` bisa bagian dari `scenes` stream atau stage terpisah ASUMSI.
-
-### 7.4 Contoh Stream Lengkap
+### 7.4 Contoh Stream Lengkap V2
 
 ```
-event: progress
-data: {"stage":"character_profiles","delta":"[{\"nama\":\"Hero\",\"gayarambut\":\"hitam pendek\""}
+event: stage
+data: {"stage":"starting","message":"Memulai generate..."}
+
+event: log
+data: {"level":"info","message":"[generate] Resolving provider openrouter","timestamp":"2026-06-20T10:00:00.123Z"}
+
+event: stage
+data: {"stage":"character_profiles","message":"Membuat profil karakter..."}
+
+event: log
+data: {"level":"info","message":"[llm] Calling GPT-4o with prompt (1200 chars)","timestamp":"2026-06-20T10:00:01.456Z"}
 
 event: progress
-data: {"stage":"character_profiles","delta":",\"wajah_asal\":\"Indonesia\"...}]"}
+data: {"stage":"character_profiles","progress":50,"delta":"[{\"nama\":\"Hero\""}
 
 event: progress
-data: {"stage":"scenes","delta":"[{\"order\":1,\"description\":\"Hero masuk hutan\""}
+data: {"stage":"character_profiles","progress":100,"delta":"}]"}
 
-event: progress
-data: {"stage":"scenes","delta":",\"voiceover_script\":\"Di sebuah hutan...\"}]"}
+event: log
+data: {"level":"warn","message":"[classifier] AI confidence 0.65 di bawah threshold 0.7 untuk hutan-bg.png","timestamp":"2026-06-20T10:00:05.890Z"}
 
-event: progress
-data: {"stage":"image_prompts","delta":"{\"characters\":[{\"target\":\"Hero\",\"prompt_text\":\"3D render young boy...\"}]}"}
+event: stage
+data: {"stage":"scenes","message":"Membuat adegan berurut..."}
 
-event: progress
-data: {"stage":"moral_message","delta\":\"Jaga alam, anak.\""}
+event: stage
+data: {"stage":"image_prompts","message":"Membuat image prompt..."}
+
+event: stage
+data: {"stage":"supporting_characters","message":"Membuat karakter pendukung..."}
+
+event: stage
+data: {"stage":"moral_message","message":"Membuat pesan moral..."}
+
+event: log
+data: {"level":"info","message":"[generate] Consistency check: 0 warnings","timestamp":"2026-06-20T10:00:45.123Z"}
 
 event: done
-data: {"result":{"title":"Petualangan Hutan Anak","duration_target":{"type":"shorts","seconds":60},"style":{"type":"3D","ratio":"16:9"},"character_profiles":[...],"scenes":[...],"image_prompts":{...},"supporting_characters":[...],"moral_message":"Jaga alam, anak."},"warnings":[],"generationLogId":101}
+data: {"result":{...},"warnings":[],"logs":[...],"generationLogId":101}
 ```
 
 ### 7.5 Client Handling
 
-- Client `EventSource`/`fetch` ReadableStream listen `event: progress` → render partial per komponen real-time (NFR-U1, NFR-U2).
-- `event: done` → simpan `result`, tampilkan tombol export, simpan warnings.
-- `event: error` → tampilkan error state + opsi retry/switch provider (FR-13 fallback manual).
+- Client listen `event: stage`/`progress` -> render partial real-time (NFR-U1, NFR-U2).
+- **`event: log` (V2)**: append ke LogViewer. Toggle `showLogs: false` (default) = skip. Toggle ON = render log lines + level badge (info=blue, warn=yellow, error=red) + timestamp. Buffer max 500 entries.
+- `event: done` -> simpan `result`, tampilkan tombol export, simpan warnings.
+- `event: error` -> tampilkan error state + opsi retry/switch provider.
 - Stream ditutup server setelah `done`/`error`.
-- ASUMSI: heartbeat `: ping\n\n` setiap 15s untuk jaga koneksi proxy (best practice SSE).
+- Heartbeat `: ping\n\n` setiap 15s (best practice SSE).
 
 ---
 
-## 8. Schemas (Zod)
+## 8. Schemas (Zod V2)
 
-Schema di `src/lib/validation/schemas.ts` (`SRS.md 3.4, 8.7`). Request/response schema konsisten dengan `DATABASE_SCHEMA.md` field.
+Schema di `src/lib/validation/schemas.ts`.
 
 ### 8.1 Project Schemas
 
 ```ts
-// CreateProjectInput
 const CreateProjectInputSchema = z.object({
   title: z.string().min(3).max(200).trim(),
   durationType: z.enum(['shorts', 'tutorial']),
   durationTargetSeconds: z.number().int().positive(),
   styleType: z.enum(['3D', '2D']),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).or(z.string()),
+  storyDescription: z.string().max(500).trim().optional(),  // V2 NEW
 });
 
-// UpdateProjectInput (semua opsional)
 const UpdateProjectInputSchema = CreateProjectInputSchema.partial();
 
-// ProjectDTO (response)
 const ProjectDTOSchema = z.object({
   id: z.number(),
   userId: z.number(),
@@ -911,28 +899,21 @@ const ProjectDTOSchema = z.object({
   aspectRatio: z.string(),
   status: z.enum(['draft', 'generating', 'complete', 'failed']),
   resultJson: z.unknown().nullable(),
+  storyDescription: z.string().nullable(),  // V2 NEW
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   deletedAt: z.string().datetime().nullable(),
 });
 ```
 
-| Field | Tipe | Wajib | Validasi | Bukti |
-|---|---|---|---|---|
-| `title` | string | YA | min 3 max 200 char, trim | `SRS.md 5 (FR-01)` |
-| `durationType` | enum | YA | `shorts`\|`tutorial` | `SRS.md 5 (FR-02)` |
-| `durationTargetSeconds` | integer | YA | positive. Shorts ≤180, tutorial 420-900 | `PRD.md 7 (AC-02)` |
-| `styleType` | enum | YA | `3D`\|`2D` | `SRS.md 5 (FR-10)` |
-| `aspectRatio` | string | YA | `16:9`\|`9:16`\|`1:1` atau custom | `SRS.md 5 (FR-10)` |
-| `status` | enum | — | `draft`\|`generating`\|`complete`\|`failed` | `DATABASE_SCHEMA.md 4.3` |
-
-### 8.2 GenerateInput Schema
+### 8.2 GenerateInput Schema (V2 Extended)
 
 ```ts
 const GenerateInputSchema = z.object({
   projectId: z.number().int().positive().optional(),
   input: z.object({
     title: z.string().min(3).max(200).trim(),
+    storyDescription: z.string().max(500).trim().optional(),  // V2 NEW
     durationTarget: z.object({
       type: z.enum(['shorts', 'tutorial']),
       seconds: z.number().int().positive(),
@@ -944,22 +925,19 @@ const GenerateInputSchema = z.object({
     providerId: z.number().int().positive().optional(),
     references: z.array(z.object({
       name: z.string(),
-      type: z.enum(['tokoh', 'background']),
+      type: z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']),  // V2: 6 opsi
+      aiClassification: z.object({  // V2 NEW
+        role: z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']),
+        name: z.string().nullable(),
+        description: z.string(),
+        confidence: z.number().min(0).max(1),
+      }).optional(),
     })).optional(),
   }),
 });
 ```
 
-| Field | Tipe | Wajib | Validasi | Bukti |
-|---|---|---|---|---|
-| `projectId` | integer | TIDAK | Bila ada → save/overwrite result ke project. Bila tidak → generate ephemeral (ASUMSI) | `SRS.md 5 (FR-15)` |
-| `input.title` | string | YA | min 3 max 200 | `SRS.md 5 (FR-01)` |
-| `input.durationTarget` | object | YA | `{type, seconds}` | `PRD.md 8.2` |
-| `input.style` | object | YA | `{type: 3D\|2D, ratio}` | `PRD.md 8.2` |
-| `input.providerId` | integer | TIDAK | ID provider_configs milik user. Default: `is_active=1` | `DATABASE_SCHEMA.md 4.2` |
-| `input.references` | array | TIDAK | `{name, type}` dari asset_references | `SRS.md 5 (FR-17)` |
-
-### 8.3 ProviderConfig Schemas
+### 8.3 ProviderConfig Schemas (V1 — tetap)
 
 ```ts
 const CreateProviderConfigInputSchema = z.object({
@@ -987,26 +965,59 @@ const ProviderConfigDTOSchema = z.object({
 });
 ```
 
-| Field | Tipe | Wajib | Validasi | Bukti |
-|---|---|---|---|---|
-| `provider` | enum | YA | `ollama`\|`openrouter`\|`9router`\|`custom` | `PRD.md 5 (FR-13)` ; `RAG-CONTEXT.md 5.2` |
-| `name` | string | YA | unique per user | `DATABASE_SCHEMA.md 4.2` |
-| `baseUrl` | string URL | YA | preset per provider + custom | `RAG-CONTEXT.md 5.2` |
-| `model` | string | YA | user input, no hardcode default | `SRS.md 12 SRS-A8` |
-| `apiKey` | string | YA (create) | encrypt sebelum save | `SRS.md 5 (FR-14)` |
-| `apiKeyMasked` | string | — | `****` + 4 char terakhir (response only) | `SRS.md 9.1 SEC-02` |
+### 8.4 AssetReference DTO Schema (V2 Extended)
 
-### 8.4 PromptPackageSchema (LLM Structured Output — PRD §8.2)
+```ts
+const AssetReferenceDTOSchema = z.object({
+  id: z.number(),
+  projectId: z.number().nullable(),  // V2: nullable untuk pre-submit
+  tipe: z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']),  // V2: 6 opsi
+  filename: z.string(),
+  blobUrl: z.string(),
+  label: z.string().nullable(),
+  mimeType: z.string().nullable(),
+  sizeBytes: z.number().nullable(),
+  aiClassification: z.object({  // V2 NEW
+    role: z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']),
+    name: z.string().nullable(),
+    description: z.string(),
+    confidence: z.number().min(0).max(1),
+  }).nullable(),
+  createdAt: z.string().datetime(),
+});
+```
+
+### 8.5 GenerationLog DTO Schema (V2 Extended)
+
+```ts
+const GenerationLogDTOSchema = z.object({
+  id: z.number(),
+  projectId: z.number(),
+  provider: z.string(),
+  model: z.string(),
+  durationMs: z.number().nullable(),
+  status: z.enum(['success', 'fail', 'partial']),
+  errorMessage: z.string().nullable(),
+  logsJson: z.array(z.object({  // V2 NEW
+    level: z.enum(['info', 'warn', 'error']),
+    message: z.string(),
+    timestamp: z.string().datetime(),
+  })).nullable(),
+  createdAt: z.string().datetime(),
+});
+```
+
+### 8.6 PromptPackageSchema (LLM Structured Output — unchanged V2)
 
 ```ts
 const PromptPackageSchema = z.object({
   title: z.string(),
   duration_target: z.object({
-    type: z.enum(['shorts', 'tutorial']),
+    type: z.enum(['shorts','tutorial']),
     seconds: z.number(),
   }),
   style: z.object({
-    type: z.enum(['3D', '2D']),
+    type: z.enum(['3D','2D']),
     aspect_ratio: z.string(),
   }),
   character_profiles: z.array(z.object({
@@ -1058,11 +1069,25 @@ const PromptPackageSchema = z.object({
 });
 ```
 
-- Sitasi: `PRD.md 8.2` ; `SRS.md 8.7` (verbatim match).
-- Dipakai di `generateObject({ schema: PromptPackageSchema })` atau `streamObject` (`SRS.md 4.2 #2`).
-- Catatan: field snake_case (bukan camelCase) — selaras PRD §8.2 + DB column (`DATABASE_SCHEMA.md 4.5, 4.7`).
+- Sitasi: `PRD.md V2.0 S8.2` ; `SRS.md V2.0 S7.5, S8.7`.
+- Field snake_case — selaras PRD §8.2 + DB column.
 
-### 8.5 DTO Sub-resource
+### 8.7 ClassifyInput Schema (V2 NEW)
+
+```ts
+const ClassifyInputSchema = z.object({
+  assetReferenceId: z.number().int().positive(),
+});
+
+const ClassificationResultSchema = z.object({
+  role: z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']),
+  name: z.string().nullable(),
+  description: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+```
+
+### 8.8 Sub-resource DTO Schemas (V2 Updated)
 
 ```ts
 const CharacterDTOSchema = z.object({
@@ -1081,68 +1106,71 @@ const SceneDTOSchema = z.object({
 
 const ImagePromptDTOSchema = z.object({
   id: z.number(), projectId: z.number(), sceneId: z.number().nullable(),
-  tipe: z.enum(['tokoh','background']), target: z.string(),
-  promptText: z.string(), referenceFilename: z.string().nullable(),
+  tipe: z.enum(['tokoh','background','prop','accessory','environment','other']),  // V2: 6 opsi
+  target: z.string(),
+  promptText: z.string(),
+  referenceFilename: z.string().nullable(),
   createdAt: z.string().datetime(),
-});
-
-const GenerationLogDTOSchema = z.object({
-  id: z.number(), projectId: z.number(), provider: z.string(), model: z.string(),
-  durationMs: z.number().nullable(), status: z.enum(['success','fail','partial']),
-  errorMessage: z.string().nullable(), createdAt: z.string().datetime(),
 });
 ```
 
 ---
+
 ## 9. Error Envelope
 
 ### 9.1 Format
 
-Lihat 3.3. Semua error response pakai envelope:
-```json
-{ "error": { "code": "...", "message": "...", "details": { } }, "traceId": "..." }
-```
+Lihat §3.3.
 
-### 9.2 Daftar Error Code + HTTP Mapping
+### 9.2 Daftar Error Code + HTTP Mapping (V2)
 
-| Code | HTTP | Kapan | Contoh details | Bukti |
-|---|---|---|---|---|
-| `VALIDATION_ERROR` | 400 | Zod parse fail, input invalid | `{ "field": "title", "min": 3, "received": 2 }` | `SRS.md 7.3` |
-| `VALIDATION_ERROR` | 422 | Business validation (shorts >180s) | `{ "field": "durationTargetSeconds", "max": 180 }` | `PRD.md 7 (AC-02)` |
-| `UNAUTHORIZED` | 401 | Session tidak ada / expired | `{ }` | `SRS.md 7.3` |
-| `FORBIDDEN` | 403 | Ownership fail (project milik user lain) | `{ "resource": "project", "id": 42 }` | `SRS.md 9.1 SEC-07` |
-| `NOT_FOUND` | 404 | Resource tidak ada / soft deleted | `{ "resource": "project", "id": 99 }` | `SRS.md 7.3` |
-| `CONFLICT` | 409 | Unique constraint (provider name dup), project belum generate saat export | `{ "field": "name", "value": "OpenRouter Utama" }` | `DATABASE_SCHEMA.md 4.2` |
-| `RATE_LIMITED` | 429 | Rate limit terlampaui (generate 10/min) | `{ "retryAfter": 6 }` | `SRS.md 12 SRS-A15` |
-| `PROVIDER_ERROR` | 502 | LLM provider gagal (auth, model invalid, rate limit provider) | `{ "provider": "openrouter", "upstream": "..." }` | `SRS.md 7.3, 8.3` |
-| `TIMEOUT` | 504 | LLM timeout (streaming partial disimpan ASUMSI NFR-R2) | `{ "stage": "scenes", "elapsedMs": 60000 }` | `SRS.md 7.3, 8.1` |
-| `INTERNAL` | 500 | Error tak terduga server | `{ }` | `SRS.md 7.3` |
-| `BAD_GATEWAY` | 502 | Storage Blob gagal / Turso unreachable | `{ "service": "blob"|"turso" }` | ASUMSI |
-| `SERVICE_UNAVAILABLE` | 503 | Health degraded | `{ "db": "fail" }` | ASUMSI |
+| Code | HTTP | Kapan | Contoh details | V1/V2 | Bukti |
+|---|---|---|---|---|---|
+| `VALIDATION_ERROR` | 400 | Zod parse fail | `{ "field": "title", "min": 3, "received": 2 }` | V1 | `SRS.md V2.0 S8.5` |
+| `VALIDATION_ERROR` | 422 | Business validation | `{ "field": "durationTargetSeconds", "max": 180 }` | V1+V2 | `PRD.md V2.0 S7 AC-02` |
+| `UNAUTHORIZED` | 401 | Session tidak ada/expired | `{ }` | V1 | `SRS.md V2.0 S8.5` |
+| `FORBIDDEN` | 403 | Ownership fail | `{ "resource": "project", "id": 42 }` | V1 | `SRS.md V2.0 S10.1 SEC-07` |
+| `NOT_FOUND` | 404 | Resource tidak ada/soft deleted | `{ "resource": "project", "id": 99 }` | V1 | `SRS.md V2.0 S8.5` |
+| `CONFLICT` | 409 | Unique constraint | `{ "field": "name", "value": "OpenRouter Utama" }` | V1 | `DATABASE_SCHEMA.md V2.0 S4.2` |
+| `RATE_LIMITED` | 429 | Rate limit terlampaui | `{ "retryAfter": 6 }` | V1 | `SRS.md V2.0 S12 SRS-V2-A15` |
+| `PROVIDER_ERROR` | 502 | LLM provider gagal | `{ "provider": "openrouter", "upstream": "..." }` | V1 | `SRS.md V2.0 S8.5` |
+| `TIMEOUT` | 504 | LLM timeout | `{ "stage": "scenes", "elapsedMs": 60000 }` | V1 | `SRS.md V2.0 S8.5` |
+| **`CLASSIFICATION_ERROR`** | **502** | **Vision LLM gagal** | `{ "assetReferenceId": 99, "reason": "timeout" }` | **NEW V2** | `PRD.md V2.0 S9.3` |
+| `INTERNAL` | 500 | Error tak terduga | `{ }` | V1 | `SRS.md V2.0 S8.5` |
+| `BAD_GATEWAY` | 502 | Storage/Turso gagal | `{ "service": "blob"|"turso" }` | V1 | ASUMSI |
+| `SERVICE_UNAVAILABLE` | 503 | Health degraded | `{ "db": "fail" }` | V1 | ASUMSI |
 
 ### 9.3 Error Code di SSE error Event
 
-SSE `error` event pakai subset code: `PROVIDER_ERROR`, `TIMEOUT`, `INTERNAL`. Tidak pakai HTTP status (karena stream sudah 200 OK). Sitasi: `SRS.md 7.2`.
+SSE `error` event: `PROVIDER_ERROR`, `TIMEOUT`, **`CLASSIFICATION_ERROR`** (V2), `INTERNAL`.
 
-### 9.4 Consistency Warning (FR-12)
+### 9.4 Consistency Warning (FR-12) — V2 Extended
 
 Bukan error — field `warnings[]` di `event: done`. Tidak block save.
 
 ```json
-{ "warnings": [ { "code": "CONSISTENCY_MISMATCH", "message": "Karakter 'Hero' identitas beda di scene 2", "target": "Hero", "scene": 2 } ] }
+{
+  "warnings": [
+    { "code": "CONSISTENCY_MISMATCH", "message": "Karakter 'Hero' identitas beda di scene 2", "target": "Hero", "scene": 2 },
+    { "code": "LOW_CLASSIFICATION_CONFIDENCE", "message": "AI confidence 0.65 di bawah threshold 0.7", "target": "hutan-bg.png", "confidence": 0.65 }
+  ]
+}
 ```
 
-Sitasi: `SRS.md 5 (FR-12)` ; `PROJECT_ARCHITECTURE.md 4.1 (consistency-checker)`.
+**V2 warning codes:**
+- `CONSISTENCY_MISMATCH` (V1): identitas karakter beda lintas scene.
+- **`LOW_CLASSIFICATION_CONFIDENCE` (V2)**: Vision LLM confidence < 0.7.
 
 ---
 
 ## 10. Rate Limiting
 
-| Endpoint | Limit | Window | Header response | Bukti |
-|---|---|---|---|---|
-| `POST /api/v1/generate` | **10 req/min/user** | 60s | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` | `SRS.md 12 SRS-A15` ; `PRD.md 6.2 NFR-S4` |
-| Lainnya (CRUD/setting/upload/export) | **60 req/min/user** (ASUMSI umum) | 60s | sama | ASUMSI |
-| `POST /api/v1/upload` | 20 req/min/user (ASUMSI — multipart berat) | 60s | sama | ASUMSI |
+| Endpoint | Limit | Window | Header response | V2 Change | Bukti |
+|---|---|---|---|---|---|
+| `POST /api/v1/generate` | **10 req/min/user** | 60s | `X-RateLimit-*` | Tetap | `SRS.md V2.0 S12 SRS-V2-A15` |
+| `POST /api/v1/upload/classify` | **30 req/min/user** | 60s | sama | **NEW V2** | ASUMSI SRS-V2-A12 |
+| Lainnya (CRUD/setting/upload/export/dashboard) | **60 req/min/user** | 60s | sama | Tetap | ASUMSI |
+| `POST /api/v1/upload` | 20 req/min/user | 60s | sama | Tetap | ASUMSI |
 
 ### 10.1 Header Rate Limit
 
@@ -1166,7 +1194,7 @@ X-RateLimit-Reset: 1718803200
 
 ### 10.3 Implementasi
 
-Middleware `src/middleware.ts` (NextAuth + rate limit). ASUMSI: in-memory atau Upstash Redis bila multi-instance Vercel. Fase awal: in-memory per instance (ASUMSI — tidak sempurna cross-instance, tapi cukup dev/staging). Sitasi: `PROJECT_ARCHITECTURE.md 5 (src/middleware.ts), 9 SB-12`.
+Middleware `src/middleware.ts` (NextAuth + rate limit). V2 tidak ada perubahan arsitektur — tetap in-memory per instance. Multi-instance Vercel = perlu Upstash Redis (fase akhir).
 
 ---
 
@@ -1176,150 +1204,228 @@ Middleware `src/middleware.ts` (NextAuth + rate limit). ASUMSI: in-memory atau U
 
 | Header | Wajib | Deskripsi | Bukti |
 |---|---|---|---|
-| `Cookie: next-auth.session-token=...` | YA (protected) | Session NextAuth | `PROJECT_ARCHITECTURE.md 7.4` |
-| `Content-Type: application/json` | YA (body) | JSON request | 3.1 |
-| `Content-Type: multipart/form-data; boundary=...` | YA (upload) | Upload file | 6.6 |
-| `Accept: text/event-stream` | disarankan (generate) | SSE | 7 |
-| `Accept-Language: id`|`en` | opsional | Override bahasa pesan error (FR-19) | ASUMSI |
+| `Cookie: next-auth.session-token=...` | YA (protected) | Session NextAuth | `RAG-CONTEXT.md S5.3` |
+| `Content-Type: application/json` | YA (body) | JSON request | §3.1 |
+| `Content-Type: multipart/form-data; boundary=...` | YA (upload) | Upload file | §6.6 |
+| `Accept: text/event-stream` | disarankan (generate) | SSE | §7 |
+| `Accept-Language: id`|`en` | opsional | Override bahasa pesan error | ASUMSI |
 
 ### 11.2 Header Response Standar
 
 | Header | Deskripsi | Bukti |
 |---|---|---|
-| `Content-Type` | per endpoint | 3.1 |
-| `X-RateLimit-*` | lihat 10 | 10 |
-| `X-Trace-Id` | ID trace (sama dengan `traceId` body error) | ASUMSI |
-| `Content-Disposition: attachment; filename="..."` | export only | 6.7 |
+| `Content-Type` | per endpoint | §3.1 |
+| `X-RateLimit-*` | lihat §10 | §10 |
+| `X-Trace-Id` | ID trace | ASUMSI |
+| `Content-Disposition: attachment; filename="..."` | export only | §6.7 |
 
 ### 11.3 CORS
 
 | Aspek | Nilai | Bukti |
 |---|---|---|
-| Same-origin | Next.js App Router default same-origin. Browser cookie kirim otomatis | `PROJECT_ARCHITECTURE.md 1.2` |
-| Cross-origin API | TIDAK di-enable fase awal (ASUMSI — app fullstack satu origin) | ASUMSI |
-| Bila butuh terprogram | enable `Access-Control-Allow-Origin` per route + `Authorization: Bearer` (bukan cookie) | ASUMSI fase akhir |
+| Same-origin | Next.js App Router default | `RAG-CONTEXT.md S3` |
+| Cross-origin API | TIDAK di-enable fase awal | ASUMSI |
 
-### 11.4 Keamanan
+### 11.4 Keamanan (V2)
 
-| Aspek | Implementasi | Bukti |
-|---|---|---|
-| HTTPS only | Vercel default | `SRS.md 9.1 SEC-09` |
-| CSRF | Next.js built-in Server Actions + NextAuth CSRF token | `SRS.md 9.1 SEC-05` |
-| Input sanitization (XSS) | Zod + escape HTML sebelum render/prompt | `SRS.md 9.1 SEC-06` |
-| API key user encrypt at rest | AES-256-GCM, mask di response | `SRS.md 9.1 SEC-01/SEC-02` |
-| Server-only LLM/crypto | `import 'server-only'` di `lib/ai/*`, `lib/crypto/*` | `SRS.md 9.1 SEC-03` |
-| Ownership RBAC | `user_id` filter semua query | `SRS.md 9.1 SEC-07` |
-| 9router localhost only | tidak reachable Vercel prod | `PROJECT_ARCHITECTURE.md 7.1, 8` |
-| Rate limit | middleware | 10 |
-| Env secret | Vercel env, `.env.example` tanpa value | `SRS.md 9.1 SEC-08` |
+| Aspek | Implementasi | V2 Change | Bukti |
+|---|---|---|---|
+| HTTPS only | Vercel default | Tetap | `SRS.md V2.0 S10.1 SEC-09` |
+| CSRF | Next.js built-in + NextAuth CSRF | Tetap | `SRS.md V2.0 S10.1 SEC-05` |
+| Input sanitization | Zod + escape HTML | Tetap | `SRS.md V2.0 S10.1 SEC-06` |
+| API key encrypt | AES-256-GCM, mask di response | Tetap | `SRS.md V2.0 S10.1 SEC-01/SEC-02` |
+| Server-only LLM/crypto | `import 'server-only'` | Tetap | `SRS.md V2.0 S10.1 SEC-03` |
+| Ownership RBAC | `user_id` filter semua query | Tetap | `SRS.md V2.0 S10.1 SEC-07` |
+| 9router localhost only | tidak reachable Vercel prod | Tetap | `RAG-CONTEXT.md S5.2, S9 G4` |
+| **Vision LLM API key** | **Encrypt via `provider_configs` existing** | **V2 NEW** | `PRD.md V2.0 S5 FR-V2-02` |
+| Rate limit | middleware | **V2: tambah limit `/upload/classify`** | §10 |
+| Env secret | Vercel env, `.env.example` tanpa value | Tetap | `SRS.md V2.0 S10.1 SEC-08` |
 
 ---
 
 ## 12. Backward-Compat & Deprecation
 
-| Aturan | Detail | Bukti |
-|---|---|---|
-| Versioning | `/api/v1/*`. Breaking change ke `/api/v2` (ASUMSI) | 1.3 |
-| Additive field | New field di response = non-breaking, tetap v1 | ASUMSI |
-| Deprecation header | `Sunset: <date>` + `Deprecation: true` per endpoint bila akan hapus (ASUMSI fase akhir) | ASUMSI |
-| Deprecated field | Tandai di docs + response field `deprecated: true` (ASUMSI) | ASUMSI |
-| End-of-life window | ASUMSI 6 bulan dari deprecation ke removal | ASUMSI |
-| Server Actions | Internal contract, tidak version terpisah. Bila schema Server Action berubah, bump internal | ASUMSI |
+| Aturan | Detail | V2 Notes | Bukti |
+|---|---|---|---|
+| Versioning | `/api/v1/*` | V2 semua ADDITIVE — tetap di `/api/v1/*` | §1.3 |
+| Additive field | New field di response = non-breaking | V2: `storyDescription`, `aiClassification`, `logsJson` | §3.1 |
+| Additive enum | New enum value = non-breaking | V2: `tipe` 2->6 opsi. Client V1 kirim 2 nilai, server accept. V2 kirim 6, server accept. | §8.4, §6.6 |
+| Optional request field | New opsional = non-breaking | V2: `projectId` opsional di upload. `storyDescription` opsional. | §6.6, §8.2 |
+| New endpoint | Tidak breaking | V2: `POST /upload/classify`, `GET /dashboard/stats` | §6.6, §6.9 |
+| Deprecation header | `Sunset: <date>` + `Deprecation: true` (fase akhir) | Tidak ada deprecation di V2 | ASUMSI |
+| End-of-life window | 6 bulan dari deprecation ke removal (fase akhir) | — | ASUMSI |
 
-> Fase awal: tidak ada endpoint deprecated. Aturan ini untuk fase akhir.
+> **Backward compat strategy V2**: SEMUA perubahan V2 = additive. Existing V1 client yang ignore field baru tetap jalan. Migrasi V2 tidak break V1 client.
 
 ---
 
 ## 13. Webhook / Async
 
-**TIDAK ADA webhook fase awal.** Alasan:
+**TIDAK ADA webhook fase awal (V1 + V2).** Alasan:
 
-1. LLM call synchronous/streaming via SSE — tidak ada job background yang perlu notifikasi. Sitasi: `RAG-CONTEXT.md 5.4` (Vercel tidak punya native queue gratis, ASUMSI streaming SSE synchronous).
-2. Export synchronous baca `result_json` snapshot — tidak async. Sitasi: `DATABASE_SCHEMA.md 12.3`.
-3. Upload synchronous via Vercel Blob `put()` — langsung return URL. Sitasi: `SRS.md 5 (FR-17), 8.5`.
-4. Tidak ada integrasi pihak ketiga yang butuh webhook (OOS-3 image gen langsung). Sitasi: `PRD.md 9 OOS-3`.
+1. LLM call synchronous/streaming via SSE — tidak ada job background perlu notifikasi. Sitasi: `RAG-CONTEXT.md S5.4`.
+2. Export synchronous baca `result_json` snapshot. Sitasi: `DATABASE_SCHEMA.md V2.0 S12.3`.
+3. Upload synchronous via Vercel Blob `put()` — langsung return URL (V2: dengan classification inline). Sitasi: `SRS.md V2.0 S5 (FR-17)`.
+4. **V2 Vision LLM classification** synchronous inline saat upload. Tidak async. Sitasi: `PRD.md V2.0 S5 FR-V2-02`.
+5. Tidak ada integrasi pihak ketiga yang butuh webhook (OOS-3). Sitasi: `PRD.md V2.0 S11 OOS-3`.
 
-**Bila fase akhir butuh webhook** (ASUMSI — mis. background job generate panjang via Vercel Cron/queue eksternal):
-- Event: `generate.completed`, `generate.failed`
+**Bila fase akhir butuh webhook** (ASUMSI):
+- Event: `generate.completed`, `generate.failed`, `classification.completed`
 - Payload: `{ "projectId": 42, "status": "success"|"fail", "generationLogId": 101, "timestamp": "..." }`
 - Signature: HMAC-SHA256 header `X-PromptFlow-Signature: <hex>`
-- Retry: 3x exponential backoff (ASUMSI NFR-R3)
-- Endpoint user: terdaftar di settings (ASUMSI fase akhir)
+- Retry: 3x exponential backoff
 
 ---
 
 ## 14. Daftar Status Code
 
-| HTTP | Nama | Dipakai endpoint | Bukti |
-|---|---|---|---|
-| 200 | OK | GET semua, PATCH, SSE generate (stream mulai) | `SRS.md 7.3` |
-| 201 | Created | POST projects, POST providers, POST upload | 6 |
-| 204 | No Content | DELETE project, DELETE provider, DELETE upload | 6 |
-| 400 | Bad Request | VALIDATION_ERROR (Zod fail, format invalid) | `SRS.md 7.3` |
-| 401 | Unauthorized | UNAUTHORIZED (no session) | `SRS.md 7.3` |
-| 403 | Forbidden | FORBIDDEN (ownership fail) | `SRS.md 9.1 SEC-07` |
-| 404 | Not Found | NOT_FOUND (resource tidak ada / soft deleted) | `SRS.md 7.3` |
-| 409 | Conflict | CONFLICT (unique provider name, export project belum generate) | `DATABASE_SCHEMA.md 4.2` |
-| 422 | Unprocessable Entity | VALIDATION_ERROR business (shorts >180s) | `PRD.md 7 (AC-02)` |
-| 429 | Too Many Requests | RATE_LIMITED | `SRS.md 12 SRS-A15` |
-| 500 | Internal Server Error | INTERNAL | `SRS.md 7.3` |
-| 502 | Bad Gateway | PROVIDER_ERROR (LLM), BAD_GATEWAY (Blob/Turso) | `SRS.md 7.3` |
-| 503 | Service Unavailable | SERVICE_UNAVAILABLE (health degraded) | ASUMSI |
-| 504 | Gateway Timeout | TIMEOUT (LLM timeout) | `SRS.md 7.3, 8.1` |
+| HTTP | Nama | Dipakai endpoint | V1/V2 | Bukti |
+|---|---|---|---|---|
+| 200 | OK | GET semua, PATCH, SSE generate (stream mulai) | V1 | `SRS.md V2.0 S8.5` |
+| 201 | Created | POST projects, POST providers, POST upload, POST upload/classify | V1+V2 | §6 |
+| 204 | No Content | DELETE project, DELETE provider, DELETE upload | V1 | §6 |
+| 400 | Bad Request | VALIDATION_ERROR (Zod fail) | V1 | `SRS.md V2.0 S8.5` |
+| 401 | Unauthorized | UNAUTHORIZED | V1 | `SRS.md V2.0 S8.5` |
+| 403 | Forbidden | FORBIDDEN (ownership fail) | V1 | `SRS.md V2.0 S10.1 SEC-07` |
+| 404 | Not Found | NOT_FOUND | V1 | `SRS.md V2.0 S8.5` |
+| 409 | Conflict | CONFLICT (unique constraint) | V1 | `DATABASE_SCHEMA.md V2.0 S4.2` |
+| 422 | Unprocessable Entity | VALIDATION_ERROR business | V1+V2 | `PRD.md V2.0 S7 AC-02` |
+| 429 | Too Many Requests | RATE_LIMITED | V1 | `SRS.md V2.0 S12 SRS-V2-A15` |
+| 500 | Internal Server Error | INTERNAL | V1 | `SRS.md V2.0 S8.5` |
+| 502 | Bad Gateway | PROVIDER_ERROR, CLASSIFICATION_ERROR (V2), BAD_GATEWAY | V1+V2 | `SRS.md V2.0 S8.5` |
+| 503 | Service Unavailable | SERVICE_UNAVAILABLE | V1 | ASUMSI |
+| 504 | Gateway Timeout | TIMEOUT | V1 | `SRS.md V2.0 S8.5` |
 
 ---
 
-## 15. Asumsi API + Referensi
+## 15. Changelog V1 to V2
 
-### 15.1 Asumsi API
+### 15.1 Endpoint Changes
 
-| ID | Asumsi | Status Bukti | Dampak | Sitasi |
+| # | Endpoint | Tipe Perubahan V2 | Detail |
+|---|---|---|---|
+| 4 | `GET /api/v1/projects` | Enhancement | Pagination `?page=&limit=` dipakai. Response +`storyDescription`. |
+| 5 | `POST /api/v1/projects` | Extension | +`storyDescription` opsional (max 500 char). |
+| 9 | `POST /api/v1/generate` | Extension+SSE | +`storyDescription`, +`aiClassification` refs. SSE +`log` event. Stage +`supporting_characters`. Warnings +`LOW_CLASSIFICATION_CONFIDENCE`. |
+| 15 | `POST /api/v1/upload` | Major | `projectId` OPSIONAL. `tipe` 6 opsi. +`aiClassification` response. Auto-classify. |
+| 17 | `DELETE /api/v1/upload` | Extension | `projectId` OPSIONAL untuk orphan ref delete. |
+| 21 | `GET /api/v1/projects/[id]/image-prompts` | Extension | `tipe` filter 6 nilai. |
+| 22 | `GET /api/v1/projects/[id]/logs` | Extension | +`logsJson` per log. +`provider` filter. |
+
+### 15.2 New Endpoints V2
+
+| # | Endpoint | Deskripsi |
+|---|---|---|
+| 16 | `POST /api/v1/upload/classify` | Trigger AI Vision classification per asset reference. |
+| 23 | `GET /api/v1/dashboard/stats` | Enriched dashboard: 6-8 metric + per-provider breakdown + recent projects + storage + weekly trend. |
+
+### 15.3 Schema Changes
+
+| Schema | Tipe Perubahan V2 | Detail |
+|---|---|---|
+| `CreateProjectInputSchema` | Extension | +`storyDescription: z.string().max(500).optional()` |
+| `ProjectDTOSchema` | Extension | +`storyDescription: z.string().nullable()` |
+| `GenerateInputSchema` | Extension | +`storyDescription`. `references[].type` 6 enum. +`references[].aiClassification` |
+| `AssetReferenceDTOSchema` | Major | `projectId: nullable`. `tipe` 6 enum. +`aiClassification: object nullable` |
+| `GenerationLogDTOSchema` | Extension | +`logsJson: array nullable` |
+| `ImagePromptDTOSchema` | Extension | `tipe` 6 enum |
+| `ClassifyInputSchema` (NEW) | New | `{assetReferenceId: number}` |
+| `ClassificationResultSchema` (NEW) | New | `{role, name, description, confidence}` |
+| `DashboardStatsDTOSchema` (NEW) | New | Lihat §6.9 |
+
+### 15.4 SSE Protocol Changes
+
+| Aspek | V1 | V2 |
+|---|---|---|
+| Event types | `progress`, `done`, `error` | + **`log`** (NEW) |
+| `log` event data | — | `{level, message, timestamp}` |
+| `done` warnings | `CONSISTENCY_MISMATCH` | + **`LOW_CLASSIFICATION_CONFIDENCE`** |
+| `error` codes | `PROVIDER_ERROR`, `TIMEOUT`, `INTERNAL` | + **`CLASSIFICATION_ERROR`** |
+| Stage list | 4 stages | + **`supporting_characters`** |
+| `done` logs field | — | + **`logs: array`** |
+
+### 15.5 Database Schema Changes (V2)
+
+| Tabel | Kolom Baru | Tipe | Nullable | Bukti |
 |---|---|---|---|---|
-| API-A1 | Versioning URI prefix `/api/v1/*` | ASUMSI (paket konteks) | SRS 7.1 / ARCH 5 sebut `/api/*` tanpa prefix, implementasi folder `/api/v1/` | `SRS.md 7.1` ; `PROJECT_ARCHITECTURE.md 5` |
-| API-A2 | Envelope sukses `{ data, pagination }` | ASUMSI | SRS hanya definisikan error envelope. Bisa flat object | `SRS.md 7.3` |
-| API-A3 | camelCase field JSON request/response | ASUMSI (best practice Next.js) | DB snake_case, mapping di repository | `DATABASE_SCHEMA.md 4` |
-| API-A4 | PromptPackageSchema field snake_case | DIKONFIRMASI PRD 8.2 | Verbatim match, tidak di-camelCase | `PRD.md 8.2` ; `SRS.md 8.7` |
-| API-A5 | NextAuth credentials provider | TIDAK ADA BUKTI preferensi | Bisa OAuth fase akhir | `RAG-CONTEXT.md 9 G2` ; ASUMSI SRS-A1 |
-| API-A6 | Bearer token opsional untuk API terprogram | ASUMSI | Fase awal cookie saja | `PROJECT_ARCHITECTURE.md 7.4` |
-| API-A7 | Rate limit 10 req/min/user generate | ASUMSI SRS-A15 | In-memory fase awal, Upstash Redis fase akhir | `SRS.md 12` |
-| API-A8 | Rate limit 60 req/min/user umum | ASUMSI | Best practice | — |
-| API-A9 | Upload max 10MB, mime image/* | ASUMSI | Validasi Zod + middleware | `SRS.md 5 (FR-17)` |
-| API-A10 | Soft delete project (deleted_at) | ASUMSI SRS-A19 | DELETE = 204, bukan hard delete | `DATABASE_SCHEMA.md 10.1` |
-| API-A11 | PATCH (bukan PUT) untuk partial update | ASUMSI | SRS 7.1 sebut PUT, kontrak ini pilih PATCH partial | `SRS.md 7.1` |
-| API-A12 | providerId opsional di generate (default is_active=1) | ASUMSI | Satu provider aktif per user | `DATABASE_SCHEMA.md 4.2` |
-| API-A13 | projectId opsional di generate (ephemeral bila kosong) | ASUMSI | Fase awal mungkin wajib, keputusan implementasi | `SRS.md 5 (FR-15)` |
-| API-A14 | Endpoint health, auth/session, test connection, sub-resource list | ASUMSI (paket konteks + DATABASE_SCHEMA) | Tidak di SRS 7.1 eksplisit (kecuali sub-resource dari DB_SCHEMA) | `SRS.md 7.1` ; `DATABASE_SCHEMA.md 4` |
-| API-A15 | SSE heartbeat ping 15s | ASUMSI best practice | Jaga koneksi proxy | — |
-| API-A16 | traceId di error envelope | ASUMSI | Debugging | `SRS.md 7.3` (TIDAK ada traceId eksplisit) |
-| API-A17 | Error code BAD_GATEWAY, SERVICE_UNAVAILABLE tambahan | ASUMSI | SRS 7.3 sebut 5 code inti | `SRS.md 7.3` |
-| API-A18 | Export 409 bila resultJson null | ASUMSI | Project belum generate | `DATABASE_SCHEMA.md 4.3` |
-| API-A19 | 9router tidak di Vercel prod | DIKONFIRMASI localhost only | Prod: Ollama cloud/OpenRouter/custom | `RAG-CONTEXT.md 5.2, 9 G4` |
-| API-A20 | Webhook TIDAK ADA fase awal | ASUMSI + DIKONFIRMASI OOS | LLM synchronous/streaming | `RAG-CONTEXT.md 5.4` ; `PRD.md 9` |
+| `projects` | `story_description` | TEXT | YES | `DATABASE_SCHEMA.md V2.0 S4.3, S7.2` |
+| `asset_references` | `ai_classification` | TEXT | YES | `DATABASE_SCHEMA.md V2.0 S4.4, S7.2` |
+| `generation_logs` | `logs_json` | TEXT | YES | `DATABASE_SCHEMA.md V2.0 S4.8, S7.2` |
 
-### 15.2 Referensi Internal
+Semua kolom baru nullable -> 100% backward-compatible.
+
+### 15.6 Backward Compatibility Verdict
+
+**100% backward-compatible V1 to V2.** Semua perubahan V2 additive:
+- Tidak ada endpoint V1 yang dihapus
+- Tidak ada field V1 yang diubah
+- Tidak ada enum value V1 yang dihapus
+- Tidak ada breaking change status code
+- Semua field baru opsional
+- V1 client tidak perlu update
+
+---
+
+## 16. Asumsi API + Referensi
+
+### 16.1 Asumsi API V2
+
+| ID | Asumsi | Status | Dampak | Sitasi |
+|---|---|---|---|---|
+| API-A1 | Versioning `/api/v1/*` | DIKONFIRMASI | Locked | `REVIEW_REPORT.md S10` |
+| API-A2 | Envelope `{ data, pagination }` | ASUMSI | SRS hanya definisikan error | `SRS.md V2.0 S8.5` |
+| API-A3 | camelCase field JSON | ASUMSI | DB snake_case, mapping di repo | `DATABASE_SCHEMA.md V2.0 S4` |
+| API-A4 | PromptPackageSchema snake_case | DIKONFIRMASI | Verbatim match | `PRD.md V2.0 S8.2` |
+| API-A5 | NextAuth credentials | ASUMSI | Bisa OAuth fase akhir | `RAG-CONTEXT.md S5.3` |
+| API-A6 | Bearer token opsional | ASUMSI | Fase awal cookie | ASUMSI |
+| API-A7 | Rate limit 10/min generate | ASUMSI SRS-V2-A15 | In-memory fase awal | `SRS.md V2.0 S12` |
+| API-A8 | Rate limit 60/min umum | ASUMSI | Best practice | — |
+| API-A9 | Upload max 10MB | ASUMSI SRS-V2-A17 | Validasi Zod | `SRS.md V2.0 S9.1` |
+| API-A10 | Soft delete project | ASUMSI SRS-V2-A16 | DELETE = 204 | `DATABASE_SCHEMA.md V2.0 S11.1` |
+| API-A11 | PATCH bukan PUT | ASUMSI | Tetap | `SRS.md V2.0 S7.1` |
+| API-A12 | providerId opsional | ASUMSI | Default is_active=1 | `DATABASE_SCHEMA.md V2.0 S4.2` |
+| API-A13 | projectId opsional di generate | ASUMSI | Ephemeral bila kosong | `SRS.md V2.0 S5 (FR-15)` |
+| API-A14 | V2: upload projectId OPSIONAL | ASUMSI SRS-V2-A5 | Pre-submit orphan refs | `PRD.md V2.0 S5 FR-V2-01` |
+| API-A15 | V2: tipe 6 opsi | DIKONFIRMASI | App layer Zod | `SRS.md V2.0 S7.3` |
+| API-A16 | V2: SSE log event | DIKONFIRMASI | Frontend LogViewer | `SRS.md V2.0 S6.5` |
+| API-A17 | V2: auto-classify saat upload | ASUMSI SRS-V2-A11 | Seamless UX | `PRD.md V2.0 S5 FR-V2-02` |
+| API-A18 | V2: Vision LLM = GPT-4o/Gemini | ASUMSI SRS-V2-A1 | Provider support | `PRD.md V2.0 S12 VD-1` |
+| API-A19 | V2: confidence threshold 0.7 | ASUMSI SRS-V2-A13 | UI warn | `SRS.md V2.0 S14` |
+| API-A20 | V2: storyDescription max 500 | DIKONFIRMASI | Zod validation | `PRD.md V2.0 S5 FR-V2-04` |
+| API-A21 | V2: dashboard load <= 1.5s | ASUMSI SRS-V2-P2 | Performance | `SRS.md V2.0 S11` |
+| API-A22 | SSE heartbeat 15s | ASUMSI | Proxy keepalive | — |
+| API-A23 | traceId di error | ASUMSI | Debugging | `SRS.md V2.0 S8.5` |
+| API-A24 | 9router localhost only | DIKONFIRMASI | Prod: cloud/custom | `RAG-CONTEXT.md S5.2` |
+| API-A25 | Webhook TIDAK ADA | DIKONFIRMASI OOS | LLM synchronous | `PRD.md V2.0 S11` |
+
+### 16.2 Referensi Internal
 
 | Dokumen | Path | Bagian relevan |
 |---|---|---|
-| RAG-CONTEXT (sumber kebenaran) | `product-docs/RAG-CONTEXT.md` | 5.1, 5.2 (provider base URL), 6 (upload), 9 (gap) |
-| PRD | `product-docs/PRD.md` | 5 (FR-01..FR-19), 8.2 (PromptPackageSchema), 7 (AC) |
-| SRS | `product-docs/SRS.md` | 7 (API overview), 8.7 (Zod), 9 (keamanan), 12 (asumsi) |
-| DATABASE_SCHEMA | `product-docs/DATABASE_SCHEMA.md` | 4 (entitas & field), 6.2 (validation), 10 (soft delete) |
-| PROJECT_ARCHITECTURE | `product-docs/PROJECT_ARCHITECTURE.md` | 5 (folder), 6 (data flow generate), 7 (integrasi), 9 (security) |
+| RAG-CONTEXT | `product-docs/RAG-CONTEXT.md` | S3, S5, S8, S9 |
+| PRD V2.0 | `product-docs/PRD.md` | S5 (FR), S8 (schema), S9 (API) |
+| SRS V2.0 | `product-docs/SRS.md` | S4 (arch), S6 (spec V2), S7 (schema), S8 (API), S9 (constraint), S10 (security), S12 (phases) |
+| DATABASE_SCHEMA V2.0 | `product-docs/DATABASE_SCHEMA.md` | S4 (entities+V2), S7 (constraints V2), S9 (migration V2) |
+| AGENTS.md | `product-docs/AGENTS.md` | S7 (endpoints), S9 (PromptPackageSchema), S10 (security) |
+| REVIEW_REPORT | `product-docs/REVIEW_REPORT.md` | S10 WARN-002 (locking /api/v1/*) |
 
-### 15.3 Sitasi Eksternal Kunci
+### 16.3 Sitasi Eksternal Kunci
 
-| Sitasi | Klaim didukung | Bagian |
+| URL | Klaim didukung | Bagian |
 |---|---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | createOpenAICompatible, structured output, streaming | 1, 6.4, 8.4 |
-| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL, Bearer, header opsional | 6.5, 15.1 API-A19 |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat https://ollama.com/v1 | 6.5 |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js, libSQL HTTP | 11.4 |
-| https://vercel.com/docs/vercel-blob | Vercel Blob upload | 6.6 |
+| https://ai-sdk.dev/providers/openai-compatible-providers | createOpenAICompatible, structured output, streaming | §1.1, §6.4, §8.6 |
+| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL, Bearer | §6.5, §16.1 API-A24 |
+| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat | §6.5 |
+| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js, libSQL HTTP | §11.4 |
+| https://vercel.com/docs/vercel-blob | Vercel Blob upload | §6.6 |
+| https://platform.openai.com/docs/guides/vision | GPT-4o Vision API | §6.6, §6.6.2 |
+| https://ai.google.dev/gemini-api/docs/vision | Gemini Vision API | §6.6, §6.6.2 |
+| https://recharts.org/ | Dashboard chart library | §6.9 (ASUMSI) |
 
 ---
 
-**Dokumen ini fokus pada KONTRAK API siap pakai agent eksekutor (backend + frontend). Tujuan bisnis di BRD, pasar di MRD, produk di PRD, spesifikasi teknis di SRS, arsitektur penuh di PROJECT_ARCHITECTURE, skema data di DATABASE_SCHEMA, aturan kode di CODING_RULES. API_CONTRACT tidak membangun deliverable akhir / menulis kode implementasi — hanya kontrak.**
+**Dokumen ini fokus pada KONTRAK API V2 siap pakai agent eksekutor (backend + frontend). V2 = backward-compatible additive layer di atas V1. Tujuan bisnis di BRD V2, pasar di MRD V2, produk di PRD V2, spesifikasi teknis di SRS V2, arsitektur di PROJECT_ARCHITECTURE, data di DATABASE_SCHEMA V2, aturan kode di CODING_RULES. API_CONTRACT tidak membangun deliverable akhir / menulis kode — hanya kontrak.**
 
 > **Dibuat oleh:** docgen-api-spec subagent
-> **Tanggal:** 2026-06-19
-> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Versi:** 2.0

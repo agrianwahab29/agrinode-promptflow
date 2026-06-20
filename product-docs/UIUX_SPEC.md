@@ -1,14 +1,14 @@
-# UIUX Specification — PromptFlow
+﻿# UIUX Specification V2.0 — PromptFlow
 ## Workflow Engine Otomasi Prompt Animasi AI
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/PRD.md` + `product-docs/SRS.md` + `product-docs/PROJECT_ARCHITECTURE.md` (bersitasi per klaim penting)
+> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/PRD.md` V2.0 + `product-docs/SRS.md` V2.0 + `product-docs/PROJECT_ARCHITECTURE.md`
 > **Root proyek:** `C:\laragon\www\PromptFlow`
 > **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Catatan:** UIUX_SPEC menurunkan persona PRD §2 + tech stack frontend SRS §4 + struktur folder PROJECT_ARCHITECTURE §5 menjadi design system + spesifikasi UI konkret siap dikode agent eksekutor frontend. Token WAJIB konkret (HEX/px/ms), bukan deskripsi vague.
+> **Catatan:** V2 OVERWRITE V1. V1 design tokens dipertahankan (`--primary #7c3aed`, Inter + JetBrains Mono, spacing 4px base, radius 6px). Fokus V2: upload di generate page + role classification + story description + real-time logs + dashboard enrichment + UI consistency (loading.tsx/error.tsx/Suspense/pagination).
 
 ---
 
@@ -16,18 +16,19 @@
 
 1. Pendahuluan, Prinsip Desain & Brand Voice
 2. Design System (Design Tokens)
-3. Inventory Komponen UI
+3. Inventory Komponen UI V2
 4. Layout & Grid
 5. Navigasi & Information Architecture
 6. User Flows (Mermaid)
-7. Wireframes Deskriptif
+7. Wireframes Deskriptif V2
 8. Iconografi & Aset
 9. Aksesibilitas
 10. Interaction & Motion
-11. Konten & Copy
+11. Konten & Copy & i18n
 12. Responsif & Kompatibilitas
 13. Empty / Error / Loading States
-14. Asumsi UIUX & Referensi
+14. Asumsi UIUX V2 & Referensi
+15. Verifikasi Implementasi
 
 ---
 
@@ -35,164 +36,165 @@
 
 ### 1.1 Tujuan Dokumen
 
-UIUX_SPEC menjabarkan design system + spesifikasi UI konkret untuk PromptFlow
-— web app fullstack Next.js App Router otomasi susun prompt animasi AI.
-Tujuan: agent eksekutor frontend bisa langsung mengkode tanpa menebak
-style/struktur/token. Output aplikasi = teks prompt terstruktur (JSON + opsi
-export markdown), BUKAN file media.
-- Sitasi: `PRD.md 1.1, 1.2` ; `SRS.md 1.1` ; `PROJECT_ARCHITECTURE.md 1.2`
+UIUX_SPEC V2 menjabarkan design system + spesifikasi UI konkret untuk upgrade V2 PromptFlow. V1 sudah built & berjalan di Laragon (9 tabel DB, 21 endpoint API, shadcn/ui + Tailwind v4). V2 menambah 8 fitur UI utama (lihat 1.5) yang mengubah alur kerja dari "upload di project detail" menjadi "upload di generate page + AI classification + real-time logs + dashboard enrichment".
+
+Tujuan: agent eksekutor frontend bisa langsung mengkode tanpa menebak style/struktur/token. Output aplikasi = teks prompt terstruktur (JSON + export markdown), BUKAN file media.
 
 ### 1.2 Persona Sasaran UI
 
-UI diturunkan dari persona PRD §2. Tiga persona utama: Kreator Solo, Indie
-Studio, Edukator. Faktor desain dominan: kecepatan, simpel, dwibahasa,
-konsistensi visual karakter, biaya rendah.
-- Sitasi: `PRD.md 2.1, 2.2` ; `RAG-CONTEXT.md 7`
-
-| Persona | Implikasi UI |
+| Persona | Implikasi UI V2 |
 |---|---|
-| Kreator Solo ("Rian") | Cepat, 1 layar wizard minimal, tombol Generate besar, copy-to-clipboard everywhere |
-| Indie Studio ("Bumi Animasi") | Format terstandar, reproducible, export markdown, list project paginate |
-| Edukator ("Bu Sinta") | UI sederhana, dwibahasa ID+EN default, pesan moral visible, adegan berurut |
+| Kreator Solo ("Rian") | Upload + generate 1 halaman, AI classification transparan, real-time logs untuk transparansi proses |
+| Indie Studio ("Bumi Animasi") | Dashboard monitoring produktivitas, per-provider breakdown, paginate untuk multi-proyek |
+| Edukator ("Bu Sinta") | Loading states jelas, error boundaries recover-able, dwibahasa ID+EN, pesan moral |
 
-### 1.3 Prinsip Desain
+### 1.3 Prinsip Desain V2
 
-1. **Workflow-first**: 1 judul -> 1 paket prompt. Wizard 5 langkah linear,
-   progress indicator jelas, tidak dead-end.
-2. **Konsistensi visual karakter**: tab Karakter tampilkan master stabil
-   lintas adegan. Warning mismatch tampil bila identitas drift.
-3. **Streaming-first UX**: partial result tampil real-time per komponen,
-   skeleton + progress, bukan blank loading panjang.
-4. **Copy-everywhere**: setiap prompt item punya tombol copy, export JSON/md.
-5. **Dwibahasa default**: ID default, EN toggle. Bahasa aktif dipersist cookie.
-6. **Dark mode native**: shadcn default light/dark, toggle di header.
-7. **Aksesibilitas WAJIB**: WCAG 2.1 AA, keyboard nav, focus visible, ARIA.
+1. **Workflow-first** (V1) - 1 judul ke 1 paket prompt. V2: 1 halaman upload + generate.
+2. **Konsistensi visual karakter** (V1) - Tab Karakter + warning mismatch FR-12.
+3. **Streaming-first UX** (V1) - Partial real-time per stage.
+4. **Copy-everywhere** (V1) - CopyButton per prompt item.
+5. **Dwibahasa default** (V1) - ID default, EN toggle, persist cookie.
+6. **Aksesibilitas WAJIB** (V1) - WCAG 2.1 AA, keyboard, ARIA.
+7. **Dark mode** (V1) - Token DARK tetap di-define, toggle di-OOS V2 (deferred V3).
+8. **Transparency V2** - Real-time processing logs (collapsible) transparansi proses LLM.
+9. **AI-augmented V2** - Upload gambar ke Vision LLM auto-classify ke user override. AI = ko-pilot.
+10. **Optimistic feedback V2** - Loading.tsx + Suspense + skeleton + disabled state.
 
 ### 1.4 Brand Voice
 
-- **Tone:** Profesional hangat, edukatif, ringkas. Tidak jargon berlebih.
-- **Bahasa:** Dwibahasa ID+EN. ID default untuk persona lokal, EN untuk global.
-- **Istilah konsisten:** "Proyek" (ID) / "Project" (EN), "Adegan"/"Scene",
-  "Karakter"/"Character", "Voiceover" (sama), "Image Prompt" (sama),
-  "Provider" (sama), "Pesan Moral"/"Moral Message".
-- **Pesan error:** manusiawi, sebut aksi recovery. Bukan kode raw.
-- Sitasi: `PRD.md 5 (FR-19)` ; `SRS.md 5 (FR-19)` ; ASUMSI tone
+- **Tone:** Profesional hangat, edukatif, ringkas. Tidak jargon AI/LLM berlebih.
+- **Bahasa:** Dwibahasa ID+EN. ID default untuk persona lokal.
+- **Istilah konsisten:** "Proyek"/"Project", "Adegan"/"Scene", "Karakter"/"Character", "Voiceover" (sama), "Image Prompt" (sama), "Provider" (sama), "Pesan Moral"/"Moral Message", "Referensi"/"Reference", "Klasifikasi"/"Classification", "Catatan Proses"/"Process Logs".
+- **Pesan error:** manusiawi + sebut aksi recovery.
+- **AI:** Bahasa netral ("AI menganalisis..." bukan "GPT-4o mendeteksi...").
+
+### 1.5 V2 Fitur UI yang Ditambahkan
+
+| ID | Fitur UI V2 | Lokasi | Sitasi |
+|---|---|---|---|
+| F-V2-UI-01 | DropzoneUploader inline di generate form | `/generate` | RAG-CONTEXT S9 V2-1 |
+| F-V2-UI-02 | AssetPreviewList (thumbnail + role badge + override) | `/generate` | PRD V2.0 S6.1 |
+| F-V2-UI-03 | ClassificationResult (AI auto-classify + manual override + confidence) | `/generate` | RAG-CONTEXT S9 V2-3 |
+| F-V2-UI-04 | Extended role select (6 opsi) | `/generate` | RAG-CONTEXT S9 V2-2 |
+| F-V2-UI-05 | StoryDescriptionTextarea (max 500 char) | `/generate` | RAG-CONTEXT S9 V2-4 |
+| F-V2-UI-06 | LogViewer (Collapsible panel + Switch toggle) | `/generate` | RAG-CONTEXT S9 V2-5 |
+| F-V2-UI-07 | Dashboard MetricCard (6-8 kartu) | `/dashboard` | RAG-CONTEXT S9 V2-6 |
+| F-V2-UI-08 | Dashboard Charts (line + bar via Recharts) | `/dashboard` | PRD V2.0 S10.2 |
+| F-V2-UI-09 | PerProviderBreakdown table | `/dashboard` | RAG-CONTEXT S9 V2-6 |
+| F-V2-UI-10 | RecentActivityTable (5 project terbaru) | `/dashboard` | RAG-CONTEXT S9 V2-6 |
+| F-V2-UI-11 | Pagination di projects list | `/projects` | RAG-CONTEXT S9 V2-9 |
+| F-V2-UI-12 | loading.tsx per page group | semua | RAG-CONTEXT S9 V2-7 |
+| F-V2-UI-13 | error.tsx boundary per page group | semua | RAG-CONTEXT S11 GAP-13 |
+| F-V2-UI-14 | StoryDescription display di project detail | `/projects/[id]` | RAG-CONTEXT S9 V2-1 |
+| F-V2-UI-15 | AI classification badge di refs | `/projects/[id]` | RAG-CONTEXT S9 V2-3 |
 
 ---
 
 ## 2. Design System (Design Tokens)
 
-> **Catatan implementasi:** Tech stack frontend = Next.js App Router +
-> Tailwind CSS v4 + shadcn/ui (copy-paste components). Token di bawah
-> diturunkan jadi variabel Tailwind v4 (CSS-first `@theme`) + CSS variables
-> shadcn (`--background`, `--foreground`, dst). Folder token: `src/app/globals.css`
-> + `tailwind.config.ts`. Sitasi: `RAG-CONTEXT.md 2.1` ; `SRS.md 4.1` ;
-> `PROJECT_ARCHITECTURE.md 5` (folder `src/components/ui`, `globals.css`).
+> V2 mempertahankan SEMUA token V1. Tambah token minor untuk state V2. Dark mode token DIDEFINISIKAN tapi toggle di-OOS-kan V2 (deferred V3).
 
 ### 2.1 Warna — Palet
 
-Brand accent PromptFlow = ungu-violet modern (kreatif + teknologi). Default
-neutral + state warna pakai shadcn semantic tokens. Dark mode via `@media
-(prefers-color-scheme: dark)` + class toggle `.dark`.
+| Token | Light | Dark | Kegunaan |
+|---|---|---|---|
+| `--background` | `#ffffff` | `#0a0a0a` | Body bg |
+| `--foreground` | `#0a0a0a` | `#fafafa` | Body text |
+| `--card` | `#ffffff` | `#0f0f0f` | Card bg |
+| `--card-foreground` | `#0a0a0a` | `#fafafa` | Card text |
+| `--primary` (brand) | `#7c3aed` | `#a78bfa` | CTA, brand |
+| `--primary-foreground` | `#ffffff` | `#0a0a0a` | Teks di atas primary |
+| `--secondary` | `#f4f4f5` | `#27272a` | CTA sekunder, chip |
+| `--secondary-foreground` | `#18181b` | `#fafafa` | Teks di atas secondary |
+| `--muted` | `#f4f4f5` | `#27272a` | Skeleton, disabled bg |
+| `--muted-foreground` | `#71717a` | `#a1a1aa` | Helper text |
+| `--accent` | `#ede9fe` | `#3b0764` | Highlight, hover |
+| `--accent-foreground` | `#4c1d95` | `#ddd6fe` | Teks di atas accent |
+| `--destructive` | `#dc2626` | `#ef4444` | Error, delete |
+| `--destructive-foreground` | `#ffffff` | `#fafafa` | Teks di atas destructive |
+| `--success` | `#16a34a` | `#22c55e` | Success toast, badge |
+| `--warning` | `#d97706` | `#f59e0b` | Mismatch FR-12, warning |
+| `--info` | `#2563eb` | `#3b82f6` | Info toast, log info |
+| `--border` | `#e4e4e7` | `#27272a` | Border, divider |
+| `--input` | `#e4e4e7` | `#27272a` | Border input field |
+| `--ring` | `#7c3aed` | `#a78bfa` | Focus ring |
 
-| Token | Light | Dark | Hex (Light) | Hex (Dark) | Kegunaan |
-|---|---|---|---|---|---|
-| `--background` | white | `#0a0a0a` | `#ffffff` | `#0a0a0a` | Body bg |
-| `--foreground` | `#0a0a0a` | `#fafafa` | `#0a0a0a` | `#fafafa` | Body text |
-| `--card` | `#ffffff` | `#0f0f0f` | `#ffffff` | `#0f0f0f` | Card bg |
-| `--card-foreground` | `#0a0a0a` | `#fafafa` | `#0a0a0a` | `#fafafa` | Card text |
-| `--primary` (brand) | `#7c3aed` | `#a78bfa` | `#7c3aed` | `#a78bfa` | CTA utama, brand |
-| `--primary-foreground` | `#ffffff` | `#0a0a0a` | `#ffffff` | `#0a0a0a` | Teks di atas primary |
-| `--secondary` | `#f4f4f5` | `#27272a` | `#f4f4f5` | `#27272a` | CTA sekunder, chip |
-| `--secondary-foreground` | `#18181b` | `#fafafa` | `#18181b` | `#fafafa` | Teks di atas secondary |
-| `--muted` | `#f4f4f5` | `#27272a` | `#f4f4f5` | `#27272a` | Skeleton, disabled bg |
-| `--muted-foreground` | `#71717a` | `#a1a1aa` | `#71717a` | `#a1a1aa` | Teks helper |
-| `--accent` | `#ede9fe` | `#3b0764` | `#ede9fe` | `#3b0764` | Highlight, hover chip |
-| `--accent-foreground` | `#4c1d95` | `#ddd6fe` | `#4c1d95` | `#ddd6fe` | Teks di atas accent |
-| `--destructive` | `#dc2626` | `#ef4444` | `#dc2626` | `#ef4444` | Error, delete |
-| `--destructive-foreground` | `#ffffff` | `#fafafa` | `#ffffff` | `#fafafa` | Teks di atas destructive |
-| `--success` | `#16a34a` | `#22c55e` | `#16a34a` | `#22c55e` | Success toast, badge |
-| `--warning` | `#d97706` | `#f59e0b` | `#d97706` | `#f59e0b` | Warning konsistensi mismatch |
-| `--info` | `#2563eb` | `#3b82f6` | `#2563eb` | `#3b82f6` | Info toast, info badge |
-| `--border` | `#e4e4e7` | `#27272a` | `#e4e4e7` | `#27272a` | Border, divider |
-| `--input` | `#e4e4e7` | `#27272a` | `#e4e4e7` | `#27272a` | Border input field |
-| `--ring` | `#7c3aed` | `#a78bfa` | `#7c3aed` | `#a78bfa` | Focus ring |
+**Token V2 baru:**
 
-> **Brand accent `#7c3aed`** = ASUMSI (TIDAK ADA brand asset existing,
-> `RAG-CONTEXT.md 8` greenfield). Violet dipilih = kreatif + AI vibe.
-> Bisa diubah user. Token primary = brand.
+| Token | Light | Dark | Kegunaan V2 |
+|---|---|---|---|
+| `--log-info-bg` | `#eff6ff` | `#172554` | Background log info |
+| `--log-warn-bg` | `#fffbeb` | `#451a03` | Background log warn |
+| `--log-error-bg` | `#fef2f2` | `#450a0a` | Background log error |
+| `--confidence-low` | `#dc2626` | `#ef4444` | Confidence < 0.5 |
+| `--confidence-mid` | `#d97706` | `#f59e0b` | Confidence 0.5-0.7 |
+| `--confidence-high` | `#16a34a` | `#22c55e` | Confidence > 0.7 |
 
-### 2.2 Warna — State Semantik
+### 2.2 Warna — Role Classification (V2 Baru)
 
-| State | Token | Hex (Light) | Hex (Dark) | Penggunaan |
-|---|---|---|---|---|
-| Success | `--success` | `#16a34a` | `#22c55e` | Toast "Tersimpan", copy success badge |
-| Warning | `--warning` | `#d97706` | `#f59e0b` | Mismatch karakter (FR-12), tutorial out-of-range |
-| Error | `--destructive` | `#dc2626` | `#ef4444` | Validation error, provider error, 400 |
-| Info | `--info` | `#2563eb` | `#3b82f6` | Info toast, info badge |
-
-Kontras AA: semua foreground di atas bg WAJIB >= 4.5:1 (§9).
+| Role | Color token | Hex (Light) | Hex (Dark) |
+|---|---|---|---|
+| tokoh | `--primary` | `#7c3aed` | `#a78bfa` |
+| background | `--info` | `#2563eb` | `#3b82f6` |
+| prop | `--warning` | `#d97706` | `#f59e0b` |
+| accessory | `--accent-foreground` | `#4c1d95` | `#ddd6fe` |
+| environment | `--success` | `#16a34a` | `#22c55e` |
+| other | `--muted-foreground` | `#71717a` | `#a1a1aa` |
 
 ### 2.3 Tipografi
 
-Font family default = **Inter** (ASUMSI, `RAG-CONTEXT.md 8` sebut Inter/Geist).
-Mono = **JetBrains Mono** untuk kode/prompt teks. Tailwind v4 font stack.
-
-| Token | Family | Catatan |
-|---|---|---|
-| `--font-sans` | `Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif` | Heading + body |
-| `--font-mono` | `'JetBrains Mono', 'Fira Code', ui-monospace, monospace` | Prompt teks, kode, JSON |
-| `--font-heading` | sama `--font-sans` | Konsisten |
+| Token | Family |
+|---|---|
+| `--font-sans` | `Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif` |
+| `--font-mono` | `'JetBrains Mono', 'Fira Code', ui-monospace, monospace` |
+| `--font-heading` | sama `--font-sans` |
 
 ### 2.4 Tipografi — Size Scale
 
-Skala modular 1.25. Base 16px. Tailwind v4 utility map.
+Skala modular 1.25. Base 16px.
 
-| Token | Size (px/rem) | Weight | Line-height | Letter-spacing | Penggunaan |
+| Token | Size | Weight | Line-height | Letter-spacing | Penggunaan |
 |---|---|---|---|---|---|
-| `text-xs` | 12px / 0.75rem | 400 | 1.4 | 0.01em | Badge, label kecil |
-| `text-sm` | 14px / 0.875rem | 400 | 1.5 | 0 | Body sekunder, helper |
-| `text-base` | 16px / 1rem | 400 | 1.6 | 0 | Body default |
-| `text-lg` | 18px / 1.125rem | 500 | 1.5 | 0 | Card title, section |
-| `text-xl` | 20px / 1.25rem | 600 | 1.4 | -0.01em | Page H3 |
-| `text-2xl` | 24px / 1.5rem | 700 | 1.3 | -0.02em | Page H2, wizard step title |
-| `text-3xl` | 30px / 1.875rem | 700 | 1.2 | -0.02em | Page H1, hero |
-| `text-4xl` | 36px / 2.25rem | 800 | 1.1 | -0.03em | Landing hero |
-| `text-5xl` | 48px / 3rem | 800 | 1.05 | -0.04em | Landing hero display |
+| `text-xs` | 12px | 400 | 1.4 | 0.01em | Badge, label, log timestamp |
+| `text-sm` | 14px | 400 | 1.5 | 0 | Body sekunder, log message |
+| `text-base` | 16px | 400 | 1.6 | 0 | Body default, log mono |
+| `text-lg` | 18px | 500 | 1.5 | 0 | Card title, section |
+| `text-xl` | 20px | 600 | 1.4 | -0.01em | Page H3, metric value |
+| `text-2xl` | 24px | 700 | 1.3 | -0.02em | Page H2, wizard step |
+| `text-3xl` | 30px | 700 | 1.2 | -0.02em | Page H1, hero |
+| `text-4xl` | 36px | 800 | 1.1 | -0.03em | Landing hero |
+| `text-5xl` | 48px | 800 | 1.05 | -0.04em | Landing hero display |
 
-### 2.5 Spacing Scale
+### 2.5 Spacing Scale (base 4px)
 
-Base 4px. Tailwind v4 spacing scale.
-
-| Token | px | Penggunaan umum |
+| Token | px | Penggunaan |
 |---|---|---|
 | `space-0` | 0 | Reset |
-| `space-1` | 4 | Icon gap kecil, padding chip |
-| `space-2` | 8 | Gap inline, padding button kecil |
-| `space-3` | 12 | Padding card, gap form field |
-| `space-4` | 16 | Padding default, gap section |
+| `space-1` | 4 | Icon gap, padding chip, log gap |
+| `space-2` | 8 | Gap inline, button padding, log entry |
+| `space-3` | 12 | Padding card, gap form field, badge gap |
+| `space-4` | 16 | Padding default, gap section, form gap |
 | `space-5` | 20 | Gap antar komponen |
-| `space-6` | 24 | Padding section, gap block |
+| `space-6` | 24 | Padding section, gap block, dashboard grid |
 | `space-8` | 32 | Margin antar section |
 | `space-10` | 40 | Padding landing section |
 | `space-12` | 48 | Margin block besar |
 | `space-16` | 64 | Padding hero |
-| `space-20` | 80 | Padding section landing |
-| `space-24` | 96 | Margin vertikal besar |
 
 ### 2.6 Radius, Border, Shadow
 
 | Token | Nilai | Penggunaan |
 |---|---|---|
-| `--radius-sm` | 4px | Badge, chip, small button |
-| `--radius-md` | 6px | Input, select, default button |
+| `--radius-sm` | 4px | Badge, chip, log entry |
+| `--radius-md` | 6px | Input, select, default button (default) |
 | `--radius-lg` | 8px | Card, dialog, dropdown |
-| `--radius-xl` | 12px | Card besar, panel wizard |
-| `--radius-full` | 9999px | Avatar, toggle, pill |
+| `--radius-xl` | 12px | Card besar, panel wizard, metric hero |
+| `--radius-full` | 9999px | Avatar, toggle, pill, confidence bar |
 | `--border-width` | 1px | Default border |
-| `--border-width-focus` | 2px | Focus ring (outline-style solid) |
+| `--border-width-focus` | 2px | Focus ring |
 
-Shadow (elevation):
+Shadow:
 
 | Token | Nilai |
 |---|---|
@@ -204,21 +206,19 @@ Shadow (elevation):
 
 ### 2.7 Container & Breakpoint
 
-| Token | Nilai | Catatan |
-|---|---|---|
-| `--container-sm` | 640px | Mobile landscape, form sempit |
-| `--container-md` | 768px | Tablet |
-| `--container-lg` | 1024px | Desktop |
-| `--container-xl` | 1280px | Desktop lebar, dashboard grid |
-| `--container-2xl` | 1536px | Max landing |
+| Token | Nilai |
+|---|---|
+| `--container-sm` | 640px |
+| `--container-md` | 768px |
+| `--container-lg` | 1024px |
+| `--container-xl` | 1280px |
+| `--container-2xl` | 1536px |
 | `--container-gutter` | 16px mobile, 24px >= md, 32px >= lg |
-
-Breakpoint (Tailwind v4 default):
 
 | Prefix | Min-width | Target |
 |---|---|---|
 | (default) | 0 | Mobile portrait |
-| `sm` | 640px | Mobile landscape / tablet kecil |
+| `sm` | 640px | Mobile landscape |
 | `md` | 768px | Tablet |
 | `lg` | 1024px | Desktop |
 | `xl` | 1280px | Desktop lebar |
@@ -229,20 +229,18 @@ Breakpoint (Tailwind v4 default):
 | Token | Durasi | Easing | Penggunaan |
 |---|---|---|---|
 | `--motion-fast` | 120ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Hover, tap feedback |
-| `--motion-base` | 200ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Toggle, chip select, default transition |
-| `--motion-slow` | 320ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Dialog open, panel expand, collapse |
+| `--motion-base` | 200ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Toggle, chip, tab fade |
+| `--motion-slow` | 320ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Dialog, panel expand, collapsible |
 | `--motion-skeleton` | 1500ms | `linear` infinite | Skeleton shimmer |
 | `--motion-progress` | 800ms | `ease-in-out` | Progress bar fill |
-
-`prefers-reduced-motion: reduce` -> nonaktifkan semua animasi non-esensial
-(§9). Hanya feedback warna/state yang tetap.
+| `--motion-log-entry` | 200ms | `cubic-bezier(0.4, 0, 0.2, 1)` | V2: log entry slide-in |
 
 ### 2.9 z-index Scale
 
 | Token | Nilai | Penggunaan |
 |---|---|---|
 | `--z-base` | 0 | Default |
-| `--z-dropdown` | 1000 | Dropdown, select menu |
+| `--z-dropdown` | 1000 | Dropdown, select |
 | `--z-sticky` | 1100 | Sticky header |
 | `--z-toast` | 1200 | Sonner toast |
 | `--z-modal` | 1300 | Dialog, modal |
@@ -250,7 +248,7 @@ Breakpoint (Tailwind v4 default):
 
 ### 2.10 Implementasi Token Tailwind v4 + shadcn
 
-`src/app/globals.css` (CSS-first Tailwind v4 `@theme` + CSS vars shadcn):
+`src/app/globals.css`:
 
 ```css
 @import "tailwindcss";
@@ -276,6 +274,12 @@ Breakpoint (Tailwind v4 default):
   --color-border: #e4e4e7;
   --color-input: #e4e4e7;
   --color-ring: #7c3aed;
+  --color-log-info-bg: #eff6ff;
+  --color-log-warn-bg: #fffbeb;
+  --color-log-error-bg: #fef2f2;
+  --color-confidence-low: #dc2626;
+  --color-confidence-mid: #d97706;
+  --color-confidence-high: #16a34a;
   --radius: 6px;
   --font-sans: Inter, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -284,87 +288,123 @@ Breakpoint (Tailwind v4 default):
 .dark {
   --color-background: #0a0a0a;
   --color-foreground: #fafafa;
-  /* ...dark tokens... */
+  --color-card: #0f0f0f;
+  --color-card-foreground: #fafafa;
+  --color-primary: #a78bfa;
+  --color-primary-foreground: #0a0a0a;
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #27272a;
+  --color-muted-foreground: #a1a1aa;
+  --color-accent: #3b0764;
+  --color-accent-foreground: #ddd6fe;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #a78bfa;
+  --color-log-info-bg: #172554;
+  --color-log-warn-bg: #451a03;
+  --color-log-error-bg: #450a0a;
+  --color-confidence-low: #ef4444;
+  --color-confidence-mid: #f59e0b;
+  --color-confidence-high: #22c55e;
 }
 ```
 
-- Sitasi: `RAG-CONTEXT.md 2.1` ; `SRS.md 4.1` ; `PROJECT_ARCHITECTURE.md 5` (folder `src/app/globals.css`, `tailwind.config.ts`, `components.json`)
-
 ---
 
-## 3. Inventory Komponen UI
-
-> shadcn/ui components (copy-paste di `src/components/ui/`) + custom components
-> (di `src/components/{generate,projects,settings,common}/`). Selaras
-> struktur `PROJECT_ARCHITECTURE.md §5`. Setiap komponen sebut folder lokasi.
+## 3. Inventory Komponen UI V2
 
 ### 3.1 Komponen shadcn/ui (dipakai)
 
-| Komponen | Lokasi | Anatomi | Variant | State | Props utama | Penggunaan |
-|---|---|---|---|---|---|---|
-| Button | `components/ui/button.tsx` | label + optional icon + optional loading spinner | size: `sm/md/lg/icon`; variant: `default/secondary/outline/ghost/destructive/link` | default/hover/active/disabled/focus/loading | `variant`, `size`, `disabled`, `loading`, `asChild` | CTA Generate, Save, Copy, Cancel |
-| Input | `components/ui/input.tsx` | native input styled | size: `sm/md` | default/focus/disabled/error | `type`, `placeholder`, `value`, `onChange` | Judul, model, base URL |
-| Textarea | `components/ui/textarea.tsx` | native textarea | size: `sm/md` | default/focus/disabled/error | `placeholder`, `rows`, `value` | Prompt display (read-only), notes |
-| Select | `components/ui/select.tsx` | trigger + popover list | size: `sm/md` | default/open/disabled | `value`, `onValueChange`, `options` | Duration type, style, aspect ratio, provider |
-| Form | `components/ui/form.tsx` (react-hook-form + Zod resolver) | label + control + message | — | default/error/submitting | `form`, `name`, `rules` | Wizard form, provider form, login |
-| Card | `components/ui/card.tsx` | header + content + footer | — | default/elevated | `className` | Project card, result section, settings panel |
-| Dialog | `components/ui/dialog.tsx` | trigger + content + header + footer + close | size: `sm/md/lg` | open/closed | `open`, `onOpenChange` | Re-generate confirm, delete confirm, add provider |
-| Tabs | `components/ui/tabs.tsx` | tabs list + trigger + content | — | active/inactive | `value`, `onValueChange` | Result View (Adegan/Voiceover/Karakter/Image Prompts/Pesan Moral) |
-| Toast/Sonner | `components/ui/sonner.tsx` | toast item | variant: `default/success/error/warning/info` | enter/exit | `title`, `description`, `variant` | Copy success, save, error provider |
-| Dropzone | `components/ui/dropzone.tsx` (custom wrapper atau react-dropzone) | drag area + file list + preview thumbnail | size: `sm/md` | idle/drag-over/uploading/error | `onDrop`, `accept`, `maxSize`, `multiple` | Upload referensi tokoh/background |
-| Table | `components/ui/table.tsx` | header + row + cell | — | default/hover/striped | — | List provider config, history generasi |
-| Badge | `components/ui/badge.tsx` | label + dot optional | variant: `default/secondary/success/warning/error/info` | default | `variant`, `children` | Tipe image prompt (character/background), status, mismatch warning |
-| Skeleton | `components/ui/skeleton.tsx` | pulse block | shape: `rect/circle/text` | shimmer | `className` | Loading project list, streaming partial |
-| Alert | `components/ui/alert.tsx` | icon + title + description | variant: `default/error/warning/info` | default | `variant`, `title`, `description` | Warning mismatch karakter, warning durasi out-of-range |
-| Label | `components/ui/label.tsx` | text label | — | default | `htmlFor`, `children` | Form label |
-| Tooltip | `components/ui/tooltip.tsx` | trigger + content | — | open/closed | `content`, `side` | Icon hint, info singkat |
-| Avatar | `components/ui/avatar.tsx` | image + fallback | size: `sm/md/lg` | default | `src`, `alt`, `fallback` | Profile, user menu |
-| DropdownMenu | `components/ui/dropdown-menu.tsx` | trigger + items | — | open/closed | `items` | User menu, export menu, project actions |
-| Separator | `components/ui/separator.tsx` | line | orientation: `horizontal/vertical` | default | `orientation` | Section divider |
-| ScrollArea | `components/ui/scroll-area.tsx` | viewport + scrollbar | — | default | `className` | Result tabs content panjang, project list |
-| Progress | `components/ui/progress.tsx` | bar fill | size: `sm/md` | indeterminate/determinate | `value`, `max` | Generate streaming progress |
-| Checkbox | `components/ui/checkbox.tsx` | box + check | — | unchecked/checked/indeterminate | `checked`, `onCheckedChange` | Skip referensi, set active provider |
-| Switch | `components/ui/switch.tsx` | toggle | size: `sm/md` | on/off | `checked`, `onCheckedChange` | Toggle dark mode, set provider active |
-| Collapsible | `components/ui/collapsible.tsx` | trigger + content | — | open/closed | `open`, `onOpenChange` | Result section per adegan, character detail |
-| Breadcrumb | `components/ui/breadcrumb.tsx` | list + item + separator | — | default | `items` | Project detail nav |
+| Komponen | Lokasi | Variant | State | Props utama |
+|---|---|---|---|---|
+| Button | `components/ui/button.tsx` | size: sm/md/lg/icon; variant: default/secondary/outline/ghost/destructive/link | default/hover/active/disabled/focus/loading | variant, size, disabled, loading |
+| Input | `components/ui/input.tsx` | size: sm/md | default/focus/disabled/error | type, placeholder, value |
+| Textarea | `components/ui/textarea.tsx` | rows | default/focus/disabled/error | placeholder, rows, maxLength |
+| Select | `components/ui/select.tsx` | size: sm/md | default/open/disabled | value, onValueChange, options |
+| Card | `components/ui/card.tsx` | — | default/elevated | className |
+| Dialog | `components/ui/dialog.tsx` | size: sm/md/lg | open/closed | open, onOpenChange |
+| Tabs | `components/ui/tabs.tsx` | — | active/inactive | value, onValueChange |
+| Sonner | `components/ui/sonner.tsx` | variant: success/error/warning/info | enter/exit | title, description, variant |
+| Table | `components/ui/table.tsx` | — | default/hover | — |
+| Badge | `components/ui/badge.tsx` | variant: default/secondary/success/warning/destructive/info | default | variant, children |
+| Skeleton | `components/ui/skeleton.tsx` | shape: rect/circle/text | shimmer | className |
+| Alert | `components/ui/alert.tsx` | variant: default/destructive/warning/info | default | variant, title, description |
+| Label | `components/ui/label.tsx` | — | default | htmlFor |
+| Tooltip | `components/ui/tooltip.tsx` | — | open/closed | content, side |
+| Switch | `components/ui/switch.tsx` | size: sm/md | on/off/disabled | checked, onCheckedChange, disabled |
+| Collapsible | `components/ui/collapsible.tsx` | — | open/closed | open, onOpenChange |
+| ScrollArea | `components/ui/scroll-area.tsx` | — | default | className |
+| Progress | `components/ui/progress.tsx` | size: sm/md | indeterminate/determinate | value, max |
 
-### 3.2 Komponen Custom (domain PromptFlow)
+### 3.2 Komponen Custom V1 (dipertahankan)
 
-| Komponen | Lokasi | Anatomi | Variant | State | Props | Sumber fitur |
-|---|---|---|---|---|---|---|
-| `PromptCard` | `components/projects/prompt-card.tsx` | Card: title + meta (durasi, style, rasio) + status badge + actions (open, delete) | size: `sm/md` | default/hover/loading | `project`, `onOpen`, `onDelete` | FR-15 list project |
-| `SceneCard` | `components/generate/scene-card.tsx` | Collapsible: order badge + description + voiceover block + image_prompts sub-list | — | collapsed/expanded/streaming | `scene`, `streaming` | FR-03/FR-09 result view |
-| `CharacterCard` | `components/generate/character-card.tsx` | Card: nama + peran badge + grid field (rambut/wajah/pakaian atas/bawah/alas kaki/latar/aksi) | peran: `utama/lain/pendamping` | default/streaming | `character` | FR-07 master karakter |
-| `ImagePromptList` | `components/generate/image-prompt-list.tsx` | List item: target + Badge tipe (character/background) + prompt_text (mono, read-only) + reference_filename badge + CopyButton | tipe: `character/background` | default/copied | `items`, `tipe` | FR-06 image prompts |
-| `ProviderConfigForm` | `components/settings/provider-config-form.tsx` | Form: provider select + base_url input + model input + api_key password (mask) + isActive switch + save/delete buttons | mode: `create/edit` | default/submitting/error | `provider?`, `onSave`, `onDelete` | FR-13/FR-14 |
-| `WizardStep` | `components/generate/wizard-step.tsx` | Stepper header + content slot + nav (Back/Next/Generate) | — | active/inactive/done | `step`, `total`, `onBack`, `onNext`, `onGenerate` | New Project Wizard |
-| `ResultTabs` | `components/generate/result-tabs.tsx` | Tabs: Adegan / Voiceover / Karakter / Image Prompts / Pesan Moral + content per tab + ExportMenu + Re-generate button | — | idle/streaming/done/error | `result`, `warnings`, `streaming`, `onRegenerate` | Result view FR-16 |
-| `DropzoneUploader` | `components/generate/dropzone-uploader.tsx` | Dropzone + file list (thumb + filename + tipe select tokoh/background + remove) | tipe: `tokoh/background` | idle/drag/uploading/preview/error | `files`, `onAdd`, `onRemove`, `onChangeTipe` | FR-17 upload referensi |
-| `CopyButton` | `components/common/copy-button.tsx` | Button icon (clipboard) + tooltip + toast on success | size: `sm/md/icon` | idle/copying/copied | `text`, `label?` | NFR-U4 copy per prompt |
-| `ExportMenu` | `components/generate/export-menu.tsx` | DropdownMenu: JSON / Markdown | — | open/closed | `projectId`, `onExport` | FR-16 export |
-| `GenerateProgress` | `components/generate/generate-progress.tsx` | Progress bar + status text per komponen (character_profiles, scenes, image_prompts, moral) + skeleton | — | idle/streaming/partial/done/error | `status`, `partial` | NFR-U1 streaming UX |
-| `EmptyState` | `components/common/empty-state.tsx` | icon + title + description + optional CTA | variant: `default/error` | default | `icon`, `title`, `description`, `action?` | Empty project list, no result |
-| `ErrorBoundary` | `components/common/error-boundary.tsx` | fallback UI: icon + message + retry | — | default/error | `children`, `fallback` | Global error catch |
-| `LanguageToggle` | `components/common/language-toggle.tsx` | Toggle ID/EN (segmented) | — | id/en | `locale`, `onChange` | FR-19 dwibahasa |
-| `ThemeToggle` | `components/common/theme-toggle.tsx` | Switch light/dark | — | light/dark | `theme`, `onChange` | Dark mode |
-| `AppHeader` | `components/common/app-header.tsx` | Logo + nav links + LanguageToggle + ThemeToggle + UserMenu | — | auth/unauth | `session?` | Global header |
-| `AppFooter` | `components/common/app-footer.tsx` | Links + copyright + locale | — | default | — | Global footer landing |
+| Komponen | Lokasi | State | Sumber |
+|---|---|---|---|
+| PromptCard | `components/projects/prompt-card.tsx` | default/hover/loading | FR-15 |
+| SceneCard | `components/generate/scene-card.tsx` | collapsed/expanded/streaming | FR-03/FR-09 |
+| CharacterCard | `components/generate/character-card.tsx` | default/streaming | FR-07 |
+| ImagePromptList | `components/generate/image-prompt-list.tsx` | default/copied | FR-06 |
+| ProviderConfigForm | `components/settings/provider-config-form.tsx` | default/submitting/error | FR-13/FR-14 |
+| WizardStep | `components/generate/wizard-step.tsx` | active/inactive/done | V1 |
+| ResultTabs | `components/generate/result-tabs.tsx` | idle/streaming/done/error | Result V1 |
+| DropzoneUploader | `components/generate/dropzone-uploader.tsx` | idle/drag/uploading/error | FR-17 V2-extended |
+| CopyButton | `components/common/copy-button.tsx` | idle/copying/copied | NFR-U4 |
+| ExportMenu | `components/generate/export-menu.tsx` | open/closed | FR-16 |
+| GenerateProgress | `components/generate/generate-progress.tsx` | idle/streaming/partial/done/error | NFR-U1 |
+| EmptyState | `components/common/empty-state.tsx` | default | — |
+| ErrorBoundary | `components/common/error-boundary.tsx` | default/error | — |
+| LanguageToggle | `components/common/language-toggle.tsx` | id/en | FR-19 |
+| AppHeader | `components/common/app-header.tsx` | auth/unauth | V1 |
+| AppFooter | `components/common/app-footer.tsx` | default | V1 |
 
-### 3.3 Status Komponen per Lokasi Folder
+### 3.3 Komponen Custom V2 BARU
+
+| Komponen | Lokasi | Anatomi | State | Sumber |
+|---|---|---|---|---|
+| StoryDescriptionTextarea | `components/generate/story-description-textarea.tsx` | Textarea + char counter (0/500) + clear button | default/focus/disabled/error | FR-V2-04 |
+| AssetPreviewList | `components/generate/asset-preview-list.tsx` | Grid 2-4 col: thumb + filename + role badge + remove + override | default/uploading/classified/error | FR-V2-01 |
+| ClassificationResult | `components/generate/classification-result.tsx` | Card: thumb + role badge + name + desc mono + confidence bar + override select | classifying/classified/error/overridden | FR-V2-02 |
+| ConfidenceBar | `components/generate/confidence-bar.tsx` | Progress bar 0-1 + color level + value text | — | FR-V2-02 |
+| LogViewer | `components/generate/log-viewer.tsx` | Collapsible: header (Switch + counter badge) + ScrollArea log list | closed/open; toggle on/off | FR-V2-05 |
+| LogEntry | `components/generate/log-entry.tsx` | Row: timestamp + level badge + message mono | info/warn/error | FR-V2-05 |
+| RoleBadge | `components/generate/role-badge.tsx` | Pill badge icon + label per role | 6 roles | FR-V2-03 |
+| ConsistencyChecker | `components/generate/consistency-checker.tsx` | Alert warning list mismatch | none/warning | FR-12 |
+| MetricCard | `components/dashboard/metric-card.tsx` | Card: label + value (text-2xl) + delta + icon | default/loading | FR-V2-06 |
+| WeeklyTrendChart | `components/dashboard/weekly-trend-chart.tsx` | Line chart Recharts: x=minggu, y=jumlah | loading/loaded/empty | FR-V2-06 |
+| SuccessFailBarChart | `components/dashboard/success-fail-bar-chart.tsx` | Bar chart Recharts: x=status, y=jumlah | loading/loaded/empty | FR-V2-06 |
+| PerProviderBreakdownTable | `components/dashboard/per-provider-breakdown-table.tsx` | Table 5 col: provider + avg dur + sr% + calls + last used | loading/loaded/empty | FR-V2-06 |
+| RecentActivityTable | `components/dashboard/recent-activity-table.tsx` | Table 5 col: title + status badge + duration + style + created (max 5) | loading/loaded/empty | FR-V2-06 |
+| StorageUsageCard | `components/dashboard/storage-usage-card.tsx` | Card: icon + total files + total size + breakdown | loading/loaded/empty | FR-V2-06 |
+| Pagination | `components/common/pagination.tsx` | Page numbers + prev/next + first/last + total info | default/disabled | FR-V2-09 |
+| PageLoadingSkeleton | `components/common/page-loading-skeleton.tsx` | Generic skeleton: header + content slots | variant: generate/projects/detail/dashboard/settings | FR-V2-07 |
+| PageErrorBoundary | `components/common/page-error-boundary.tsx` | Error fallback: icon + message + retry + home | default/error | FR-V2-07 |
+
+### 3.4 Struktur Folder V2
 
 ```text
 src/components/
-  ui/                         # shadcn/ui (Button, Input, Card, ...)
-  common/                      # AppHeader, AppFooter, CopyButton, EmptyState,
-                               # ErrorBoundary, LanguageToggle, ThemeToggle
-  generate/                    # WizardStep, GenerateProgress, ResultTabs,
-                               # SceneCard, CharacterCard, ImagePromptList,
-                               # DropzoneUploader, ExportMenu
-  projects/                    # PromptCard, project list/detail
-  settings/                    # ProviderConfigForm
+  ui/                         # shadcn/ui (18 komponen)
+  common/                     # AppHeader, AppFooter, CopyButton, EmptyState,
+                              # ErrorBoundary, LanguageToggle, Pagination (V2),
+                              # PageLoadingSkeleton (V2), PageErrorBoundary (V2)
+  generate/                   # V1: WizardStep, GenerateProgress, ResultTabs,
+                              # SceneCard, CharacterCard, ImagePromptList,
+                              # DropzoneUploader (extended), ExportMenu
+                              # V2: StoryDescriptionTextarea, AssetPreviewList,
+                              # ClassificationResult, ConfidenceBar, LogViewer,
+                              # LogEntry, RoleBadge, ConsistencyChecker
+  dashboard/                  # V2: MetricCard, WeeklyTrendChart,
+                              # SuccessFailBarChart, PerProviderBreakdownTable,
+                              # RecentActivityTable, StorageUsageCard
+  projects/                   # PromptCard
+  settings/                   # ProviderConfigForm
 ```
-
-- Sitasi: `PROJECT_ARCHITECTURE.md §5` (struktur `src/components/`)
 
 ---
 
@@ -374,100 +414,106 @@ src/components/
 
 Mobile-first. Container max-width + gutter responsif.
 
-| Breakpoint | Grid | Kolom | Gutter | Margin (container) | Max width |
-|---|---|---|---|---|---|
-| <640px (mobile) | 4 kolom | 4 | 16px | 16px | 100% |
-| 640-1024px (tablet) | 8 kolom | 8 | 24px | 24px | 768px / 100% |
-| >=1024px (desktop) | 12 kolom | 12 | 24px | 32px | 1280px / 1536px landing |
+| Breakpoint | Kolom | Gutter | Margin | Max width |
+|---|---|---|---|---|
+| <640px | 4 | 16px | 16px | 100% |
+| 640-1024px | 8 | 24px | 24px | 768px |
+| >=1024px | 12 | 24px | 32px | 1280px |
 
-CSS: `display:grid; grid-template-columns: repeat(N, 1fr); gap: <gutter>`.
+### 4.2 Layout Pattern per Halaman (V2)
 
-### 4.2 Layout Pattern per Tipe Halaman
-
-| Halaman | Layout | Grid | Catatan |
+| Halaman | Layout | Grid | V2 Catatan |
 |---|---|---|---|
-| Landing | Full-width, section bertumpuk, container 2xl max 1536px | 12 kolom, hero 12, feature grid 3x4 kol (lg) | Background gradient subtle, CTA primary |
-| Login/Register | Centered, container sm max 640px | 1 kolom | Card panel, dark mode aware |
-| Dashboard project list | Container xl max 1280px, header + toolbar + grid card | Card grid: 1 kol mobile, 2 kol sm, 3 kol lg, 4 kol xl | Search + filter sticky top |
-| New Project Wizard | Container md max 768px centered | 1 kolom | Stepper header sticky, content scroll |
-| Result View | Container lg max 1280px (lg) / full (2xl), header + tabs + content | Tabs: 1 kolom mobile, 2 kolom lg (main + sidebar info) | Tab content scroll, sidebar: meta + export + re-generate |
-| Settings | Container lg max 1024px, header + list provider (table) + add button | 1 kolom (form), table full width | Provider form di dialog |
-| History | Container lg max 1280px, table | 1 kolom, table full width | Paginate bottom |
+| Landing | Full-width, container 2xl 1536px | 12 kolom | Sama V1 |
+| Login/Register | Centered, container sm 640px | 1 kolom | Sama V1 |
+| Generate | V2: Single-page, container lg 1024px | 2 kolom desktop (main+sidebar) | Bukan wizard |
+| Projects list | Container xl 1280px + Pagination | 1/2/3/4 kol responsif | V2: +Pagination +Skeleton |
+| Project detail | Container xl 1280px | tabs: 1 kol mobile, 2 kol lg | V2: read-only refs |
+| Dashboard | V2: Container xl 1280px | Metric 2x4 + charts 2 col + tables 2 col | V2 BARU |
+| Settings | Container lg 1024px | 1 kolom form, table full | Sama V1 |
 
 ### 4.3 Safe-area
 
-Mobile: `padding: env(safe-area-inset-top/bottom)` untuk header/footer fixed.
-iOS notch + Android gesture bar.
+Mobile: `padding: env(safe-area-inset-top/bottom)`.
 
-### 4.4 Kontainer Implementasi
+### 4.4 Suspense Boundaries (V2)
 
-```tsx
-// Container wrapper
-<div className="mx-auto w-full max-w-[1280px] px-4 md:px-6 lg:px-8">
-  {children}
-</div>
+Lokasi loading.tsx:
+
+```text
+src/app/[locale]/
+  loading.tsx                 # root fallback
+  generate/loading.tsx        # variant="generate"
+  projects/loading.tsx        # variant="projects"
+  projects/[id]/loading.tsx   # variant="detail"
+  dashboard/loading.tsx       # variant="dashboard"
+  settings/loading.tsx        # variant="settings"
 ```
 
-- Landing: `max-w-[1536px]`
-- Auth: `max-w-[640px]`
-- Wizard: `max-w-[768px]`
-- Dashboard/result: `max-w-[1280px]`
+Lokasi error.tsx:
+
+```text
+src/app/[locale]/
+  error.tsx                   # root boundary
+  generate/error.tsx
+  projects/error.tsx
+  projects/[id]/error.tsx
+  dashboard/error.tsx
+  settings/error.tsx
+```
 
 ---
 
-## 5. Navigasi & Information Architecture
+## 5. Navigasi & Information Architecture (V2)
 
-### 5.1 Top Navigation (AppHeader)
+### 5.1 Top Navigation (AppHeader V2)
 
-| Item | Label ID | Label EN | Route | Auth | Visible |
-|---|---|---|---|---|---|
-| Logo | PromptFlow | PromptFlow | `/` | — | always |
-| Dashboard | Proyek | Projects | `/projects` | wajib | authed |
-| New Project | Proyek Baru | New Project | `/generate` | wajib | authed |
-| Settings | Pengaturan | Settings | `/settings` | wajib | authed |
-| Language Toggle | ID / EN | ID / EN | toggle | — | always |
-| Theme Toggle | Mode | Mode | toggle | — | always |
-| User Menu | nama user | user name | dropdown: Profile, Logout | wajib | authed |
-| Login | Masuk | Log in | `/login` | — | unauthed |
-| Register | Daftar | Sign up | `/register` | — | unauthed |
+| Item | Label ID | Label EN | Route | Auth |
+|---|---|---|---|---|
+| Logo | PromptFlow | PromptFlow | `/` | always |
+| **Dasbor** | **Dasbor** | **Dashboard** | **`/dashboard`** | **wajib** |
+| Proyek | Proyek | Projects | `/projects` | wajib |
+| Proyek Baru | Proyek Baru | New Project | `/generate` | wajib |
+| Pengaturan | Pengaturan | Settings | `/settings` | wajib |
+| Language | ID/EN | ID/EN | toggle | always |
+| User Menu | nama user | user name | dropdown | wajib |
+| Login | Masuk | Log in | `/login` | — |
+| Register | Daftar | Sign up | `/register` | — |
 
-Mobile: header collapse -> hamburger menu (DropdownMenu) untuk nav links.
-Language + Theme toggle tetap inline.
+V2: Theme Toggle dihapus (OOS-10).
 
 ### 5.2 Breadcrumb
 
 | Halaman | Breadcrumb |
 |---|---|
-| Project detail | Proyek / [judul project] |
+| Dashboard | Dasbor |
+| Projects | Proyek |
+| Project detail | Proyek / [judul] |
+| Generate | Proyek Baru |
 | Settings | Pengaturan |
-| New Project | Proyek Baru |
-| Result (di wizard) | Proyek Baru / Hasil |
 
-### 5.3 Route Map
+### 5.3 Route Map V2
 
-| Route | Halaman | Layout | Auth |
+| Route | Halaman | Auth | Perubahan V2 |
 |---|---|---|---|
-| `/` | Landing marketing | public (no header/footer variant) | optional |
-| `/login` | Login form | auth centered | no |
-| `/register` | Register form | auth centered | no |
-| `/projects` | Dashboard list project | dashboard (header + footer) | wajib |
-| `/projects/[id]` | Project detail (result view) | dashboard | wajib |
-| `/generate` | New Project Wizard | dashboard | wajib |
-| `/settings` | Settings (provider + profile) | dashboard | wajib |
-| `/settings/providers` | (sub) Provider list | dashboard | wajib |
-| `/settings/profile` | (sub) Profile | dashboard | wajib |
-| `/api/*` | Backend | — | wajib (kecuali `/api/auth`) |
+| `/` | Landing | optional | V1 |
+| `/login` | Login | no | V1 |
+| `/register` | Register | no | V1 |
+| `/dashboard` | Dashboard | wajib | **V2 BARU** |
+| `/projects` | Projects (paginated) | wajib | **V2: pagination + Suspense** |
+| `/projects/[id]` | Project detail | wajib | **V2: read-only refs + AI badge** |
+| `/generate` | Generate (single-page) | wajib | **V2: single-page form** |
+| `/settings` | Settings | wajib | V1 |
 
-Middleware: `src/middleware.ts` redirect `/projects`, `/settings`, `/generate`,
-`/api/*` (kecuali `/api/auth`) ke `/login?callbackUrl=<asli>` bila unauth.
-- Sitasi: `SRS.md 9.1 SEC-11` ; `PROJECT_ARCHITECTURE.md 9 SB-06`
+API V2 endpoints baru:
 
-### 5.4 Footer
+| Method | Path | Deskripsi |
+|---|---|---|
+| POST | `/api/v1/upload/classify` | AI classification trigger |
+| GET | `/api/v1/dashboard/stats` | Extended enrichment data |
+| GET | `/api/v1/projects?page=&limit=` | Pagination |
 
-Landing: footer penuh (link produk, link sumber daya, link legal, copyright,
-locale). Dashboard: footer minimal (copyright + locale).
-
-### 5.5 Information Architecture
+### 5.4 IA V2
 
 ```text
 PromptFlow
@@ -476,138 +522,113 @@ PromptFlow
 │   ├── Login (/login)
 │   └── Register (/register)
 └── App (auth wajib)
-    ├── Projects (/projects)
-    │   └── [id] (detail/result)
-    ├── New Project (/generate, wizard 5 step)
+    ├── Dashboard (/dashboard)          [V2 BARU]
+    ├── Projects (/projects)             [V2: pagination]
+    │   └── [id] (detail)               [V2: read-only refs]
+    ├── Generate (/generate)             [V2: single-page form]
     └── Settings (/settings)
-        ├── Providers
-        └── Profile
 ```
 
 ---
 
 ## 6. User Flows (Mermaid)
 
-### 6.1 Flow New Project Wizard -> Generate -> Result
+### 6.1 Flow Generate V2
 
 ```mermaid
 flowchart TD
-    A[User klik New Project] --> B[Wizard Step 1: Input judul]
-    B -->|valid min 3 max 200| C[Step 2: Pilih durasi + jumlah adegan opsional]
-    C -->|shorts/tutorial| D[Step 3: Upload referensi opsional]
-    D -->|skip atau upload| E[Step 4: Pilih style 3D/2D + aspect ratio]
-    E -->|16:9/9:16/1:1/custom| F[Step 5: Pilih provider + model dari setting aktif]
-    F --> G[Tombol Generate]
-    G --> H{Provider aktif?}
-    H -->|tidak| H1[Alert: set provider dulu + link Settings]
-    H -->|ya| I[POST /api/generate streaming SSE]
-    I --> J[Tampil GenerateProgress + skeleton partial]
-    J --> K{Stream sukses?}
-    K -->|timeout| K1[Partial disimpan + warning + opsi re-generate]
-    K -->|error provider| K2[Toast error + opsi switch provider Settings]
-    K -->|done| L[Result View: Tabs Adegan/Voiceover/Karakter/Image Prompts/Pesan Moral]
-    L --> M{Consistency check FR-12}
-    M -->|mismatch| M1[Alert warning mismatch karakter]
-    M -->|ok| N[Save project otomatis + tombol Export]
-    N --> O[Export JSON atau Markdown]
-    O --> P[Selesai]
+    A[User buka /generate] --> B[Form: Title + StoryDescription opsional]
+    B --> C[Upload gambar di DropzoneUploader V2]
+    C --> D[Auto-trigger POST /api/v1/upload/classify]
+    D --> E[Vision LLM classify role]
+    E --> F{Confidence >= 0.7?}
+    F -->|ya| G[Auto-set role + name]
+    F -->|tidak| H[Warning + suggest override]
+    G --> I[User review + override role]
+    H --> I
+    I --> J[User pilih style + aspect + duration]
+    J --> K[Klik Generate]
+    K --> L[POST /api/v1/generate SSE]
+    L --> M[Stage tracker + LogViewer]
+    M --> N{Done?}
+    N -->|done| O[ResultTabs + Save project]
+    N -->|error| P[Toast error + Settings link]
 ```
 
-### 6.2 Flow Settings Provider CRUD
+### 6.2 Flow Real-time Logs
 
 ```mermaid
 flowchart TD
-    A[User buka Settings] --> B[List provider table: name, provider, model, isActive]
-    B --> C[Klik Add Provider]
-    C --> D[Dialog ProviderConfigForm: provider select, base_url, model, api_key, isActive]
-    D --> E{Validasi Zod}
-    E -->|invalid| E1[Inline error per field]
-    E -->|valid| F[POST /api/settings/providers]
-    F --> G{Server save}
-    G -->|success| G1[API key terenkripsi AES-256-GCM + mask display]
-    G1 --> H[Toast success + list refresh]
-    G -->|error| G2[Toast error + inline]
-    H --> I{Set active?}
-    I -->|ya| I1[Switch isActive on row + PUT]
-    I1 --> J[Provider aktif dipakai saat generate]
-    B --> K[Klik edit row]
-    K --> L[Dialog ProviderConfigForm mode edit, api_key pre-masked]
-    B --> M[Klik delete row]
-    M --> N[Confirm dialog]
-    N --> O[DELETE + list refresh]
+    A[Generate mulai] --> B[Backend console.log ke buffer]
+    B --> C[SSE event type:log]
+    C --> D{LogViewer toggle ON?}
+    D -->|ya| E[Append LogEntry: timestamp + level + message]
+    D -->|tidak| F[Skip render]
+    E --> G[Auto-scroll]
+    G --> H[Stage update di tracker]
+    H --> I{Done?}
+    I -->|no| C
+    I -->|yes| J[Done event + result]
 ```
 
-### 6.3 Flow Export
+### 6.3 Flow Dashboard Enrichment
 
 ```mermaid
 flowchart TD
-    A[User di Result View / Project detail] --> B[Klik ExportMenu]
-    B --> C{Pilih format}
-    C -->|JSON| D[GET /api/export?projectId=X&format=json]
-    C -->|Markdown| E[GET /api/export?projectId=X&format=markdown]
-    D --> F[Browser download .json]
-    E --> G[Browser download .md]
-    F --> H[Selesai]
-    G --> H
+    A[GET /api/v1/dashboard/stats] --> B[Query metrics + charts + tables]
+    B --> C[6-8 MetricCard]
+    C --> D[WeeklyTrendChart + SuccessFailBarChart]
+    D --> E[PerProviderBreakdownTable]
+    E --> F[RecentActivityTable max 5]
+    F --> G[StorageUsageCard]
 ```
 
-- Sitasi: `PRD.md 5 (FR-16), 8.3` ; `SRS.md 5 (FR-16)` ; `PROJECT_ARCHITECTURE.md 6`
+### 6.4 Flow Projects Pagination
+
+```mermaid
+flowchart TD
+    A[GET /projects?page=1 limit=20] --> B[Render grid + Pagination]
+    B --> C{User klik page 2?}
+    C -->|ya| D[Next.js Link soft nav]
+    D --> E[loading.tsx skeleton]
+    E --> F[Server fetch page 2]
+    F --> B
+    C -->|tidak| G[Stay]
+```
 
 ---
 
-## 7. Wireframes Deskriptif
+## 7. Wireframes Deskriptif V2
 
-> Wireframe tekstual (bukan gambar). Layout per key screen: region, komponen,
-> aksi, state. Skala: mobile-first, catat adaptasi desktop.
-
-### 7.1 Landing (`/`)
+### 7.1 Landing (/)
 
 ```text
 +---------------------------------------------------------------+
-| HEADER (sticky, full-width)                                    |
-| [Logo PromptFlow]  ............  [Masuk] [Daftar]  [ID/EN] [☀] |
+| HEADER (sticky)                                                |
+| [Logo PromptFlow]  ............  [Masuk] [Daftar]  [ID/EN]    |
 +---------------------------------------------------------------+
-| HERO (full-width, centered, container 2xl)                     |
-|                                                               |
-|         Headline besar (text-4xl/5xl, weight 800)              |
-|         "Satu judul -> paket prompt animasi siap pakai"        |
-|                                                               |
-|         Subheadline (text-lg, muted-foreground)                |
-|         "Karakter konsisten, multi-provider, export JSON/md"    |
-|                                                               |
-|         [CTA: Mulai Gratis] (Button primary, lg)              |
-|         [CTA sekunder: Lihat Demo] (Button outline)            |
-|                                                               |
-|         (opsional: ilustrasi/preview mockup di bawah, ASUMSI)  |
+| HERO (centered, container 2xl)                                 |
+|   Headline (text-4xl/5xl, w800)                                |
+|   "Satu judul -> paket prompt animasi siap pakai"              |
+|   Subheadline (text-lg, muted)                                 |
+|   "Karakter konsisten + multi-provider + AI klasifikasi"      |
+|   [Mulai Gratis] (primary lg) [Lihat Demo] (outline)          |
 +---------------------------------------------------------------+
-| SECTION: Cara Kerja (container xl, grid 3 kolom lg)            |
-| +-------------+ +-------------+ +-------------+               |
-| | 1 Input     | | 2 Generate  | | 3 Export    |               |
-| | judul+opsi  | | prompt paket| | JSON/md     |               |
-| | icon        | | icon        | | icon        |               |
-| +-------------+ +-------------+ +-------------+               |
+| SECTION: Cara Kerja (3 kolom lg)                               |
+| [1 Input]  [2 Generate]  [3 Export]                           |
 +---------------------------------------------------------------+
-| SECTION: Fitur (container xl, grid 2 kolom lg)                 |
-| +---------------------------+ +---------------------------+    |
-| | Konsistensi Karakter      | | Multi-Provider LLM        |    |
-| | desc                      | | desc                      |    |
-| +---------------------------+ +---------------------------+    |
-| +---------------------------+ +---------------------------+    |
-| | Dwibahasa ID+EN           | | Streaming Real-time       |    |
-| | desc                      | | desc                      |    |
-| +---------------------------+ +---------------------------+    |
+| SECTION: Fitur V2 (2 kolom lg)                                 |
+| [AI Image Classification]  [Real-time Process Logs]           |
+| [Dashboard Monitoring]      [Konsistensi Karakter]            |
 +---------------------------------------------------------------+
-| SECTION: CTA akhir (centered)                                  |
-|         [Mulai Gratis Sekarang] (Button primary)              |
+| CTA akhir: [Mulai Gratis Sekarang]                            |
 +---------------------------------------------------------------+
-| FOOTER (full-width)                                            |
-| [Produk] [Sumber Daya] [Legal]  © 2026 PromptFlow  [ID/EN]    |
+| FOOTER                                                         |
+| [Produk] [Sumber Daya] [Legal]  (c) 2026  [ID/EN]            |
 +---------------------------------------------------------------+
 ```
 
-State: unauth -> tombol Masuk/Daftar tampil; authed -> User Menu gantikan.
-
-### 7.2 Login (`/login`)
+### 7.2 Login (/login) — V1 sama
 
 ```text
 +---------------------------------------------------------------+
@@ -616,686 +637,735 @@ State: unauth -> tombol Masuk/Daftar tampil; authed -> User Menu gantikan.
 | CENTERED CONTAINER (max 640px)                                 |
 |   +-------------------------------------------------------+   |
 |   | CARD                                                  |   |
-|   |   Title: Masuk ke PromptFlow (text-2xl, weight 700)   |   |
-|   |   Subtitle: Selamat datang kembali (text-sm, muted)   |   |
-|   |                                                       |   |
-|   |   FORM:                                               |   |
-|   |   [Email]      (Input, type email, wajib)             |   |
-|   |   [Password]   (Input, type password, wajib)          |   |
-|   |   [Button: Masuk] (primary, full width, loading state)|   |
-|   |                                                       |   |
+|   |   Title: Masuk ke PromptFlow (text-2xl, w700)         |   |
+|   |   [Email]      (Input email, wajib)                   |   |
+|   |   [Password]   (Input password, wajib)                |   |
+|   |   [Masuk] (primary, full width, loading)              |   |
 |   |   Link: Belum punya akun? Daftar (-> /register)       |   |
 |   +-------------------------------------------------------+   |
 +---------------------------------------------------------------+
-State: error -> Alert inline (variant error) "Email/password salah".
 ```
 
-### 7.3 Dashboard Project List (`/projects`)
+### 7.3 Dashboard V2 (/dashboard) — BARU
 
 ```text
 +---------------------------------------------------------------+
-| HEADER (AppHeader full)                                        |
+| HEADER (Dasbor aktif)                                          |
 +---------------------------------------------------------------+
 | CONTAINER (max 1280px)                                         |
-|   Page Title: Proyek Saya (text-2xl)                           |
-|   Toolbar (sticky):                                           |
-|     [Search input] [Filter: tipe durasi] [Button: Proyek Baru]|
+|   Title: Dasbor (text-2xl)                                     |
+|   Subtitle: Pantau produktivitas dan performa generate         |
 |                                                               |
-|   GRID CARD (1/2/3/4 kolom responsif):                        |
-|   +-------------+ +-------------+ +-------------+            |
-|   | PromptCard  | | PromptCard  | | PromptCard  |            |
-|   | judul       | | judul       | | judul       |            |
-|   | meta durasi | | meta durasi | | meta durasi |            |
-|   | style badge | | style badge | | style badge |            |
-|   | [Buka][...] | | [Buka][...] | | [Buka][...] |            |
-|   +-------------+ +-------------+ +-------------+            |
+|   METRIC GRID (2 col mobile, 4 col desktop):                   |
+|   +-----------+ +-----------+ +-----------+ +-----------+      |
+|   |Total      | |Generasi   | |Rata-rata  | |Total      |      |
+|   |Proyek     | |Berhasil   | |Durasi     | |Upload     |      |
+|   |42 +5      | |38 +3      | |28s -2s    | |16 file    |      |
+|   +-----------+ +-----------+ +-----------+ +-----------+      |
+|   +-----------+ +-----------+ +-----------+ +-----------+      |
+|   |Success    | |Provider   | |Active     | |Latest     |      |
+|   |Rate       | |Aktif      | |Provider   | |Sync       |      |
+|   |90.5%      | |Ollama     | |llama-3.1  | |2m ago     |      |
+|   +-----------+ +-----------+ +-----------+ +-----------+      |
 |                                                               |
-|   Paginate bottom: [< 1 2 3 >]                                |
+|   CHARTS (2 col desktop):                                      |
+|   +---------------------------+ +---------------------------+ |
+|   | WeeklyTrendChart          | | SuccessFailBarChart       | |
+|   | LineChart Recharts        | | BarChart Recharts          | |
+|   | x: minggu y: jumlah       | | x: success/fail y: count  | |
+|   +---------------------------+ +---------------------------+ |
+|                                                               |
+|   TABLES (2 col desktop):                                      |
+|   +---------------------------+ +---------------------------+ |
+|   | PerProviderBreakdownTable | | RecentActivityTable       | |
+|   | provider | avg dur | sr%  | | project | status | style  | |
+|   | calls | last used         | | date | actions            | |
+|   +---------------------------+ +---------------------------+ |
+|                                                               |
+|   STORAGE:                                                     |
+|   +-------------------------------------------------------+   |
+|   | StorageUsageCard: 16 file, 12.4 MB                    |   |
+|   | Breakdown: tokoh 8, background 4, prop 3, other 1     |   |
+|   +-------------------------------------------------------+   |
 +---------------------------------------------------------------+
+
 State:
-- empty -> EmptyState icon + "Belum ada proyek" + CTA [Proyek Baru]
-- loading -> Skeleton grid 8 card
-- error -> Alert error + retry
+- loading -> PageLoadingSkeleton variant="dashboard"
+- empty -> EmptyState + CTA
 ```
 
-### 7.4 New Project Wizard (`/generate`)
-
-Layout wizard: container max 768px centered, stepper header sticky.
+### 7.4 Generate V2 (/generate) — SINGLE-PAGE FORM
 
 ```text
 +---------------------------------------------------------------+
-| HEADER                                                          |
+| HEADER (Proyek Baru aktif)                                     |
 +---------------------------------------------------------------+
-| CONTAINER (max 768px, centered)                                |
-|   STEPPER HEADER (sticky):                                     |
-|   [1 Judul] -- [2 Durasi] -- [3 Referensi] -- [4 Style] -- [5 Provider] [Generate]
-|   (progress bar di bawah stepper, --motion-progress)           |
+| CONTAINER (max 1024px)                                         |
 |                                                               |
-|   STEP CONTENT (scroll):                                       |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Step 1: Judul Animasi                         │            |
-|   │   Label: Judul Animasi (wajib, 3-200 char)    │            |
-|   │   [Input text, besar]                         │            |
-|   │   Helper: Min 3, maks 200 karakter             │            |
-|   │   (error inline bila invalid)                 │            |
-|   └───────────────────────────────────────────────┘            |
+|   Title: Buat Proyek Baru (text-2xl)                           |
 |                                                               |
-|   NAV: [Kembali: disabled]   [Lanjut: primary]                |
+|   CARD 1: Informasi Dasar                                      |
+|   +-------------------------------------------------------+   |
+|   | Label: Judul Animasi *                                |   |
+|   | [Input text, wajib min 3 max 200]                     |   |
+|   |                                                       |   |
+|   | Label: Deskripsi Singkat Cerita (opsional)            |   |
+|   | [StoryDescriptionTextarea, 4 rows, max 500 char]      |   |
+|   | Char counter: 42/500                                  |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|   CARD 2: Referensi Gambar (opsional)                          |
+|   +-------------------------------------------------------+   |
+|   | [DropzoneUploader V2: drag-drop multi-file]           |   |
+|   |                                                       |   |
+|   | [AssetPreviewList V2 - grid 2-4 col]:                 |   |
+|   | +-------+ +-------+ +-------+ +-------+              |   |
+|   | | thumb | | thumb | | thumb | | thumb |              |   |
+|   | | tokoh | | bkgd  | | prop  | | env   | (RoleBadge)  |   |
+|   | |[Select role]      [X remove]                       |   |
+|   | +-------+ +-------+ +-------+ +-------+              |   |
+|   |                                                       |   |
+|   | [ClassificationResult V2 - per gambar]:               |   |
+|   | +-----------------------------------------------+     |   |
+|   | | thumb | RoleBadge: tokoh | 0.87 (high)       |     |   |
+|   | |       | "Wahab" (mono text-sm)                |     |   |
+|   | |       | desc: "Pria 25th, rambut hitam"       |     |   |
+|   | |       | ConfidenceBar (87% high)              |     |   |
+|   | |       | [Override Select: 6 role] [Remove]    |     |   |
+|   | +-----------------------------------------------+     |   |
+|   |                                                       |   |
+|   | Checkbox: Lewati (tanpa referensi, AI buat otomatis) |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|   CARD 3: Pengaturan Generate                                  |
+|   +-------------------------------------------------------+   |
+|   | Grid 2 col:                                           |   |
+|   | Tipe Durasi: [Select shorts/tutorial]                 |   |
+|   | Durasi Target (detik, opsional): [Input number]       |   |
+|   | Gaya Gambar: [Select 3D/2D]                           |   |
+|   | Aspect Ratio: [Select 16:9/9:16/1:1/4:3/21:9]        |   |
+|   | Provider Aktif: [Badge] [link Settings bila kosong]   |   |
+|   | Model: [Select dari provider aktif]                   |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|   [Generate Paket Prompt] (primary lg full width, disabled)   |
+|                                                               |
+|   SIDEBAR (lg only, sticky):                                   |
+|   +-------------------------------------------------------+   |
+|   | LogViewer V2                                          |   |
+|   | [Switch toggle - default OFF] "Catatan Proses"        |   |
+|   | Badge: 12                                              |   |
+|   | Collapsible body (ScrollArea max 400px):              |   |
+|   | [10:23:45] [INFO] [generate] Resolving provider...    |   |
+|   | [10:23:46] [INFO] [llm] Calling GPT-4o...            |   |
+|   | [10:23:50] [WARN] [llm] Retry 1/2                    |   |
+|   | [10:24:01] [INFO] Stage: scenes...                    |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|   SAAT GENERATING:                                             |
+|   [GenerateProgress]: 1.char_profiles(done) 2.scenes(active)  |
+|   3.image_prompts(pending) 4.supporting(pending) 5.moral(pend)|
+|   Progress: 35%                                                |
 +---------------------------------------------------------------+
+
+State:
+- idle -> form, sidebar log collapsed, toggle OFF
+- uploading -> DropzoneUploader loading per file
+- classifying -> "AI menganalisis..." spinner
+- generating -> form disabled, StageTracker active, LogViewer auto-ON
+- done -> ResultTabs inline atau redirect /projects/[id]
+- error -> Alert destructive + Toast
 ```
 
-Step detail:
-
-**Step 1 — Judul:**
-- Input `title` (wajib). Helper min 3 maks 200. Error inline bila kosong.
-
-**Step 2 — Durasi:**
-- Select `duration_type` (shorts/tutorial).
-- Numeric `target_seconds` opsional (override).
-- Helper: Shorts ideal 30-60s maks 180s. Tutorial 420-900s.
-- Warning Alert bila tutorial out-of-range (boleh proceed).
-- Error bila shorts > 180.
-
-**Step 3 — Referensi (opsional):**
-- DropzoneUploader (drag-drop atau klik).
-- File list: thumbnail + filename + Select tipe (tokoh/background) + remove.
-- Checkbox "Skip (tanpa referensi)" -> sistem auto-buat (FR-05).
-- Accept `image/*`, max 10MB (ASUMSI).
-
-**Step 4 — Style + Aspect:**
-- Select `style` (3D/2D) — kartu pilihan visual 2 opsi (icon + label).
-- Select `aspect_ratio` (16:9 / 9:16 / 1:1 / 4:3 / 21:9) — grid tombol
-  dengan preview ratio.
-
-**Step 5 — Provider + Model:**
-- Display provider aktif (dari setting). Bila belum set -> Alert +
-  link ke Settings.
-- Select model (dari list provider aktif, ASUMSI fetch dari setting).
-- Tombol Generate (primary, lg, full width).
-
-State setelah Generate:
-- GenerateProgress muncul ganti konten wizard.
-- Skeleton + status per komponen (character_profiles, scenes,
-  image_prompts, moral).
-- Token partial tampil real-time di tab terkait.
-- Done -> Result View (ganti atau route ke `/projects/[id]`).
-- Error -> Toast error + opsi Settings/Retry.
-
-### 7.5 Result View (`/projects/[id]` atau inline di wizard done)
+### 7.5 Projects V2 (/projects)
 
 ```text
 +---------------------------------------------------------------+
-| HEADER + Breadcrumb: Proyek / [judul]                          |
+| HEADER (Proyek aktif)                                          |
 +---------------------------------------------------------------+
 | CONTAINER (max 1280px)                                         |
-|   HEADER RESULT:                                               |
-|   [Judul text-2xl] [meta: durasi, style, rasio, created]       |
-|   [ExportMenu: JSON/Markdown] [Button: Re-generate]            |
-|   (bila warning mismatch FR-12 -> Alert warning di sini)       |
+|   Title: Proyek Saya                                           |
+|   Toolbar: [Search] [Filter durasi] [Proyek Baru]             |
+|                                                               |
+|   GRID (1/2/3/4 col responsif):                                |
+|   +-----------+ +-----------+ +-----------+                    |
+|   | PromptCard| | PromptCard| | PromptCard|                    |
+|   | judul     | | judul     | | judul     |                    |
+|   | meta      | | meta      | | meta      |                    |
+|   | [Buka]    | | [Buka]    | | [Buka]    |                    |
+|   +-----------+ +-----------+ +-----------+                    |
+|                                                               |
+|   PAGINATION (centered):                                       |
+|   [<<] [<] [1] [2] [3] ... [10] [>] [>>]                     |
+|   "Halaman 1 dari 10 - Total 187 proyek"                      |
++---------------------------------------------------------------+
+
+State: loading -> 8 SkeletonCard | empty -> EmptyState + CTA
+```
+
+### 7.6 Project Detail V2 (/projects/[id])
+
+```text
++---------------------------------------------------------------+
+| Breadcrumb: Proyek / [judul]                                   |
++---------------------------------------------------------------+
+| CONTAINER (max 1280px)                                         |
+|   Header: [Judul] [meta] [ExportMenu] [Generate Ulang]        |
+|                                                               |
+|   Story Description (V2, jika ada):                            |
+|   +-------------------------------------------------------+   |
+|   | Info Alert: Deskripsi Cerita                          |   |
+|   | "Petualangan Wahab di hutan..."                       |   |
+|   +-------------------------------------------------------+   |
+|                                                               |
+|   Referensi Gambar (V2: READ-ONLY):                            |
+|   +-------------------------------------------------------+   |
+|   | Grid 2-4 col: thumb + filename + RoleBadge + AI badge |   |
+|   | (Tidak ada DropzoneUploader)                           |   |
+|   +-------------------------------------------------------+   |
 |                                                               |
 |   RESULT TABS (sticky):                                       |
-|   [Adegan] [Voiceover] [Karakter] [Image Prompts] [Pesan Moral]|
+|   [Adegan] [Voiceover] [Karakter] [Image Prompts] [Moral]    |
 |                                                               |
-|   TAB CONTENT (ScrollArea):                                   |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Tab Adegan:                                    │            |
-|   │   SceneCard (Collapsible) per scene:           │            |
-|   │   [Order badge 1] [deskripsi singkat]          │            |
-|   │   Expanded:                                    │            |
-|   │     - Deskripsi lengkap (text)                 │            |
-|   │     - Voiceover_script (mono block, read-only) │            |
-|   │     - Image prompts per scene (sub-list)       │            |
-|   │         [target + badge tipe + prompt + copy]  │            |
-|   └───────────────────────────────────────────────┘            |
-|                                                               |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Tab Voiceover:                                 │            |
-|   │   List per scene: order + voiceover_script     │            |
-|   │   + CopyButton per item                         │            |
-|   └───────────────────────────────────────────────┘            |
-|                                                               |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Tab Karakter:                                  │            |
-|   │   CharacterCard per karakter master:           │            |
-|   │   [nama + peran badge]                          │            |
-|   │   Grid field: gayarambut, wajah_asal,           │            |
-|   │   pakaian_atas, pakaian_bawah, alas_kaki,       │            |
-|   │   deskripsi_latar, aksi                         │            |
-|   │   (identitas stabil lintas adegan FR-12)        │            |
-|   └───────────────────────────────────────────────┘            |
-|                                                               |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Tab Image Prompts:                             │            |
-|   │   Sub-section: Karakter (master list)          │            |
-|   │     ImagePromptList tipe=character:            │            |
-|   │     [target + Badge character + prompt +       │            |
-|   │      reference_filename badge + copy]          │            |
-|   │   Sub-section: Background (master list)        │            |
-|   │     ImagePromptList tipe=background:            │            |
-|   │     [target + Badge background + prompt +      │            |
-|   │      reference_filename + copy]                │            |
-|   └───────────────────────────────────────────────┘            |
-|                                                               |
-|   ┌───────────────────────────────────────────────┐            |
-|   │ Tab Pesan Moral:                               │            |
-|   │   moral_message block + CopyButton             │            |
-|   └───────────────────────────────────────────────┘            |
-|                                                               |
-|   SIDEBAR (lg only, sticky):                                  |
-|   - Meta project (durasi, style, rasio, created)              |
-|   - ExportMenu                                                |
-|   - Re-generate button                                         |
-|   - History (COULD fase 3)                                    |
+|   TAB CONTENT: SceneCard, CharacterCard, ImagePromptList...   |
 +---------------------------------------------------------------+
-State streaming: tab aktif tampilkan skeleton + partial teks.
-State error: Alert error di header result.
 ```
 
-### 7.6 Settings (`/settings`)
+### 7.7 Settings (/settings) — V1 sama
 
 ```text
 +---------------------------------------------------------------+
-| HEADER + Breadcrumb: Pengaturan                                |
+| Breadcrumb: Pengaturan                                         |
 +---------------------------------------------------------------+
 | CONTAINER (max 1024px)                                         |
 |   TABS: [Provider] [Profil]                                    |
+|   Toolbar: [Tambah Provider] (primary)                         |
+|   TABLE:                                                       |
+|   | Name | Provider | Base URL | Model | Active | [edit][del] |
 |                                                               |
-|   TAB PROVIDER:                                                |
-|     Toolbar: [Button: Tambah Provider] (primary)              |
-|     TABLE:                                                     |
-|     | Name | Provider | Base URL | Model | Active | Aksi |    |
-|     | ...  | ...     | ...      | ...   | [sw]   | [edit][del]|
-|     Paginate                                                   |
-|                                                               |
-|   DIALOG add/edit (ProviderConfigForm):                       |
-|   +-------------------------------------------------------+   |
-|   | Nama (Input)                                          |   |
-|   | Provider (Select: ollama/openrouter/9router/custom)   |   |
-|   | Base URL (Input, pre-fill per provider)               |   |
-|   | Model (Input)                                         |   |
-|   | API Key (Input password, mask **** di edit)          |   |
-|   | [Switch: Set Active]                                  |   |
-|   | [Button: Simpan] [Button: Batal]                      |   |
-|   +-------------------------------------------------------+   |
-|                                                               |
-|   TAB PROFIL:                                                 |
-|     Avatar + nama + email (read-only)                         |
-|     Form edit nama                                            |
+|   DIALOG (ProviderConfigForm):                                 |
+|   [Nama] [Provider select] [Base URL] [Model] [API Key]       |
+|   [Switch: Set Active] [Simpan] [Batal]                       |
 +---------------------------------------------------------------+
 ```
 
-### 7.7 History (`/projects/[id]?tab=history` COULD fase 3)
+### 7.8 Loading / Error Page Pattern (V2)
+
+**loading.tsx:**
 
 ```text
 +---------------------------------------------------------------+
-| HEADER + Breadcrumb: Proyek / [judul] / Riwayat               |
+| HEADER                                                         |
 +---------------------------------------------------------------+
-| CONTAINER (max 1280px)                                         |
-|   TABLE:                                                       |
-|   | Waktu | Provider | Model | Durasi | Status | Aksi |       |
-|   | ...   | ...      | ...   | ...    | [badge]| [view][rollback]|
-|   Paginate                                                     |
+| CONTAINER                                                      |
+|   [Skeleton: Title bar]                                        |
+|   [Skeleton: Toolbar]                                          |
+|   [Skeleton: Grid 3x2 cards] (shimmer 1500ms)                |
 +---------------------------------------------------------------+
 ```
 
-- Sitasi: `PRD.md 3.5 (US-25), 4 (F-21)` COULD fase 3
+**error.tsx:**
+
+```text
++---------------------------------------------------------------+
+| HEADER                                                         |
++---------------------------------------------------------------+
+| CONTAINER (max 640px, centered)                                |
+|   [AlertTriangle icon 48px destructive]                        |
+|   "Terjadi kesalahan" (text-2xl)                               |
+|   "Gagal memuat halaman. Coba lagi." (muted)                   |
+|   [Coba Lagi] (primary) [Kembali ke Dasbor] (outline)         |
++---------------------------------------------------------------+
+```
 
 ---
 
 ## 8. Iconografi & Aset
 
-### 8.1 Icon Set
+### 8.1 Icon Set (Lucide React)
 
-Library: **Lucide React** (default shadcn/ui, via `lucide-react`).
-- Sitasi: shadcn/ui default (ASUMSI, `RAG-CONTEXT.md 2.1` shadcn/ui pakai Lucide)
-
-Icon semantic konsisten:
-
-| Aksi/Konteks | Icon Lucide | Penggunaan |
+| Aksi | Icon | V1/V2 |
 |---|---|---|
-| Generate | `Sparkles` / `Wand2` | Tombol Generate utama |
-| Copy | `Copy` / `Clipboard` | CopyButton |
-| Export | `Download` | ExportMenu |
-| Add | `Plus` | Add provider, new project |
-| Edit | `Pencil` | Edit provider |
-| Delete | `Trash2` | Delete project/provider |
-| Save | `Save` | Save project |
-| Back/Next | `ArrowLeft` / `ArrowRight` | Wizard nav |
-| Close | `X` | Dialog close, remove file |
-| Upload | `Upload` / `UploadCloud` | Dropzone |
-| Settings | `Settings` | Nav Settings |
-| User | `User` / `CircleUser` | User menu |
-| Sun/Moon | `Sun` / `Moon` | Theme toggle |
-| Languages | `Languages` | Language toggle |
-| Check | `Check` / `CheckCircle2` | Success, active |
-| Alert | `AlertTriangle` / `AlertCircle` | Warning/error |
-| Info | `Info` | Info toast |
-| Character | `UserRound` | Karakter tab |
-| Scene | `Film` / `Clapperboard` | Adegan tab |
-| Mic | `Mic` | Voiceover tab |
-| Image | `Image` | Image prompts tab |
-| Heart | `Heart` / `Sparkle` | Pesan moral |
-| Eye | `Eye` / `EyeOff` | Toggle mask API key |
-| ChevronDown | `ChevronDown` | Collapsible, select trigger |
-| Loader | `Loader2` (spin) | Loading spinner |
+| Generate | Sparkles / Wand2 | V1 |
+| Copy | Copy / Clipboard | V1 |
+| Export | Download | V1 |
+| Upload | Upload / UploadCloud | V1 |
+| Delete | Trash2 | V1 |
+| Check | Check / CheckCircle2 | V1 |
+| Alert | AlertTriangle / AlertCircle | V1 |
+| Loader | Loader2 (spin) | V1 |
+| **Dashboard** | **LayoutDashboard** | **V2** |
+| **TrendingUp/Down** | **TrendingUp / TrendingDown** | **V2** (delta indicator) |
+| **BarChart** | **BarChart3** | **V2** (chart icon) |
+| **LineChart** | **LineChart** | **V2** (chart icon) |
+| **Storage** | **HardDrive** | **V2** (storage usage) |
+| **Prop** | **Package** | **V2** (prop role) |
+| **Accessory** | **Glasses** | **V2** (accessory role) |
+| **Environment** | **TreePine / Mountain** | **V2** (environment role) |
+| **Help** | **HelpCircle** | **V2** (other role) |
+| **Logs** | **Terminal** | **V2** (log viewer) |
+| **Story** | **FileText** | **V2** (story description) |
+| **Pagination** | **ChevronLeft / ChevronRight** | **V2** |
 
-### 8.2 Logo & Maskot
+### 8.2 Logo & Aset
 
-**TIDAK ADA aset existing** (greenfield, `RAG-CONTEXT.md 8`). ASUMSI:
-- Logo: wordmark "PromptFlow" font Inter weight 800, warna primary `#7c3aed`.
-  Bisa tambah mark sederhana (icon `Sparkles` di kotak rounded primary).
-- Maskot: ASUMSI tidak ada. Bila dibutuhkan, konsep = karakter abstrak
-  (bukan hewan spesifik) — TBD user.
+Logo: wordmark "PromptFlow" font Inter weight 800, primary `#7c3aed`. Icon `Sparkles`. Maskot: tidak ada.
 
-### 8.3 Ilustrasi & Aset Lain
+Path: `public/` (logo). Upload dev: `public/references/`.
 
-- Landing ilustrasi: ASUMSI SVG abstract (gradient primary -> accent),
-  atau mockup screenshot app. TBD.
-- Empty state ilustrasi: ASUMSI icon besar Lucide (mis `FolderOpen` untuk
-  empty project, `SearchX` untuk no result).
-- Path aset: `public/` (logo, ilustrasi). Referensi upload dev: `public/references/`.
-- Sitasi: `PROJECT_ARCHITECTURE.md §5` (`public/`, `public/references/`) ;
-  `RAG-CONTEXT.md 8` (TIDAK ADA aset)
+### 8.3 Aturan Icon
 
-### 8.4 Aturan Pemakaian Icon
-
-- Ukuran default 16px (text-sm) atau 20px (text-base). Button icon = 18-20px.
-- Stroke width 1.5 (Lucide default 2, sesuaikan ke 1.5 untuk halus).
-- Warna ikut `currentColor` (inherit text color), kecuali state spesifik
-  (success/warning/error).
-- TIDAK campur library icon. Konsisten Lucide saja.
+- Size: 16px (text-sm) atau 20px (text-base). Button icon: 18-20px.
+- Stroke width 1.5.
+- Warna `currentColor`, kecuali state spesifik.
+- Konsisten Lucide saja.
 
 ---
 
-## 9. Aksesibilitas
+## 9. Aksesibilitas (WCAG 2.1 AA)
 
-Target: **WCAG 2.1 AA** minimum. Bukan opsional.
-- Sitasi: `PRD.md 6.6 (NFR-A1/A2/A3)` ; `SRS.md` (NFR-A)
+### 9.1 Kontras
 
-### 9.1 Kontras Warna
-
-| Konteks | Rasio minimum | Verifikasi |
+| Konteks | Minimum | Verifikasi |
 |---|---|---|
-| Body text di background | 4.5:1 | `--foreground` vs `--background` (light: ~16:1, dark: ~16:1) |
-| Large text (>= 24px / 18.66px bold) | 3:1 | Heading |
-| UI component border/icon | 3:1 | Input border, focus ring |
-| Link text | 4.5:1 | Primary link |
-| Teks di atas primary button | 4.5:1 | `--primary-foreground` vs `--primary` (light: ~6:1, dark: ~10:1) |
-| State color text (success/warning/error/info) di bg | 4.5:1 | Badge, toast |
+| Body text di bg | 4.5:1 | foreground vs background (~16:1) |
+| Large text >= 24px | 3:1 | heading |
+| UI border/icon | 3:1 | input border, focus ring |
+| Teks di primary button | 4.5:1 | primary-foreground vs primary (~6:1) |
+| State color badge | 4.5:1 | success/warning/error badge |
+| **V2: Role badge** | 4.5:1 | per role color |
+| **V2: Confidence bar** | 4.5:1 | low/mid/high |
+| **V2: Log bg text** | 4.5:1 | log-info/warn/error-bg |
 
-Verifikasi: Axe DevTools / Lighthouse audit. Target 0 violation AA.
+### 9.2 Keyboard
 
-### 9.2 Keyboard Navigasi
+- Semua interaktif reachable via Tab.
+- Skip link "Lewati ke konten utama".
+- Focus visible: outline `--ring` 2px solid offset 2px.
+- Modal: fokus trap, Esc tutup.
+- **V2:** LogViewer arrow key navigasi.
+- **V2:** Pagination arrow key + Enter.
+- **V2:** ClassificationResult override Select keyboard navigable.
 
-- Semua komponen interaktif WAJIB reachable via Tab.
-- Logical tab order mengikuti visual order.
-- Skip link "Lewati ke konten utama" di atas header (fokus pertama).
-- Focus visible: outline `--ring` 2px solid, offset 2px. TIDAK pernah
-  `outline: none` tanpa pengganti.
-- Modal/Dialog: fokus trap, Tab sirkular di dalam modal, Esc tutup.
-- Dropdown: arrow key navigasi, Enter pilih, Esc tutup.
-- Wizard: Tab antar field, Enter submit form di step terakhir.
+### 9.3 ARIA (V1 + V2)
 
-### 9.3 ARIA & Semantik
-
-- `aria-label` di icon-only button (CopyButton, close, delete).
-- `aria-expanded` di Collapsible/Dropdown/Accordion.
-- `aria-selected` di Tabs trigger aktif.
-- `aria-live="polite"` di region streaming result (partial update).
-- `aria-live="assertive"` di toast error.
-- `role="status"` di toast success/info.
-- `role="alert"` di Alert error/warning.
-- Form: `<label htmlFor>` atau react-hook-form Label bind. `aria-invalid`
-  + `aria-describedby` ke pesan error.
-- Table: `<thead>/<tbody>`, `scope="col"`/`scope="row"`.
-- Dropzone: `role="button"`, `aria-label="Upload gambar referensi"`,
-  instruksi drag-drop teks.
+- V1: aria-label, aria-expanded, aria-selected, aria-live, role=alert/status.
+- **V2:** LogViewer `role="log"`, `aria-live="polite"`.
+- **V2:** Pagination `aria-current="page"`.
+- **V2:** MetricCard `aria-label="[label]: [value]"`.
+- **V2:** Chart `aria-label="[chart title]"`.
+- **V2:** error.tsx `role="alert"`, `aria-live="assertive"`.
+- **V2:** ClassificationResult `aria-valuenow/min/max`.
 
 ### 9.4 Teks Alternatif
 
-- Image referensi upload: `alt` = label/nama file (bukan nama file mentah
-  bila label diisi).
 - Logo: `alt="PromptFlow"`.
-- Ilustrasi dekoratif: `alt=""` (empty) bila murni dekoratif.
-- Avatar user: `alt="Foto profil <nama>"`.
+- Upload: `alt=label/nama file`.
+- **V2:** ClassificationResult thumb: `alt="[role]: [name]"`.
 
 ### 9.5 Reduce Motion
 
-`@media (prefers-reduced-motion: reduce)`:
-- Nonaktifkan skeleton shimmer (ganti statis bg `--muted`).
-- Nonaktifkan micro-interaction (hover scale, slide).
-- Transisi tetap instant (0ms) untuk state change warna.
-- Loading tetap tampilkan teks status (bukan animasi).
-- Animasi esensial (fokus, scroll-to) tetap.
+- Nonaktifkan skeleton shimmer, micro-interaction.
+- **V2:** Log entry slide-in jadi instant.
+- **V2:** Recharts `isAnimationActive={false}`.
+- Loading tetap teks status (bukan animasi).
 
-### 9.6 Bahasa & Aksesibilitas
+### 9.6 Check-list
 
-- `lang` attribute di `<html>` ikut locale aktif (`id`/`en`).
-- Direction LTR (TIDAK ada RTL fase awal).
-- Teks tidak terpotong oleh ellipsis di breakpoint kecil -> wrap.
-
-### 9.7 Check-list Verifikasi A11y
-
-- [ ] 0 violation WCAG AA (Axe/Lighthouse)
-- [ ] Semua aksi keyboard reachable
-- [ ] Focus visible semua komponen
-- [ ] Skip link ada dan berfungsi
-- [ ] Dialog trap fokus + Esc
-- [ ] Toast announce via aria-live
-- [ ] Kontras semua teks >= 4.5:1
-- [ ] Form error announce + label bind
-- [ ] Reduce motion aman
+- [ ] 0 violation WCAG AA
+- [ ] Keyboard reachable semua (termasuk V2)
+- [ ] Focus visible semua
+- [ ] Skip link berfungsi
+- [ ] Dialog trap + Esc
+- [ ] Toast aria-live
+- [ ] V2: LogViewer aria-live polite
+- [ ] V2: Pagination aria-current
+- [ ] V2: Chart aria-label
+- [ ] Kontras >= 4.5:1 (termasuk V2)
+- [ ] Reduce motion aman (termasuk V2)
 
 ---
 
 ## 10. Interaction & Motion
 
-### 10.1 Transisi State Komponen
+### 10.1 Transisi Komponen
 
-| Komponen | Trigger | Efek | Durasi | Easing |
-|---|---|---|---|---|
-| Button | hover | bg lighten 8%, border subtle | 120ms | base |
-| Button | active/press | scale 0.97 | 120ms | base |
-| Button | focus | ring 2px `--ring` | instant | — |
-| Button | disabled | opacity 0.5, cursor not-allowed | instant | — |
-| Card | hover | shadow-md -> shadow-lg, translateY -2px | 200ms | base |
-| Input/Select | focus | border `--ring`, ring offset | 120ms | base |
-| Tabs trigger | active | underline/dot slide | 200ms | base |
-| Dialog | open | fade + scale 0.95 -> 1 | 320ms | slow |
-| Dialog | close | fade + scale 1 -> 0.95 | 200ms | base |
-| Dropdown | open | fade + slide down 4px | 200ms | base |
-| Toast | enter | slide right + fade | 200ms | base |
-| Toast | exit | slide right + fade out | 200ms | base |
-| Collapsible | toggle | height auto expand/collapse | 320ms | slow |
-| Switch | toggle | knob translate | 200ms | base |
-| Skeleton | loop | shimmer gradient | 1500ms infinite | linear |
-| Progress | fill | width transition | 800ms | ease-in-out |
+| Komponen | Trigger | Efek | Durasi |
+|---|---|---|---|
+| Button | hover | bg lighten 8% | 120ms |
+| Button | focus | ring 2px | instant |
+| Card | hover | shadow-lg, translateY -2px | 200ms |
+| Input/Select | focus | border ring | 120ms |
+| Dialog | open | fade + scale 0.95->1 | 320ms |
+| Dropdown | open | fade + slide down 4px | 200ms |
+| Toast | enter | slide right + fade | 200ms |
+| Collapsible | toggle | height expand/collapse | 320ms |
+| Switch | toggle | knob translate | 200ms |
+| Skeleton | loop | shimmer | 1500ms infinite |
+| Progress | fill | width transition | 800ms |
+| **V2: LogEntry** | enter | slide down + fade | 200ms |
+| **V2: ClassificationResult** | classified | fade in | 200ms |
+| **V2: ConfidenceBar** | fill | width transition | 800ms |
+| **V2: MetricCard delta** | load | count-up | 600ms |
+| **V2: Recharts** | render | draw-in | 400ms |
 
 ### 10.2 Micro-interaction
 
-- CopyButton: klik -> icon swap Copy -> Check (200ms), toast "Tersalin".
-- Generate button: klik -> label ganti "Generating..." + spinner Loader2 spin.
-- Dropzone: drag over -> border dashed primary, bg `--accent`.
-- Provider switch isActive: knob slide + toast "Provider aktif".
-- Tab switch: content fade cross-fade 200ms.
+- CopyButton: icon swap Copy ke Check, toast.
+- Generate button: label ganti "Generating..." + spinner.
+- Dropzone: drag over -> border dashed primary.
+- **V2:** LogViewer Switch toggle -> knob slide + Collapsible open.
+- **V2:** ClassificationResult override -> role badge color transition.
+- **V2:** StoryDescription char counter -> warna danger > 480 char.
 
 ### 10.3 Loading State
 
-- **Skeleton**: block `--muted` + shimmer gradient overlay. Untuk list card,
-  form field, result section (sebelum partial tiba).
-- **Spinner**: Loader2 spin 16-20px di button loading + GenerateProgress.
-- **Progress bar**: determinate bila persen tahu, indeterminate (stripes
-  moving) bila tidak. Label status teks per komponen.
-- **Streaming partial**: teks partial tampil dengan cursor pulse (optional,
-  respect reduce-motion) di tab terkait.
+- Skeleton: block muted + shimmer. V2: MetricCard, chart, log.
+- Spinner: Loader2 spin 16-20px.
+- Progress bar: determinate atau indeterminate.
+- **V2:** PageLoadingSkeleton per variant.
 
 ### 10.4 Empty State
 
-| Konteks | Ilustrasi/icon | Title | Description | CTA |
-|---|---|---|---|---|
-| Project list kosong | `FolderOpen` 48px muted | "Belum ada proyek" | "Mulai buat paket prompt animasi pertama Anda." | [Proyek Baru] |
-| Result belum generate | `Sparkles` | "Hasil akan muncul di sini" | "Selesaikan wizard lalu klik Generate." | — |
-| Search no result | `SearchX` | "Tidak ditemukan" | "Coba kata kunci lain." | [Reset] |
-| History kosong | `History` | "Belum ada riwayat" | "Generasi akan tercatat di sini." | — |
+| Konteks | Icon | Title | CTA |
+|---|---|---|---|
+| Project kosong | FolderOpen 48px | "Belum ada proyek" | [Proyek Baru] |
+| Search no result | SearchX | "Tidak ditemukan" | [Reset] |
+| **V2: Dashboard baru** | **BarChart3 48px** | **"Belum ada data"** | **[Proyek Baru]** |
+| **V2: Log toggle OFF** | **Terminal 32px** | **"Catatan nonaktif"** | **[Switch ON]** |
+| **V2: Upload kosong** | **UploadCloud 48px** | **"Belum ada gambar"** | **[Pilih File]** |
+| **V2: No result page** | **SearchX** | **"Tidak ada proyek halaman ini"** | **[Halaman 1]** |
 
 ### 10.5 Error State
 
 | Konteks | Komponen | Pesan |
 |---|---|---|
-| Validation field | inline Alert kecil di bawah field | "{field} wajib diisi" / "Min 3 karakter" / "Maks 200" |
-| Form submit error | Alert di atas form | "Gagal menyimpan. Periksa kembali." |
-| Provider error generate | Toast error + Alert di GenerateProgress | "Provider {name} gagal. Cek API key/base URL atau ganti provider di Pengaturan." + link |
-| Provider timeout | Alert warning + partial disimpan | "Generasi terputus. Hasil parsial tersimpan. Coba Generate ulang." |
-| Auth error | redirect `/login?callbackUrl` + toast info | "Sesi berakhir, silakan masuk kembali." |
-| 404 | full page | "Halaman tidak ditemukan" + [Kembali ke Dashboard] |
+| Validation | inline Alert | "Field wajib diisi" / "Min 3" / "Maks 200" / "Maks 500 deskripsi" |
+| Provider error | Toast + Alert | "Provider gagal. Cek API key atau ganti di Pengaturan." |
+| Provider timeout | Alert warning | "Generasi terputus. Hasil parsial tersimpan." |
+| Auth error | redirect + toast | "Sesi berakhir, silakan masuk kembali." |
+| 404 | full page | "Halaman tidak ditemukan" + [Dasbor] |
 | 500 | full page | "Terjadi kesalahan. Coba lagi." + [Refresh] |
-| Network offline | banner top | "Koneksi terputus" |
+| **V2: Upload gagal** | **Toast + Alert** | **"Gagal upload {file}: {msg}"** |
+| **V2: Classification gagal** | **Alert warning** | **"AI tidak dapat menganalisis. Pilih role manual."** |
+| **V2: Low confidence** | **Alert warning** | **"Keyakinan rendah ({n}%). Periksa atau pilih manual."** |
+| **V2: page error** | **PageErrorBoundary** | **"Terjadi kesalahan" + [Coba Lagi] + [Dasbor]** |
 
-### 10.6 Feedback (toast via Sonner)
+### 10.6 Feedback (Sonner Toast)
 
-| Trigger | Variant | Pesan (ID) | Pesan (EN) |
+| Trigger | Variant | ID | EN |
 |---|---|---|---|
-| Copy prompt | success | "Prompt tersalin" | "Prompt copied" |
+| Copy | success | "Prompt tersalin" | "Prompt copied" |
 | Save project | success | "Proyek tersimpan" | "Project saved" |
 | Save provider | success | "Provider tersimpan" | "Provider saved" |
 | Provider active | info | "Provider aktif diubah" | "Active provider changed" |
-| Delete project | success | "Proyek dihapus" | "Project deleted" |
-| Delete provider | success | "Provider dihapus" | "Provider deleted" |
-| Provider error | error | "Provider gagal: {msg}" | "Provider failed: {msg}" |
-| Validation | warning | "Periksa input" | "Check your input" |
-| Mismatch karakter | warning | "Karakter tidak konsisten. Cek tab Karakter." | "Character inconsistency. Check Character tab." |
-| Export done | success | "File diunduh" | "File downloaded" |
-| Upload gagal | error | "Upload gagal: {msg}" | "Upload failed: {msg}" |
+| Delete | success | "Proyek dihapus" | "Project deleted" |
+| Provider error | destructive | "Provider gagal: {msg}" | "Provider failed: {msg}" |
+| Mismatch | warning | "Karakter tidak konsisten" | "Character inconsistent" |
+| Export | success | "File diunduh" | "File downloaded" |
+| **V2: Upload success** | **success** | **"Gambar diunggah ({n})"** | **"Uploaded ({n} files)"** |
+| **V2: Classify done** | **info** | **"AI menganalisis {n} gambar"** | **"AI analyzed {n} images"** |
+| **V2: Generate done** | **success** | **"Paket prompt siap!"** | **"Prompt package ready!"** |
+| **V2: Override role** | **info** | **"Role diubah ke {role}"** | **"Role changed to {role}"** |
+| **V2: Remove asset** | **info** | **"Gambar dihapus"** | **"Image removed"** |
 
 ---
 
-## 11. Konten & Copy
+## 11. Konten & Copy & i18n
 
-### 11.1 Tone & Konsistensi Istilah
+### 11.1 Istilah Konsisten (V2)
 
-- Tone: profesional hangat, ringkas, edukatif. Hindari jargon teknis berlebih
-  (kecuali field teknis seperti base URL/API key).
-- Istilah konsisten ID/EN (dictionary file `messages/id.json` +
-  `messages/en.json`):
-
-| Key i18n | ID | EN |
+| Key | ID | EN |
 |---|---|---|
-| `nav.dashboard` | Proyek | Projects |
-| `nav.newProject` | Proyek Baru | New Project |
-| `nav.settings` | Pengaturan | Settings |
-| `nav.login` | Masuk | Log in |
-| `nav.register` | Daftar | Sign up |
-| `nav.logout` | Keluar | Log out |
-| `nav.profile` | Profil | Profile |
-| `wizard.step1.title` | Judul Animasi | Animation Title |
-| `wizard.step2.title` | Durasi Target | Target Duration |
-| `wizard.step3.title` | Referensi Gambar | Image Reference |
-| `wizard.step4.title` | Gaya & Rasio | Style & Aspect Ratio |
-| `wizard.step5.title` | Provider & Model | Provider & Model |
-| `wizard.generate` | Generate | Generate |
-| `wizard.back` | Kembali | Back |
-| `wizard.next` | Lanjut | Next |
-| `wizard.skip` | Lewati (tanpa referensi) | Skip (no reference) |
-| `result.tabs.scenes` | Adegan | Scenes |
-| `result.tabs.voiceover` | Voiceover | Voiceover |
-| `result.tabs.characters` | Karakter | Characters |
-| `result.tabs.imagePrompts` | Image Prompts | Image Prompts |
-| `result.tabs.moral` | Pesan Moral | Moral Message |
-| `result.export` | Ekspor | Export |
-| `result.regenerate` | Generate Ulang | Regenerate |
-| `result.copy` | Salin | Copy |
-| `result.copied` | Tersalin | Copied |
-| `settings.provider` | Provider | Provider |
-| `settings.baseUrl` | Base URL | Base URL |
-| `settings.model` | Model | Model |
-| `settings.apiKey` | API Key | API Key |
-| `settings.active` | Aktif | Active |
-| `settings.add` | Tambah Provider | Add Provider |
-| `settings.save` | Simpan | Save |
-| `settings.delete` | Hapus | Delete |
-| `settings.cancel` | Batal | Cancel |
-| `error.required` | Wajib diisi | Required |
-| `error.minChars` | Min {n} karakter | Min {n} characters |
-| `error.maxChars` | Maks {n} karakter | Max {n} characters |
-| `error.providerFail` | Provider gagal. Cek API key/base URL atau ganti provider di Pengaturan. | Provider failed. Check API key/base URL or switch provider in Settings. |
-| `error.timeout` | Generasi terputus. Hasil parsial tersimpan. | Generation interrupted. Partial result saved. |
-| `empty.projects` | Belum ada proyek. Mulai buat paket prompt animasi pertama Anda. | No projects yet. Start creating your first animation prompt package. |
-| `warning.mismatch` | Karakter tidak konsisten lintas adegan. | Character inconsistent across scenes. |
+| nav.dashboard | Dasbor | Dashboard |
+| nav.projects | Proyek | Projects |
+| nav.newProject | Proyek Baru | New Project |
+| nav.settings | Pengaturan | Settings |
+| generate.title | Buat Proyek Baru | Create New Project |
+| V2: generate.storyDesc.label | Deskripsi Singkat Cerita (opsional) | Short Story Description (optional) |
+| V2: generate.storyDesc.helper | Jelaskan premis, tokoh, atau pesan utama | Describe the premise, characters, or main message |
+| V2: generate.ref.label | Referensi Gambar (opsional) | Image Reference (optional) |
+| V2: generate.ref.dropTitle | Drag-drop gambar di sini, atau klik | Drag-drop images here, or click to select |
+| V2: generate.ref.skip | Lewati (tanpa referensi) | Skip (no reference) |
+| V2: generate.classify.analyzing | AI menganalisis gambar... | AI analyzing image... |
+| V2: generate.classify.lowConf | Keyakinan rendah. Pilih role manual. | Low confidence. Select role manually. |
+| V2: generate.role.tokoh | Tokoh | Character |
+| V2: generate.role.background | Latar | Background |
+| V2: generate.role.prop | Properti | Prop |
+| V2: generate.role.accessory | Aksesoris | Accessory |
+| V2: generate.role.environment | Lingkungan | Environment |
+| V2: generate.role.other | Lainnya | Other |
+| V2: generate.log.title | Catatan Proses | Process Logs |
+| V2: generate.log.toggle | Tampilkan catatan proses | Show process logs |
+| V2: generate.log.empty | Aktifkan toggle untuk melihat log | Enable toggle to see real-time logs |
+| V2: dashboard.title | Dasbor | Dashboard |
+| V2: dashboard.subtitle | Pantau produktivitas | Monitor productivity |
+| V2: dashboard.metric.totalProjects | Total Proyek | Total Projects |
+| V2: dashboard.metric.successful | Generasi Berhasil | Successful Generations |
+| V2: dashboard.metric.avgDuration | Rata-rata Durasi | Average Duration |
+| V2: dashboard.metric.successRate | Tingkat Keberhasilan | Success Rate |
+| V2: dashboard.chart.weeklyTrend | Tren Mingguan | Weekly Trend |
+| V2: dashboard.table.providerBreakdown | Rincian Provider | Per-Provider Breakdown |
+| V2: dashboard.table.recentActivity | Aktivitas Terbaru | Recent Activity |
+| V2: dashboard.storage.title | Penyimpanan | Storage |
+| V2: pagination.prev | Sebelumnya | Previous |
+| V2: pagination.next | Selanjutnya | Next |
+| V2: pagination.info | Halaman {current} dari {total} | Page {current} of {total} |
+| V2: error.page.title | Terjadi kesalahan | Something went wrong |
+| V2: error.page.retry | Coba Lagi | Try Again |
+| V2: error.page.home | Kembali ke Dasbor | Back to Dashboard |
+| result.tabs.scenes | Adegan | Scenes |
+| result.tabs.voiceover | Voiceover | Voiceover |
+| result.tabs.characters | Karakter | Characters |
+| result.tabs.imagePrompts | Image Prompts | Image Prompts |
+| result.tabs.moral | Pesan Moral | Moral Message |
+| error.providerFail | Provider gagal. Cek API key atau ganti. | Provider failed. Check key or switch. |
+| error.timeout | Generasi terputus. Hasil parsial tersimpan. | Generation interrupted. Partial saved. |
+| empty.projects | Belum ada proyek. Mulai buat yang pertama. | No projects yet. Create your first. |
 
-### 11.2 Pesan Error Umum
+### 11.2 Pesan Error
 
-- 400 validation: "Input tidak valid: {detail}" (detail dari Zod).
-- 401 auth: "Sesi berakhir, silakan masuk kembali."
-- 403: "Anda tidak memiliki akses ke resource ini."
+- 400: "Input tidak valid: {detail}"
+- 401: "Sesi berakhir, silakan masuk kembali."
+- 403: "Anda tidak memiliki akses."
 - 404: "Tidak ditemukan."
-- 429 rate limit: "Terlalu banyak permintaan. Coba lagi sebentar."
+- 429: "Terlalu banyak permintaan. Coba lagi."
 - 500: "Terjadi kesalahan server. Coba lagi."
-- 502/504 provider: "Provider tidak merespons. Coba ganti provider atau
-  ulangi."
+- 502/504: "Provider tidak merespons. Coba ganti provider."
+- **V2:** classification_error: "Gagal menganalisis gambar. Pilih role manual."
 
 ### 11.3 Placeholder
 
-- Input judul: "Mis. Petualangan Si Kancil di Hutan" (ID) /
-  "E.g. The Kancil's Forest Adventure" (EN).
-- Model: "Mis. gpt-4o-mini, llama-3.1-70b" (sama ID/EN).
-- Base URL: auto-fill per provider.
-- API key: "Masukkan API key" (ID) / "Enter API key" (EN).
-- Search project: "Cari proyek..." (ID) / "Search projects..." (EN).
+- Judul: "Mis. Petualangan Si Kancil di Hutan"
+- **V2: Deskripsi cerita:** "Mis. Wahab adalah pemuda pemberani yang belajar menjaga hutan..."
+- Model: "Mis. gpt-4o-mini, llama-3.1-70b"
+- API key: "Masukkan API key"
+- Search: "Cari proyek..."
 
-### 11.4 Empty State Copy
+### 11.4 i18n
 
-Lihat §10.4. Teks dwibahasa, ambil dari i18n key `empty.*`.
-
-### 11.5 Internasionalisasi (i18n)
-
-- Library: **next-intl** (ASUMSI, `SRS.md 4.1` / `PROJECT_ARCHITECTURE.md 12`).
-- Locale: `id` (default), `en`. Persist via cookie `NEXT_LOCALE`.
-- File: `messages/id.json`, `messages/en.json`.
-- Toggle: LanguageToggle di header (segmented ID/EN).
-- Konten generate LLM: bahasa ikut judul (ASUMSI NFR-I2), BUKAN UI locale.
-- Format tanggal/angka: pakai `Intl.DateTimeFormat` + `Intl.NumberFormat`
-  per locale.
-- Sitasi: `PRD.md 5 (FR-19)` ; `SRS.md 5 (FR-19)` ; `PROJECT_ARCHITECTURE.md 12`
+Library: next-intl. Locale: `id` (default), `en`. Persist cookie `NEXT_LOCALE`. File: `messages/id.json`, `messages/en.json`. V2 tambah key di 11.1.
 
 ---
 
 ## 12. Responsif & Kompatibilitas
 
-### 12.1 Breakpoint & Strategi
+### 12.1 Breakpoint
 
-Mobile-first. Semua layout default mobile, augmentasi `sm`/`md`/`lg`/`xl`.
-
-| Breakpoint | Min | Adaptasi utama |
+| Breakpoint | Min | Adaptasi V2 |
 |---|---|---|
-| mobile | 0 | Header hamburger, single col, wizard full width, result tabs scroll horizontal bila overflow |
-| sm | 640px | Project grid 2 col, header nav inline (Dashboard, New, Settings) |
-| md | 768px | Project grid 2 col, result sidebar mulai muncul (lg), wizard container 768 |
-| lg | 1024px | Project grid 3 col, result sidebar sticky penuh, header full nav inline |
-| xl | 1280px | Project grid 4 col, container dashboard 1280 |
-| 2xl | 1536px | Landing container 1536 |
+| mobile | 0 | Header hamburger, generate form stack, Pagination simplified |
+| sm | 640px | Project grid 2, AssetPreview 2 col |
+| md | 768px | Generate form container 1024, result sidebar |
+| lg | 1024px | Generate 2 col (main+sidebar), Dashboard 4 col metric |
+| xl | 1280px | Dashboard chart 2 col, project grid 4 |
 
-### 12.2 Reflow Komponen
+### 12.2 Reflow V2
 
 | Komponen | Mobile | Desktop |
 |---|---|---|
-| AppHeader | hamburger menu (DropdownMenu) untuk nav; LanguageToggle + ThemeToggle inline | nav inline (Dashboard, New, Settings) + Language + Theme + UserMenu |
-| Dashboard grid | 1 col | 4 col (xl) |
-| Wizard | full width, stepper horizontal compact (ikon only + label di bawah) | container 768, stepper penuh dengan label |
-| Result | tabs + content stack, sidebar jadi block bawah | tabs + content 2 col (main + sidebar sticky) |
-| Settings table | horizontal scroll bila overflow, atau card list | table full width |
-| Provider form dialog | full screen modal | dialog centered |
-| Toast | bottom center, full width minus margin | bottom right, fixed width |
+| Generate form | Stack vertikal (main + log di bawah) | 2 col (main + sidebar sticky) |
+| LogViewer | Bawah form, full width Collapsible | Sidebar 400px height |
+| AssetPreview | 1-2 col | 3-4 col |
+| ClassificationResult | Stack: thumb atas, info bawah | Horizontal: thumb kiri, info kanan |
+| Pagination | Simplified: [prev] [current/total] [next] | Full: [<<][<][1][2][3][>][>>] |
+| Dashboard metric | 1-2 col | 4 col |
+| Dashboard charts | 1 col | 2 col |
+| Dashboard tables | 1 col | 2 col |
+| Toast | Bottom center full width | Bottom right fixed |
 
-### 12.3 Kompatibilitas Browser/Device/OS
+### 12.3 Browser/Device/OS
 
-Target dukungan modern evergreen (dari SRS NFR, ASUMSI best practice):
+| Browser | Min |
+|---|---|
+| Chrome | 120+ |
+| Edge | 120+ |
+| Firefox | 120+ |
+| Safari | 17+ |
+| Mobile Safari | iOS 17+ |
+| Chrome Android | 120+ |
 
-| Browser | Min versi | Catatan |
-|---|---|---|
-| Chrome | 120+ | Primary target |
-| Edge | 120+ | Chromium base |
-| Firefox | 120+ | — |
-| Safari | 17+ | macOS + iOS |
-| Mobile Safari | iOS 17+ | iPhone/iPad |
-| Chrome Android | 120+ | — |
-
-Fitur yang dipakai (CSS grid, `:has()`, container queries bila perlu) didukung
-browser modern. TIDAK support IE. TIDAK support native app (OOS-4).
+V2 dependency: Recharts (^2.x), bundle +~80KB gzip. Lazy load dashboard route.
 
 ### 12.4 Touch Target
 
-Mobile: min touch target 44x44px (WCAG 2.5.5 AAA, rekomendasi AA 24x24 ->
-PromptFlow target 44x44). Button icon padding `p-3` (12px) + icon 20px = 44px.
+Min 44x44px. Button icon padding `p-3` (12px) + icon 20px = 44px.
 
-### 12.5 Performance Frontend
+### 12.5 Performance V2
 
-- Image referensi preview: thumbnail kecil (max 200px), bukan full image.
-- Lazy load image (`loading="lazy"`).
-- Code split per route (Next.js App Router default).
-- Skeleton sebelum data fetch untuk hindari layout shift (CLS).
-- Font: `next/font` Inter (ASUMSI) + `display:swap`.
+- Thumbnail refs: max 200px, `loading="lazy"`, Next.js Image.
+- Code split per route (App Router default).
+- **V2:** Recharts lazy: `dynamic(() => import(...), { ssr: false })`.
+- **V2:** Pagination prefetch=true.
+- **V2:** Dashboard bundle <= 200KB JS gzipped.
+- **V2:** NFR-V2-P1 Page transition <= 200ms.
+- **V2:** NFR-V2-P2 Dashboard load <= 1.5s.
 
 ---
 
-## 13. Asumsi UIUX & Referensi
+## 13. Empty / Error / Loading States (loading.tsx + error.tsx)
 
-### 13.1 Asumsi UIUX
+### 13.1 loading.tsx (V2)
 
-| ID | Asumsi | Status Bukti | Dampak | Sitasi |
-|---|---|---|---|---|
-| UX-A1 | Brand accent = violet `#7c3aed` | ASUMSI (greenfield, TIDAK ADA brand asset) | Bisa diubah user. Token primary. | `RAG-CONTEXT.md 8` |
-| UX-A2 | Font = Inter + JetBrains Mono | ASUMSI (RAG sebut Inter/Geist) | Bisa Geist bila user prefer. | `RAG-CONTEXT.md 8` ; `PRD.md 8.4` |
-| UX-A3 | Icon set = Lucide React | ASUMSI (shadcn/ui default) | Konsisten dengan shadcn. | `RAG-CONTEXT.md 2.1` |
-| UX-A4 | Logo = wordmark PromptFlow + icon Sparkles | ASUMSI (TIDAK ADA aset) | TBD user desain final. | `RAG-CONTEXT.md 8` |
-| UX-A5 | Maskot = tidak ada fase awal | ASUMSI | Bila dibutuhkan konsep abstrak. | — |
-| UX-A6 | Tone brand = profesional hangat edukatif | ASUMSI | Konsisten persona Edukator. | `PRD.md 2.1` |
-| UX-A7 | Dark mode default ikut system + toggle | ASUMSI (shadcn default) | Persist cookie `theme`. | `RAG-CONTEXT.md 8` |
-| UX-A8 | i18n lib = next-intl | ASUMSI (SRS rekomendasi) | Bisa native App Router i18n. | `SRS.md 4.1` ; `RAG-CONTEXT.md 9 G5` |
-| UX-A9 | Result view = inline di wizard done ATAU route `/projects/[id]` | ASUMSI | Implementasi agent pilih. | `PROJECT_ARCHITECTURE.md 5` |
-| UX-A10 | Touch target 44x44px | ASUMSI (WCAG 2.5.5) | Mobile a11y. | `PRD.md 6.6` |
-| UX-A11 | Dropzone max file 10MB | ASUMSI | Validasi Zod. | `SRS.md 5 (FR-17)` |
-| UX-A12 | History UI = COULD fase 3, deferred | ASUMSI | F-21 COULD. | `PRD.md 4 (F-21)` |
-| UX-A13 | Template library judul = COULD fase 3, deferred | ASUMSI | F-20 COULD. | `PRD.md 4 (F-20)` |
-| UX-A14 | Konsistensi mismatch = warning, tidak block save | DIKONFIRMASI PRD | Alert warning, FR-12. | `PRD.md 5 (FR-12), 7 AC-12` |
-| UX-A15 | Bahasa konten LLM ikut judul, BUKAN locale UI | ASUMSI NFR-I2 | Konten prompt teks bahasa judul. | `SRS.md 6.7` |
-| UX-A16 | Max tokoh default 10 per project | ASUMSI P-A3 | Validasi Zod input. | `PRD.md 10.2 P-A3` ; `RAG-CONTEXT.md 9 G11` |
+5 variant PageLoadingSkeleton:
 
-### 13.2 Referensi Internal
-
-| Dokumen | Path | Bagian relevan |
+| Variant | Skeleton | Halaman |
 |---|---|---|
-| RAG-CONTEXT | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` | §2 stack, §8 aset, §9 gap |
-| PRD | `C:\laragon\www\PromptFlow\product-docs\PRD.md` | §2 persona, §4 MoSCoW, §5 FR, §7 AC, §8.2 JSON schema |
-| SRS | `C:\laragon\www\PromptFlow\product-docs\SRS.md` | §4 stack, §5 FR teknis, §8 constraint, §9 keamanan, §10 fase |
-| PROJECT_ARCHITECTURE | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` | §5 folder, §6 data flow, §12 cross-cutting |
-| GitHub | https://github.com/agrianwahab29/promptflow.git | — |
+| generate | Title + Card skeletons + Button | `/generate` |
+| projects | Title + Toolbar + 8 Card skeletons | `/projects` |
+| detail | Title + Meta + Refs + Tabs skeletons | `/projects/[id]` |
+| dashboard | Title + 8 MetricCard + 2 Chart + 2 Table skeletons | `/dashboard` |
+| settings | Title + Tabs + Table skeleton | `/settings` |
 
-### 13.3 Sitasi Eksternal Kunci
+### 13.2 error.tsx (V2)
 
-| Sitasi | Klaim didukung | Bagian |
-|---|---|---|
-| https://ui.shadcn.com/docs/installation/next | shadcn/ui install Next.js | §2.10, §3 |
-| https://ui.shadcn.com/docs/tailwind-v4 | shadcn/ui Tailwind v4 token | §2 |
-| https://nextjs.org/docs | Next.js App Router, layout, i18n | §4, §5, §11.5 |
-| https://lucide.dev | Lucide icon set | §8.1 |
-| https://next-intl-docs.vercel.app | next-intl dwibahasa (ASUMSI) | §11.5 |
-| https://www.w3.org/TR/WCAG21 | WCAG 2.1 AA | §9 |
-| https://vercel.com/docs/vercel-blob | Vercel Blob (ASUMSI storage) | §8.3, §13 |
+```tsx
+'use client';
+import { PageErrorBoundary } from '@/components/common/page-error-boundary';
+export default function Error({ error, reset }) {
+  return <PageErrorBoundary error={error} reset={reset} />;
+}
+```
 
----
+### 13.3 Disabled State (V2)
 
-## 14. Verifikasi Implementasi (Check-list Agent Eksekutor)
+Disabled: generating, uploading, classifying, deleting, saving.
+Visual: `opacity-50` + `cursor-not-allowed` + `pointer-events-none`.
 
-Sebelum ship UI, verifikasi:
+### 13.4 Suspense (V2)
 
-- [ ] Token warna/typografi/spacing/radius/shadow/motion konkret di
-      `globals.css` + `tailwind.config.ts` (§2).
-- [ ] Semua komponen shadcn/ui ter-install di `src/components/ui/` (§3.1).
-- [ ] Komponen custom di folder konsisten `PROJECT_ARCHITECTURE.md §5` (§3.2).
-- [ ] Layout grid mobile-first + container max per tipe halaman (§4).
-- [ ] AppHeader + footer + breadcrumb + route map (§5).
-- [ ] Wizard 5 step + stepper + nav (§7.4).
-- [ ] Result tabs 5 + sidebar + export + re-generate (§7.5).
-- [ ] Settings provider CRUD + form dialog + mask API key (§7.6).
-- [ ] Dropzone upload referensi + tipe tokoh/background (§7.4 step 3).
-- [ ] CopyButton di setiap prompt item (§3.2, §7.5).
-- [ ] Empty/error/loading state sesuai tabel (§10).
-- [ ] Toast Sonner untuk feedback (§10.6).
-- [ ] A11y: skip link, focus ring, aria, kontras 4.5:1, reduce-motion (§9).
-- [ ] Dwibahasa ID+EN via next-intl, file `messages/*.json` (§11.5).
-- [ ] Dark mode toggle + persist (§2.1, §2.10).
-- [ ] Responsive semua breakpoint (§12).
-- [ ] Lucide icon konsisten (§8.1).
-- [ ] Streaming partial result tampil real-time + skeleton (§10.3).
+```tsx
+<Suspense fallback={<PageLoadingSkeleton variant="projects" />}>
+  <ProjectsList />
+</Suspense>
+```
 
 ---
 
-**Dokumen ini fokus pada DESIGN SYSTEM + SPESIFIKASI UI konkret siap dikode.
-Tujuan bisnis di BRD, pasar di MRD, produk di PRD, spesifikasi teknis di SRS,
-arsitektur di PROJECT_ARCHITECTURE, data di DATABASE_SCHEMA, kontrak API di
-API_CONTRACT, aturan kode di CODING_RULES. UIUX_SPEC tidak membangun deliverable
-akhir / menulis kode komponen produk — hanya spesifikasi UI.**
+## 14. Asumsi UIUX V2 & Referensi
+
+### 14.1 Asumsi
+
+| ID | Asumsi | Status | Sitasi |
+|---|---|---|---|
+| UX-V2-A1 | Brand accent = `#7c3aed` | Dipertahankan V1 | RAG-CONTEXT S7 |
+| UX-V2-A2 | Font = Inter + JetBrains Mono | Dipertahankan V1 | RAG-CONTEXT S7 |
+| UX-V2-A3 | Icon = Lucide React | Dipertahankan V1 | RAG-CONTEXT S2.1 |
+| UX-V2-A4 | Logo = wordmark + Sparkles | V1 (TIDAK ADA aset) | RAG-CONTEXT S7 |
+| UX-V2-A5 | Dark mode token defined, toggle dihapus V2 | OOS per PRD V2 S11 | PRD V2.0 S11 OOS-10 |
+| UX-V2-A6 | Generate = single-page form | Dikonfirmasi V2 | PRD V2.0 S10.1 |
+| UX-V2-A7 | Story desc = optional, max 500 | ASUMSI V2 | PRD V2.0 S10.1 |
+| UX-V2-A8 | LogViewer = Collapsible + Switch, default OFF | ASUMSI V2 | RAG-CONTEXT S9 V2-5 |
+| UX-V2-A9 | Dashboard = 6-8 cards + charts + tables | ASUMSI V2 | PRD V2.0 S10.2 |
+| UX-V2-A10 | Pagination = 20 per page | ASUMSI V2 | RAG-CONTEXT S9 V2-9 |
+| UX-V2-A11 | Role = 6 opsi | Dikonfirmasi V2 | PRD V2.0 S5 FR-V2-03 |
+| UX-V2-A12 | Confidence threshold 0.7 | ASUMSI V2 | RAG-CONTEXT S10 B |
+| UX-V2-A13 | Recharts untuk chart | ASUMSI V2 | PRD V2.0 S5 FR-V2-06 |
+| UX-V2-A14 | loading.tsx + error.tsx per page group | Dikonfirmasi V2 | RAG-CONTEXT S11 GAP-12 |
+| UX-V2-A15 | Touch target 44x44px | Dikonfirmasi V1 | PRD V2.0 S6.6 |
+
+### 14.2 Referensi
+
+| Dokumen | Path |
+|---|---|
+| RAG-CONTEXT | product-docs/RAG-CONTEXT.md |
+| PRD V2.0 | product-docs/PRD.md |
+| SRS V2.0 | product-docs/SRS.md |
+| PROJECT_ARCHITECTURE | product-docs/PROJECT_ARCHITECTURE.md |
+
+### 14.3 Sitasi Eksternal
+
+| Sitasi | Klaim |
+|---|---|
+| https://ui.shadcn.com/docs/installation/next | shadcn/ui install |
+| https://ui.shadcn.com/docs/tailwind-v4 | shadcn/ui Tailwind v4 token |
+| https://nextjs.org/docs | App Router, loading.tsx, error.tsx |
+| https://recharts.org/ | Recharts dashboard chart |
+| https://lucide.dev | Lucide icon set |
+| https://next-intl-docs.vercel.app | next-intl dwibahasa |
+| https://www.w3.org/TR/WCAG21 | WCAG 2.1 AA |
+
+---
+
+## 15. Verifikasi Implementasi (Check-list)
+
+**Design Tokens:**
+- [ ] Token warna/typo/spacing/radius/shadow/motion di globals.css
+- [ ] V2: Token log, confidence, role color ditambah
+- [ ] V2: Dark mode token defined (toggle OOS)
+
+**Komponen:**
+- [ ] 18 shadcn/ui ter-install
+- [ ] 16 custom V1 di folder benar
+- [ ] V2: 17 komponen baru (7 generate + 6 dashboard + 3 common + 1)
+- [ ] Folder konsisten PROJECT_ARCHITECTURE
+
+**Layout V2:**
+- [ ] Generate single-page (bukan wizard)
+- [ ] Dashboard layout metric+charts+tables
+- [ ] loading.tsx + error.tsx per page group
+- [ ] Suspense boundaries
+
+**Generate Page (KRITIS):**
+- [ ] DropzoneUploader inline multi-file 6 role
+- [ ] AssetPreviewList grid + RoleBadge
+- [ ] ClassificationResult + ConfidenceBar + override
+- [ ] StoryDescriptionTextarea max 500
+- [ ] LogViewer sidebar Collapsible + Switch OFF default
+- [ ] Form disabled saat generating
+- [ ] GenerateProgress + skeleton
+
+**Dashboard (KRITIS):**
+- [ ] 6-8 MetricCard + delta
+- [ ] 2 chart Recharts (line + bar)
+- [ ] PerProviderBreakdownTable
+- [ ] RecentActivityTable max 5
+- [ ] StorageUsageCard
+- [ ] Load <= 1.5s
+
+**Projects V2:**
+- [ ] Pagination component
+- [ ] Skeleton via Suspense + loading.tsx
+- [ ] Page transition <= 200ms
+
+**Project Detail V2:**
+- [ ] Read-only refs (no upload)
+- [ ] StoryDescription display
+- [ ] AI classification badge
+
+**A11y:**
+- [ ] WCAG 2.1 AA 0 violation
+- [ ] Keyboard reachable (termasuk V2)
+- [ ] Focus visible
+- [ ] V2: LogViewer aria-live
+- [ ] V2: Pagination aria-current
+- [ ] V2: Chart aria-label
+- [ ] Kontras >= 4.5:1
+- [ ] Reduce motion
+
+**i18n:**
+- [ ] ID+EN via next-intl
+- [ ] V2: Key baru di messages/*.json
+
+**Responsif:**
+- [ ] Semua breakpoint
+- [ ] V2: Generate form reflow
+- [ ] V2: LogViewer reflow
+- [ ] V2: Pagination mobile/desktop
+
+**Quality Gate:**
+- [ ] Lint 0, typecheck 0, build pass
+- [ ] Coverage >= 80%
+- [ ] E2E: login -> provider -> generate(classify+log) -> save -> export
+- [ ] A11y Axe 0 violation
+
+---
+
+> **Dokumen ini = design system + spesifikasi UI V2 siap dikode.**
+> **V1 tokens dipertahankan (`--primary #7c3aed`, Inter + JetBrains Mono, 4px, 6px).**
+> **V2: 17 komponen baru + 1 route baru (Dashboard) + single-page generate + AI classification + real-time logs + dashboard enrichment + loading.tsx/error.tsx.**
+> **Business di BRD V2, pasar di MRD V2, produk di PRD V2, teknis di SRS V2, arsitektur di PROJECT_ARCHITECTURE, data di DATABASE_SCHEMA, API di API_CONTRACT, aturan di CODING_RULES.**
 
 > **Dibuat oleh:** docgen-uiux subagent
-> **Tanggal:** 2026-06-19
-> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Versi:** 2.0

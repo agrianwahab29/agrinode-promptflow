@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 export default function LoginPage() {
   return (
@@ -80,6 +81,12 @@ function LoginForm() {
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? 'Loading...' : t('login')}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Belum punya akun?{' '}
+              <Link href={`/${locale}/register`} className="font-medium text-primary hover:underline">
+                {t('register')}
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

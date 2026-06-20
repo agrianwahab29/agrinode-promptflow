@@ -4,6 +4,9 @@ import {
   PromptPackageSchema,
   CreateProviderConfigInputSchema,
   GenerateInputSchema,
+  AssetRoleEnum,
+  ClassificationResultSchema,
+  SseLogEntrySchema,
 } from './schemas';
 
 describe('TitleSchema', () => {
@@ -157,6 +160,111 @@ describe('PromptPackageSchema', () => {
       image_prompts: { characters: [], backgrounds: [] },
       supporting_characters: [],
       moral_message: 'Hi',
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('V2: AssetRoleEnum (6-tipe)', () => {
+  it('accepts all 6 valid roles', () => {
+    for (const r of ['tokoh', 'background', 'prop', 'accessory', 'environment', 'other'] as const) {
+      expect(AssetRoleEnum.safeParse(r).success).toBe(true);
+    }
+  });
+
+  it('rejects invalid role', () => {
+    expect(AssetRoleEnum.safeParse('foo').success).toBe(false);
+  });
+});
+
+describe('V2: ClassificationResultSchema', () => {
+  it('accepts valid classification', () => {
+    const r = ClassificationResultSchema.safeParse({
+      role: 'tokoh', label: 'Hero', confidence: 0.95,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects confidence out of range', () => {
+    const r = ClassificationResultSchema.safeParse({
+      role: 'tokoh', label: 'X', confidence: 1.5,
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('V2: SseLogEntrySchema', () => {
+  it('accepts info log', () => {
+    const r = SseLogEntrySchema.safeParse({ level: 'info', message: 'hi', timestamp: 123 });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects invalid level', () => {
+    const r = SseLogEntrySchema.safeParse({ level: 'debug', message: 'hi', timestamp: 123 });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('V2: GenerateInputSchema storyDescription', () => {
+  it('accepts storyDescription up to 500', () => {
+    const r = GenerateInputSchema.safeParse({
+      input: {
+        title: 'Valid Title',
+        durationTarget: { type: 'shorts', seconds: 60 },
+        style: { type: '3D', ratio: '16:9' },
+        storyDescription: 'A'.repeat(500),
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects storyDescription > 500', () => {
+    const r = GenerateInputSchema.safeParse({
+      input: {
+        title: 'Valid Title',
+        durationTarget: { type: 'shorts', seconds: 60 },
+        style: { type: '3D', ratio: '16:9' },
+        storyDescription: 'A'.repeat(501),
+      },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('accepts missing storyDescription', () => {
+    const r = GenerateInputSchema.safeParse({
+      input: {
+        title: 'Valid Title',
+        durationTarget: { type: 'shorts', seconds: 60 },
+        style: { type: '3D', ratio: '16:9' },
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe('V2: GenerateReferenceSchema 6-tipe', () => {
+  it('accepts all 6 roles', () => {
+    for (const type of ['tokoh', 'background', 'prop', 'accessory', 'environment', 'other'] as const) {
+      const r = GenerateInputSchema.safeParse({
+        input: {
+          title: 'Valid Title',
+          durationTarget: { type: 'shorts', seconds: 60 },
+          style: { type: '3D', ratio: '16:9' },
+          references: [{ name: 'a.png', type }],
+        },
+      });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  it('rejects invalid role', () => {
+    const r = GenerateInputSchema.safeParse({
+      input: {
+        title: 'Valid Title',
+        durationTarget: { type: 'shorts', seconds: 60 },
+        style: { type: '3D', ratio: '16:9' },
+        references: [{ name: 'a.png', type: 'invalid' }],
+      },
     });
     expect(r.success).toBe(false);
   });

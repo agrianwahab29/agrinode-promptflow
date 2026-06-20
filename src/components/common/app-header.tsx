@@ -59,11 +59,18 @@ export async function AppHeader() {
               </Button>
             </form>
           ) : (
-            <Link href={`/${locale}/login`}>
-              <Button variant="ghost" size="sm">
-                {t('login')}
-              </Button>
-            </Link>
+            <>
+              <Link href={`/${locale}/register`}>
+                <Button variant="ghost" size="sm">
+                  {t('register')}
+                </Button>
+              </Link>
+              <Link href={`/${locale}/login`}>
+                <Button variant="ghost" size="sm">
+                  {t('login')}
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

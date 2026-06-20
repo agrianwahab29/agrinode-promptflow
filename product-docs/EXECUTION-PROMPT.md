@@ -1,297 +1,380 @@
-# EXECUTION PROMPT - PromptFlow
+# EXECUTION PROMPT - PromptFlow V2
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
 > **Tipe:** Prompt eksekusi final siap-tempel untuk agent eksekutor (Claude Code / Aider / Codex / OpenCode / dll).
-> **Target:** Bangun web app fullstack PromptFlow end-to-end sampai deploy Vercel + Turso, Fase 1 → 2 → 3, capai Definition of Done.
+> **Target:** Upgrade PromptFlow V1 ke V2 — 8 fitur baru, autonomous sampai selesai.
+> **Status kode:** V1 SUDAH built & berjalan. V2 = upgrade iteratif, BUKAN greenfield.
 
 ---
 
 ## 1. Identitas & Tujuan
 
-Kamu adalah agent eksekutor otonom. Tugas tunggal: **bangun PromptFlow** — web app fullstack Next.js App Router yang mengotomasi susunan paket prompt animasi AI terstruktur (JSON + markdown) dari input minimal (judul + durasi + gaya + opsi referensi), multi-provider LLM, dengan konsistensi karakter lintas adegan.
+Kamu adalah agent eksekutor otonom. Tugas: **upgrade PromptFlow V1 ke V2** — web app fullstack Next.js App Router yang mengotomasi susunan paket prompt animasi AI terstruktur (JSON + markdown) dari input minimal. V1 sudah jalan: 9 tabel DB, auth NextAuth, upload Vercel Blob, generate SSE streaming, export JSON/markdown, i18n dwibahasa, 21 endpoint API.
+
+**CRITICAL:** Ini proyek UPGRADE, bukan greenfield. JANGAN overwrite V1 codebase. V2 = additive changes saja.
 
 - **Root proyek:** `C:\laragon\www\PromptFlow`
 - **Repo GitHub:** `https://github.com/agrianwahab29/promptflow.git`
-- **Status kode:** Greenfield — belum ada kode/schema/aset. Init dari nol.
-- **Deploy target:** Vercel (serverless) + Turso DB + Vercel Blob.
+- **Deploy target:** Vercel (serverless) + Turso DB + Vercel Blob
 - **Output deliverable:** Teks prompt JSON terstruktur (`PromptPackageSchema`) + export markdown. **BUKAN** file media.
-- **Bahasa instruksi:** Bahasa Indonesia. Identifier teknis apa adanya (camelCase JS, snake_case DB, snake_case-ish PromptPackage field).
-
-Eksekusi penuh otonom dari Fase 1 → 2 → 3 sampai DoD final tercapai. Tidak nanya user kecuali asumsi kritis (§9) ragu. Laporkan di akhir.
+- **Bahasa instruksi:** Bahasa Indonesia. Identifier teknis apa adanya.
 
 ---
 
 ## 2. Sumber Kebenaran (WAJIB BACA SEBELUM CODING)
 
-**Aturan mutlak:** BACA SEMUA dokumen di `C:\laragon\www\PromptFlow\product-docs\` sebelum tulis satu baris kode pun. Mulai dari `AGENTS.md` (panduan utama ringkas tegas), lalu rujukan lain. Pakai fakta bersitasi (path + section). Klaim tanpa bukti = tandai `ASUMSI` + konfirmasi user (§9). Jangan halusinasi field/endpoint/rule yang tidak ada di dokumen.
+**Aturan mutlak:** BACA SEMUA dokumen ini sebelum tulis satu baris kode. Mulai `AGENTS.md`, lalu rujukan lain. Pakai fakta bersitasi. Klaim tanpa bukti = `ASUMSI`.
 
 | # | Dokumen | Path absolut | Peran |
 |---|---|---|---|
-| 0 | AGENTS.md | `C:\laragon\www\PromptFlow\product-docs\AGENTS.md` | **Panduan utama** — baca pertama. 16 section ringkas tegas. Stack, prinsip, struktur folder, tahapan Fase 1-3, schema DB ringkas, PromptPackageSchema, keamanan, testing, env, command, reviewer notes, DoD, asumsi. |
-| 1 | RAG-CONTEXT.md | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` | Sumber kebenaran faktual asli (gap list G1-G12, sitasi eksternal). |
-| 2 | BRD.md | `C:\laragon\www\PromptFlow\product-docs\BRD.md` | Why — nilai bisnis, KPI K1-K7, stakeholder, batasan, OOS. |
-| 3 | MRD.md | `C:\laragon\www\PromptFlow\product-docs\MRD.md` | Who — pasar, persona (Kreator Solo / Indie Studio / Edukator), positioning. |
-| 4 | PRD.md | `C:\laragon\www\PromptFlow\product-docs\PRD.md` | What — FR-01..FR-19, MoSCoW §4, JSON schema §8.2, acceptance §7. |
-| 5 | SRS.md | `C:\laragon\www\PromptFlow\product-docs\SRS.md` | How — arsitektur §3, tech stack §4, spec fungsional §5, data model §6, interface §7, constraint §8, keamanan §9, tahapan §10, verifikasi §11, asumsi §12. |
-| 6 | DATABASE_SCHEMA.md | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` | 9 entitas + Drizzle schema §8.3 (copy exact), migration plan §8, AES §11, env §11.4, soft delete §10. |
-| 7 | PROJECT_ARCHITECTURE.md | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` | Folder §5 (bikin persis), C4 diagram, data flow §6, external §7, deployment §8, security boundary §9. |
-| 8 | UIUX_SPEC.md | `C:\laragon\www\PromptFlow\product-docs\UIUX_SPEC.md` | Design tokens §2 (warna `--primary #7c3aed`, Inter + JetBrains Mono, spacing 4px, radius 6px), komponen §3, flows §6, wireframe §7, a11y §9 WCAG AA. |
-| 9 | API_CONTRACT.md | `C:\laragon\www\PromptFlow\product-docs\API_CONTRACT.md` | 21 endpoint §5, SSE protocol §7, PromptPackageSchema Zod §8.4, error envelope §9, rate limit §10. |
-| 10 | CODING_RULES.md | `C:\laragon\www\PromptFlow\product-docs\CODING_RULES.md` | Standar per framework, git, lint, CI, **30 larangan §13 (L01-L30)** — baca sebelum coding. |
-| 11 | TEST_PLAN.md | `C:\laragon\www\PromptFlow\product-docs\TEST_PLAN.md` | 86 test case, coverage target 80%, environment, CI gate. |
-| 12 | REVIEW_REPORT.md | `C:\laragon\www\PromptFlow\product-docs\REVIEW_REPORT.md` | Validasi lintas dokumen (PASS WITH WARNINGS) — catat WARN-001 & WARN-002. |
-
-**Catatan reviewer (WAJIB ikut):**
-- **WARN-001:** SRS §1.2 baris ringkas stack kurang sebut Drizzle + next-intl eksplisit. Keduanya hadir di SRS §4.1 sebagai ASUMSI (SRS-A3, SRS-A2) + konsisten lintas dokumen downstream. **Pakai Drizzle ORM + next-intl**, jangan tukar Prisma/native-i18n tanpa konfirmasi user.
-- **WARN-002:** API_CONTRACT §1.3 pakai prefix `/api/v1/*`. SRS §7.1 + PROJECT_ARCHITECTURE §5 + CODING_RULES §3.1 pakai `/api/*` tanpa v1. **PILIH `/api/v1/*`** (rekomendasi reviewer — paling eksplisit, cache-friendly). Struktur folder `src/app/api/v1/...` sudah pakai v1. Konsisten di seluruh route handler + middleware + API_CONTRACT + test. Jangan campur.
+| 0 | AGENTS.md | `C:\laragon\www\PromptFlow\product-docs\AGENTS.md` | **Panduan utama** — baca pertama. Stack, prinsip, struktur folder, tahapan Fase A-D, schema DB, endpoint, keamanan, testing, env, DoD, asumsi. |
+| 1 | RAG-CONTEXT.md | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` | Sumber kebenaran faktual (gap list, kode V1 analysis, V2 requirements). |
+| 2 | BRD.md | `C:\laragon\www\PromptFlow\product-docs\BRD.md` | Why — nilai bisnis, KPI, stakeholder, V2 scope. |
+| 3 | MRD.md | `C:\laragon\www\PromptFlow\product-docs\MRD.md` | Who — pasar, persona, positioning. |
+| 4 | PRD.md | `C:\laragon\www\PromptFlow\product-docs\PRD.md` | What — FR-01..FR-19 + FR-V2-01..FR-V2-10, MoSCoW, JSON schema, acceptance criteria. |
+| 5 | SRS.md | `C:\laragon\www\PromptFlow\product-docs\SRS.md` | How — arsitektur, tech stack, spec fungsional, data model, interface, constraint, keamanan, tahapan V2. |
+| 6 | DATABASE_SCHEMA.md | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` | 9 entitas + 3 kolom V2 nullable, Drizzle schema, migration plan. |
+| 7 | PROJECT_ARCHITECTURE.md | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` | Folder V2, container/component C4, data flow, deployment, security boundary. |
+| 8 | UIUX_SPEC.md | `C:\laragon\www\PromptFlow\product-docs\UIUX_SPEC.md` | Design tokens, komponen UI V2, user flows, wireframe, a11y. |
+| 9 | API_CONTRACT.md | `C:\laragon\www\PromptFlow\product-docs\API_CONTRACT.md` | 23 endpoint, SSE protocol V2, Zod schemas, error envelope, rate limit. |
+| 10 | CODING_RULES.md | `C:\laragon\www\PromptFlow\product-docs\CODING_RULES.md` | Standar koding, **38 larangan (L01-L38)**, security rules, test standards. |
+| 11 | TEST_PLAN.md | `C:\laragon\www\PromptFlow\product-docs\TEST_PLAN.md` | 168 test case, coverage target, CI gate. |
+| 12 | REVIEW_REPORT.md | `C:\laragon\www\PromptFlow\product-docs\REVIEW_REPORT.md` | Validasi lintas dokumen — 6 CRITICAL (4 sudah fix di AGENTS.md V2). |
 
 ---
 
-## 3. Stack Final Ringkas
+## 3. Stack Final (GROUND TRUTH dari package.json)
+
+**PENTING:** AI SDK = **v4** (BUKAN v6). Kode = ground truth. Jangan install AI SDK v6.
 
 | Lapisan | Teknologi | Versi |
 |---|---|---|
-| Frontend+Backend | Next.js (App Router) | stabil terkini (15+/16+) |
-| Runtime | Node.js | Node 20+ (Vercel didukung) |
-| Bahasa | TypeScript strict | `tsconfig strict:true` |
-| Styling | Tailwind CSS | **v4** (CSS-first) |
-| Komponen UI | shadcn/ui | latest stabil (copy-paste) |
-| AI orchestration | Vercel AI SDK + `@ai-sdk/openai-compatible` | **AI SDK v6** |
-| Validasi | Zod | stabil terkini |
-| DB | Turso (libSQL, SQLite-compatible via HTTP) | latest |
-| ORM | Drizzle ORM + `@libsql/client` + `drizzle-kit` | stabil terkini |
-| Storage gambar | Vercel Blob (`@vercel/blob`) | latest |
-| Auth | NextAuth.js (Auth.js v5+) | stabil terkini |
-| Enkripsi | Node `crypto` (AES-256-GCM) | native Node |
-| i18n | next-intl | stabil terkini |
-| Test unit/integration | Vitest (co-located) | stabil terkini |
-| Test e2e | Playwright | stabil terkini |
-| Lint | ESLint + `next lint` | stabil terkini |
-| Format | Prettier ATAU Biome (pilih satu, jangan campur) | stabil |
-| Package manager | **pnpm** | latest stabil |
-| Deploy | Vercel | n/a |
-
-Lock versi di `package.json` saat init. Jangan upgrade mayor mid-fase tanpa review.
-
----
-
-## 4. Instruksi Eksekusi (Urut, Tegas)
-
-Eksekusi urut. Selesaikan satu task sebelum lanjut. Verifikasi per task sebelum DoD fase.
-
-### 4a. Setup Awal
-
-1. **Init repo + Next.js.** Di `C:\laragon\www\PromptFlow` (folder sudah ada `product-docs/`, JANGAN hapus): `git init` (atau clone dari GitHub lalu copy `product-docs/` bila perlu). Jalankan `pnpm create next-app .` App Router + TypeScript + Tailwind v4 + ESLint. Jangan overwrite `product-docs/`. Init shadcn/ui: `pnpm dlx shadcn@latest init`. Verifikasi: `pnpm dev` jalan, `pnpm lint` 0 error.
-2. **Install dependency inti:** `pnpm add ai @ai-sdk/openai-compatible zod next-auth bcryptjs @libsql/client drizzle-orm drizzle-kit @vercel/blob next-intl lucide-react react-hook-form @hookform/resolvers sonner`. Install dev: `pnpm add -D vitest @vitest/coverage-v8 @playwright/test @types/bcryptjs`. Lock versi di `package.json`.
-3. **Setup Tailwind v4 + shadcn/ui.** Konfigurasi `src/app/globals.css` CSS-first `@theme` + CSS vars shadcn. Tambah design tokens UIUX_SPEC §2 (warna `--primary #7c3aed`, `--success #16a34a`, `--warning #d97706`, `--info #2563eb`, font Inter + JetBrains Mono, radius 6px). Buat `components.json` shadcn.
-4. **Setup Drizzle + Turso + schema 9 entitas.** Buat DB Turso, dapat `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`. Tulis `drizzle.config.ts` (dialect turso). Tulis `src/lib/db/schema.ts` — **copy exact dari DATABASE_SCHEMA.md §8.3** (9 tabel: `users`, `provider_configs`, `projects`, `asset_references`, `characters`, `scenes`, `image_prompts`, `generation_logs`, `supporting_characters` + index komposit). Tulis `src/lib/db/client.ts` init Drizzle + libSQL + guard env. Jalankan `pnpm db:generate` + `pnpm db:push`. Verifikasi tabel terbentuk di Turso. Urutan dependency: users → provider_configs → projects → asset_references → characters → scenes → image_prompts → generation_logs → supporting_characters.
-5. **Setup NextAuth credentials.** `src/lib/auth/config.ts` credentials provider (email+password, bcryptjs hash ASUMSI CR-A15). `src/lib/auth/middleware.ts` protected routes. Env `NEXTAUTH_SECRET` + `NEXTAUTH_URL`. Tabel `users` (sudah di schema). Verifikasi: login e2e jalan, protected route redirect `/login` bila unauth.
-6. **Setup next-intl dwibahasa.** `src/lib/i18n/config.ts` + `request.ts`. `messages/id.json` + `messages/en.json` (kosong dulu, isi saat Fase 2). Root layout i18n provider. Toggle `LanguageToggle` di header.
-7. **Setup env vars.** Buat `.env.example` (dokumentasi, tanpa value asli) + `.env.local` (dev, TIDAK commit, di `.gitignore`). Lihat §env AGENTS.md §12. Guard wajib di init: `if (!process.env.ENCRYPTION_KEY) throw`, `if (!process.env.TURSO_DATABASE_URL) throw`, `if (!process.env.NEXTAUTH_SECRET) throw`.
-8. **Setup Vitest + Playwright + ESLint + CI.** `vitest.config.ts` (coverage v8). `playwright.config.ts`. GitHub Actions CI `.github/workflows/ci.yml`: `pnpm install --frozen-lockfile` → `pnpm lint` → `pnpm typecheck` → `pnpm test --coverage` → `pnpm test:e2e` → `pnpm build`. Block merge bila fail.
-
-### 4b. Fase 1 — Skeleton + DB + Auth + Provider + Generate Shorts + Export JSON (MUST core)
-
-Ikut AGENTS.md §6 Fase 1 (task F1-01..F1-12). Selesaikan satu per satu, verifikasi per task.
-
-| # | Task | Detail singkat |
-|---|---|---|
-| F1-01 | Init Next.js + Tailwind + shadcn | (sudah di setup awal) |
-| F1-02 | Setup Turso + Drizzle + schema 9 entitas + migration | (sudah di setup awal) |
-| F1-03 | Setup NextAuth credentials | (sudah di setup awal) |
-| F1-04 | Provider factory + crypto | `src/lib/ai/provider-registry.ts` `createOpenAICompatible({name, apiKey, baseURL, headers})`. `src/lib/crypto/aes.ts` AES-256-GCM (`encrypt`/`decrypt`/`mask`) — copy dari DATABASE_SCHEMA.md §11.2. Env `ENCRYPTION_KEY` 32 byte base64. Semua `import 'server-only'`. |
-| F1-05 | Zod schema + prompt templates | `src/lib/validation/schemas.ts`: `TitleSchema`, `DurationSchema`, `StyleSchema`, `AspectRatioSchema`, `GenerateInputSchema`, `ProviderConfigSchema`, **`PromptPackageSchema`** — **copy exact dari AGENTS.md §9 / API_CONTRACT §8.4**. `src/lib/ai/prompts/*.system.ts` (scenes, voiceover, character, image-prompts, moral). |
-| F1-06 | Generate endpoint SSE (Shorts 30-60s) | `POST /api/v1/generate` SSE. `src/lib/ai/llm-client.ts` `generateObject`/`streamObject` + retry 3x backoff. `src/lib/ai/response-parser.ts` Zod validate + fallback JSON parse. `src/lib/ai/consistency-checker.ts` FR-12 post-check (return warnings[], tidak block). SSE event protocol per API_CONTRACT §7. Stage: `character_profiles` → `scenes` → `image_prompts` → `moral` → `done`. Token < 10s (NFR-P3). |
-| F1-07 | UI generate (Shorts) + streaming display | `/generate` Client Component form (title, duration_type=shorts, style, aspect_ratio). `GenerateProgress` + `ResultTabs` (SceneCard, CharacterCard, ImagePromptList, moral). Copy-to-clipboard per item (NFR-U4). E2E form submit → streaming render real-time. |
-| F1-08 | Project CRUD | `GET/POST /api/v1/projects`, `GET/PATCH/DELETE /api/v1/projects/[id]`. Server Actions. Ownership check (`user_id === session.user.id`). Soft delete (`deleted_at`). Paginate list (index `idx_projects_user_created`). |
-| F1-09 | Export JSON | `GET /api/v1/projects/[id]/export?format=json`. Header `Content-Disposition: attachment`. Body = `result_json` (PromptPackage). |
-| F1-10 | Settings provider UI | `/settings` form provider + base URL pre-fill (Ollama `https://ollama.com/v1`, OpenRouter `https://openrouter.ai/api/v1`, 9router `http://localhost:20128/v1`, custom) + model input + API key password. Save encrypt. List mask `****`. Test connection `POST /api/v1/settings/providers/[id]/test`. |
-| F1-11 | Vitest + Playwright + CI | (sudah di setup awal) Coverage >= 80% unit. CI green. |
-| F1-12 | Deploy Vercel preview | Connect repo. Set env (AGENTS.md §12). `pnpm build` sukses. Deploy preview. Verifikasi: login + generate Shorts + export JSON e2e OK. |
-
-**Fase 1 DoD (WAJIB semua, AGENTS.md §15):**
-- [ ] Semua task F1-01..F1-12 selesai.
-- [ ] `pnpm build` pass tanpa error.
-- [ ] `pnpm lint` 0 error 0 warning.
-- [ ] `pnpm typecheck` 0 error.
-- [ ] `pnpm test --coverage` >= 80% unit/integration.
-- [ ] `pnpm test:e2e` critical path green (login → set provider → generate Shorts → save → export JSON).
-- [ ] Deploy Vercel preview sukses + URL jalan.
-- [ ] Env vars lengkap di Vercel (TURSO_*, ENCRYPTION_KEY, NEXTAUTH_SECRET, NEXTAUTH_URL).
-- [ ] Schema DB 9 entitas ter-migrate ke Turso (`pnpm db:push` sukses).
-- [ ] NextAuth login jalan. Protected routes redirect `/login` bila unauth.
-- [ ] Provider test connection OK.
-- [ ] Generate SSE hasil valid `PromptPackageSchema` (Zod parse pass).
-- [ ] Export JSON download `.json` valid.
-- [ ] API key user terenkripsi di DB + mask `****` di response.
-
-### 4c. Fase 2 — Upload Referensi + Tutorial + Markdown + Dwibahasa (SHOULD)
-
-Ikut AGENTS.md §6 Fase 2 (task F2-01..F2-06). Fase 1 DoD tetap hold.
-
-| # | Task | Detail singkat |
-|---|---|---|
-| F2-01 | Vercel Blob setup | Install `@vercel/blob`. `src/lib/storage/blob.ts` (`put`, `del`, `head`). Env `BLOB_READ_WRITE_TOKEN`. Dev flag `USE_VERCEL_BLOB` (false → upload ke `public/references/`). |
-| F2-02 | Upload endpoint + UI + metadata | `POST /api/v1/upload` multipart (tipe tokoh/background, label, image `image/*` max 10MB). `DELETE /api/v1/upload?name=&projectId=`. Simpan `asset_references` (filename, blob_url, tipe, project_id, mime_type, size_bytes). `DropzoneUploader` component. |
-| F2-03 | Inject reference_filename ke prompt | Generate pipeline rujuk `reference_filename` di `image_prompts.characters[].reference_filename` & `backgrounds[].reference_filename`. System prompt inject "Character 'X' — reference image: hero.png. Maintain visual consistency." Tanpa referensi → null, fitur tetap jalan (FR-05). |
-| F2-04 | Generate Tutorial mode | Support `duration_type=tutorial` (420-900s, 8-20 adegan). Adjust prompt template + `estimated_scenes`. Warning bila di luar range (boleh proceed). |
-| F2-05 | Export Markdown | `GET /api/v1/projects/[id]/export?format=markdown`. `src/lib/export/markdown.template.ts` render PRD §8.3 struktur (judul+metadata, profil karakter, pendukung, adegan urut, image prompt master list, pesan moral). |
-| F2-06 | i18n dwibahasa ID + EN | Isi `messages/id.json` + `messages/en.json` lengkap. Semua teks UI pakai `useTranslations`/`getTranslations` (L09 no hardcoded teks). Toggle `LanguageToggle` persist cookie. |
-
-**Fase 2 DoD:** upload referensi jalan, Tutorial mode jalan (8-20 adegan), export markdown jalan, UI dwibahasa. Fase 1 DoD tetap hold.
-
-### 4d. Fase 3 — Polish UI + Konsistensi + History + Template (COULD + polish)
-
-Ikut AGENTS.md §6 Fase 3 (task F3-01..F3-06). Fase 2 DoD tetap hold.
-
-| # | Task | Detail singkat |
-|---|---|---|
-| F3-01 | Konsistensi post-check UI | Tampilkan warning mismatch karakter dari `consistency-checker.ts` (FR-12) di `ResultTabs` (Alert variant warning). |
-| F3-02 | History generasi | `GET /api/v1/projects/[id]/logs`. UI history per project. Compare/rollback (COULD). |
-| F3-03 | Template library judul | Library judul animasi populer (COULD). UI library + pilih judul. |
-| F3-04 | Polish UI/UX design tokens | Implement full design tokens UIUX_SPEC §2 (warna `--primary #7c3aed`, font Inter + JetBrains Mono, spacing 4px base, radius 6px, shadow, motion). Loading/error/empty state UIUX_SPEC §13. Micro-motion UIUX_SPEC §10. WCAG AA audit axe (0 violation). |
-| F3-05 | Telemetri KPI | Log `generation_logs` untuk KPI K1-K7 BRD §3.2. Dashboard sederhana (opsional). |
-| F3-06 | Rate limit | Middleware rate limit `POST /api/v1/generate` 10 req/min/user (SRS-A15). Header `X-RateLimit-Limit/Remaining/Reset`. 429 bila exceed. |
-
-**Fase 3 DoD:** konsistensi check visible, history jalan, template library jalan, UI polish match UIUX_SPEC, WCAG AA (axe 0 violation), telemetri KPI log, rate limit jalan. Fase 2 DoD tetap hold.
+| Framework | Next.js (App Router) | ^15.1.0 |
+| UI Library | React + ReactDOM | ^19.0.0 |
+| **AI SDK** | **ai (Vercel AI SDK)** | **^4.0.0** |
+| AI Provider | @ai-sdk/openai-compatible | ^1.0.0 |
+| Validasi | Zod | ^3.24.0 |
+| Auth | next-auth | 5.0.0-beta.25 |
+| Password Hash | bcryptjs | ^2.4.3 |
+| DB Client | @libsql/client | ^0.14.0 |
+| ORM | drizzle-orm | ^0.38.0 |
+| ORM Kit | drizzle-kit | ^0.30.0 |
+| Storage | @vercel/blob | ^0.27.0 |
+| i18n | next-intl | ^3.26.0 |
+| Icons | lucide-react | ^0.468.0 |
+| Form | react-hook-form | ^7.54.0 |
+| Toast | sonner | ^1.7.0 |
+| UI Primitives | Radix UI (14 paket) | ^1.1.0–^1.2.0 |
+| UI Helpers | clsx + tailwind-merge + cva | ^2.1.1 / ^2.5.0 / ^0.7.1 |
+| TypeScript | typescript | ^5.7.0 |
+| Tailwind CSS | tailwindcss | ^4.0.0 |
+| Test Unit | vitest | ^2.1.0 |
+| Test E2E | @playwright/test | ^1.49.0 |
+| Lint | eslint + eslint-config-next | ^9.17.0 / ^15.1.0 |
+| Format | prettier + prettier-plugin-tailwindcss | ^3.4.0 / ^0.6.0 |
+| Package Manager | pnpm | 11.7.0 |
+| DB Engine | Turso (libSQL via HTTP) | latest |
+| **V2 Baru** | Recharts atau Tremor | latest stabil |
 
 ---
 
-## 5. Aturan Kerja (WAJIB Patuh Sepanjang Build)
+## 4. V2 Features Ringkas (8 Fitur Baru)
 
-1. **Type-safe strict.** `tsconfig.json` `strict:true`. `no any` (L06). `unknown` + Zod narrow bila terpaksa.
-2. **Secure by default.** API key user = AES-256-GCM at rest, mask `****` di response, decrypt server-only (`lib/crypto/aes.ts`).
-3. **Repository pattern.** DB akses lewat `src/lib/db/repositories/*.repo.ts`. Tidak ada query Drizzle langsung di route handler/component.
-4. **Server Component default.** Client Component hanya bila butuh interaksi (form, streaming display). `'use client'` minimal.
-5. **Validation Zod di boundary.** Input request → Zod parse sebelum proses. LLM structured output → Zod `PromptPackageSchema` parse.
-6. **Structured output LLM.** `generateObject({ schema: PromptPackageSchema })` bila provider `supportsStructuredOutputs: true`. Fallback `streamText` + parse JSON + Zod validate.
-7. **Streaming SSE.** `POST /api/v1/generate` = `text/event-stream`. Token mulai mengalir < 10s (NFR-P3).
-8. **i18n key.** Teks UI via `useTranslations`/`getTranslations` next-intl. No hardcoded teks (L09). Dwibahasa ID + EN.
-9. **a11y WCAG 2.1 AA.** Focus visible, keyboard nav, label, kontras, ARIA (UIUX_SPEC §9).
-10. **Test 80% coverage** unit/integration (Vitest co-located `*.test.ts`). E2E critical path (Playwright). CI gate.
-11. **Conventional commit.** `feat(scope): ...`, `fix(scope): ...`, `chore(scope): ...`. Atomic commit (CODING_RULES §8).
-12. **No direct push `main`** (L20). Lewat PR + review. Branch `feat/<scope>`, `fix/<scope>`, `chore/<scope>`.
-13. **No secret client-side.** Env `NEXT_PUBLIC_*` hanya nilai non-sensitif. API key LLM, ENCRYPTION_KEY, NEXTAUTH_SECRET = server-only.
-14. **No LLM call client-side.** `lib/ai/*` wajib `import 'server-only'` (L24).
-15. **No decrypt client-side** (L25).
-16. **Hormati 30 Larangan** CODING_RULES §13 (L01-L30) — baca sebelum coding. Yang kunci: L06 no any, L07 no hardcoded secret, L12 no query tanpa `user_id`, L14 no string concat SQL, L15 no `dangerouslySetInnerHTML` tanpa sanitasi, L16 no eval, L17 no `process.env.X!` tanpa guard, L20 no push main, L21 no `it.skip` tanpa alasan, L22 no snapshot komponen UI, L24 no LLM client, L25 no decrypt client, L30 function max 60 baris.
-17. **Catat WARN-001 & WARN-002** (AGENTS.md §14). Pakai Drizzle + next-intl (jangan tukar). Pakai prefix `/api/v1/*` (jangan `/api/*` murni). Konsisten seluruh route + middleware + test.
-
-Sitasi: `SRS.md §9.1` ; `CODING_RULES.md §1.3, §13` ; `PROJECT_ARCHITECTURE.md §1.3, §9`.
+| # | Fitur | Prioritas | Lokasi |
+|---|---|---|---|
+| 1 | Image reference dipindah ke generate page (upload multi-file + 6-tipe role classification) | MUST | `/generate` |
+| 2 | AI image classification (Vision LLM — GPT-4o/Gemini Vision) | MUST | `lib/ai/image-classifier.ts` + `/api/v1/upload/classify` |
+| 3 | Field deskripsi cerita (opsional, max 500 char) | MUST | Generate form + `projects.story_description` |
+| 4 | Real-time processing logs (SSE log event + Collapsible toggle) | SHOULD | SSE + `LogViewer` component |
+| 5 | Dashboard enrichment (6-8 cards + charts + tables) | SHOULD | `/dashboard` + `dashboard.repo.ts` |
+| 6 | Konsistensi UI (loading.tsx + error.tsx + design tokens) | SHOULD | Per page group |
+| 7 | Navigation optimization (pagination + Suspense + prefetch) | SHOULD | Projects list + pages |
+| 8 | Push ke GitHub | SHOULD | `git init` + `.gitignore` + push |
 
 ---
 
-## 6. Verifikasi Per Task (Jalankan Sebelum Lanjut)
+## 5. Instruksi Eksekusi (Fase A → B → C → D)
 
-Jalankan command ini setelah tiap task selesai. Bukti sebelum klaim sukses (verification-before-completion principle).
+**Dependency Graph:**
+```
+Fase A (Core) -> Fase B (Intelligence) -> Fase D (Quality)
+                     |
+                     +-> Fase C (Dashboard) -> Fase D (Quality)
+```
+
+Fase A WAJIB selesai dulu. Fase B dan C bisa paralel. Fase D = final validation.
+
+### Fase A: Core V2 (MUST — 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VA-01 | Git init + .gitignore | `git init`, `.gitignore` lengkap (node_modules, .env.local, .next, public/references, *.tsbuildinfo, drizzle/meta), README updated | Repo ter-push ke GitHub |
+| VA-02 | Schema migration V2 | Tambah 3 kolom nullable di `schema.ts`: `projects.storyDescription` (TEXT), `assetReferences.aiClassification` (TEXT), `generationLogs.logsJson` (TEXT). `pnpm db:generate` + `pnpm db:push`. | Migration sukses, existing data intact |
+| VA-03 | Upload di generate page | Pindahkan DropzoneUploader dari project detail ke generate form. Upload tanpa projectId (buat project saat submit). Backward compat: project detail tetap view refs read-only. | E2E upload di generate page jalan |
+| VA-04 | Extended role classification | Update `GenerateReferenceSchema.type` ke 6 opsi: `tokoh, background, prop, accessory, environment, other`. Update DropzoneUploader select. Update upload route validation. Update prompt-builder injection. | 6 opsi tipe muncul di UI + validasi jalan |
+| VA-05 | Field deskripsi cerita | Tambah `storyDescription: z.string().max(500).optional()` di `GenerateInputSchema`. Tambah Textarea di form (bawah judul, char counter). Inject ke `buildUserMessage()`. Simpan di `projects.storyDescription`. | E2E: isi deskripsi -> prompt lebih kontekstual |
+| VA-06 | Push ke GitHub | Commit conventional + push ke `https://github.com/agrianwahab29/promptflow.git` | Repo accessible |
+
+**Fase A DoD:**
+- [ ] Git repo ter-push ke GitHub
+- [ ] Schema migration V2 sukses (3 kolom nullable)
+- [ ] Upload di generate page jalan (multi-file, 6-tipe)
+- [ ] Field deskripsi cerita jalan
+- [ ] `pnpm build` pass + `pnpm lint` 0 error + `pnpm typecheck` 0 error
+
+### Fase B: Intelligence (SHOULD — 3-4 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VB-01 | AI image classifier | `lib/ai/image-classifier.ts` — `import 'server-only'`. Vision LLM HTTP call (direct, BUKAN AI SDK). Prompt classify. Parse JSON response. Zod validate `ClassificationResultSchema`. Update `asset_references.tipe` + `label` + `ai_classification`. Confidence threshold 0.7. Batch max 5. | Unit test classify round-trip |
+| VB-02 | Classification endpoint | `POST /api/v1/upload/classify` — input `{assetReferenceId}`. Auto-trigger saat upload. Rate limit 30 req/min. | E2E: upload -> auto-classify -> result visible |
+| VB-03 | Classification UI | `ClassificationResult` component: thumbnail + role badge + confidence bar + override dropdown. `AssetPreviewList`: grid thumb + filename + role badge. Fallback ke manual select jika Vision LLM gagal. | E2E: classify result visible, override jalan |
+| VB-04 | Real-time logs | Extend SSE events: tambah event type `log` dengan `{level, message, timestamp}`. Backend: `log-buffer.ts` in-memory array. Drain ke SSE. Persist ke `generation_logs.logsJson` saat done. | E2E: log events muncul di SSE stream |
+| VB-05 | LogViewer component | Collapsible panel (Radix UI) + Switch toggle. Default OFF. Log per stage + timestamp + level badge (info=blue, warn=yellow, error=red). Max 500 entries. Log lines escape HTML (SEC-C24). | E2E: toggle show/hide jalan |
+
+**Fase B DoD:**
+- [ ] AI image classification jalan (Vision LLM)
+- [ ] Classification UI visible + manual override
+- [ ] Real-time log events di SSE
+- [ ] LogViewer Collapsible jalan
+
+### Fase C: Dashboard & Polish (SHOULD — 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VC-01 | Dashboard queries | `dashboard.repo.ts` — queries: totalProjects, successfulGenerations, avgDuration, perProviderBreakdown, recentProjects(5), weeklyTrend, storageUsage. Refactor dari direct Drizzle ke repository pattern. | Dashboard data lengkap |
+| VC-02 | Dashboard charts | Install Recharts. Line chart: projects per minggu. Bar chart: success vs fail ratio. | Charts render correctly |
+| VC-03 | Dashboard UI | 6-8 MetricCard + WeeklyTrendChart + SuccessFailBarChart + PerProviderBreakdownTable + RecentActivityTable + StorageUsageCard. Load <= 1.5s. | E2E: dashboard load cepat |
+| VC-04 | loading.tsx | Tambah per page group: `/generate`, `/projects`, `/projects/[id]`, `/dashboard`, `/settings`. Pakai `PageLoadingSkeleton` component. | Skeleton muncul saat loading |
+| VC-05 | error.tsx | Tambah per page group: `PageErrorBoundary` — error message + retry button + link home. | Error boundary jalan |
+| VC-06 | Design tokens | Primary violet `#7c3aed`, font Inter, spacing 4px base, radius 6px. Badge variants: success, secondary, destructive, info. Disabled states. Empty states. | Visual konsisten |
+
+**Fase C DoD:**
+- [ ] Dashboard enrichment: 6-8 cards + charts + tables
+- [ ] Dashboard load <= 1.5s
+- [ ] loading.tsx + error.tsx per page group
+- [ ] Design tokens konsisten
+
+### Fase D: Quality & Deploy (SHOULD — 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VD-01 | Pagination | Projects list: `?page=1&limit=20`. UI: `Pagination` component — page numbers + prev/next + first/last. Server-side. Max 100/page. | E2E: pagination jalan |
+| VD-02 | Suspense boundaries | Tambah Suspense di projects list, dashboard, generate page | Streaming SSR jalan |
+| VD-03 | SQA unit test | Jalankan semua test. Coverage >= 80%. Fix failing tests. | `pnpm test --coverage` >= 80% |
+| VD-04 | SQA E2E test | Critical path: login -> set provider -> upload + classify -> generate -> save -> export | `pnpm test:e2e` green |
+| VD-05 | Lint + typecheck | `pnpm lint` 0 error. `pnpm typecheck` 0 error. | CI gate pass |
+| VD-06 | Performance test | Latency: Shorts <= 60s, Dashboard <= 1.5s, Page transition <= 200ms, AI classify <= 5s | Metrics sesuai target |
+| VD-07 | Deploy Vercel | Deploy preview. Set env vars (12 keys total). E2E test di preview URL. | Preview URL jalan |
+
+**Fase D DoD:**
+- [ ] Pagination projects list jalan
+- [ ] Coverage >= 80% unit/integration
+- [ ] E2E critical path green
+- [ ] Performance targets terpenuhi
+- [ ] Deploy Vercel preview sukses
+
+---
+
+## 6. Aturan Kerja (WAJIB Patuh)
+
+1. **Type-safe strict.** `tsconfig.json` `strict: true`. `no any` (L06). `unknown` + Zod narrow.
+2. **Secure by default.** API key = AES-256-GCM at rest, mask `****` di response, decrypt server-only.
+3. **Repository pattern.** DB akses lewat `lib/db/repositories/*.repo.ts`. Tidak ada query Drizzle langsung di route handler.
+4. **Server Component default.** Client Component hanya bila butuh interaksi. `'use client'` minimal.
+5. **Validation Zod di boundary.** Input -> Zod parse. LLM output -> Zod `PromptPackageSchema` parse.
+6. **Direct HTTP + retry 2x backoff.** Kode pakai direct HTTP POST ke `/chat/completions` (BUKAN `generateObject`). Retry 2x + exponential backoff max 8000ms. Post-check `consistency-checker.ts` + Zod validate.
+7. **Streaming SSE.** `POST /api/v1/generate` = `text/event-stream`. V2 tambah event type `log`.
+8. **i18n key.** Teks UI via `useTranslations`/`getTranslations`. No hardcoded teks (L09). Dwibahasa ID + EN.
+9. **a11y WCAG 2.1 AA.** Focus visible, keyboard nav, label, kontras.
+10. **Test 80% coverage** unit/integration (Vitest). E2E critical path (Playwright). CI gate.
+11. **Conventional commit.** `feat(scope): ...`, `fix(scope): ...`. Atomic commit.
+12. **No direct push `main`.** Lewat PR + review. Branch `feat/<scope>`.
+13. **No secret client-side.** API key, ENCRYPTION_KEY, NEXTAUTH_SECRET, VISION_LLM_API_KEY = server-only.
+14. **No LLM call client-side.** `lib/ai/*` wajib `import 'server-only'`.
+15. **Vision is separate concern.** Vision LLM call di `lib/ai/image-classifier.ts`. Direct HTTP + Zod parse. BUKAN AI SDK.
+16. **Pagination as first-class.** List endpoint WAJIB support `?page=&limit=`. Response `{data[], pagination{}}`.
+17. **Log buffer in-memory.** Real-time logs buffer di memory selama SSE. Persist ke `generation_logs.logsJson` saat done.
+18. **Hormati 38 Larangan** CODING_RULES §13 (L01-L38) — baca sebelum coding.
+
+---
+
+## 7. Endpoint API (23 endpoint — 21 V1 + 2 V2 BARU)
+
+| # | Method | Path | V1/V2 | Ringkasan |
+|---|---|---|---|---|
+| 1 | GET/POST | `/api/v1/auth/[...nextauth]` | V1 | NextAuth handler |
+| 2 | GET | `/api/v1/auth/session` | V1 | Ambil session aktif |
+| 3 | GET | `/api/v1/health` | V1 | Health check |
+| 4 | GET | `/api/v1/projects` | V1+V2 | List paginate + `storyDescription` |
+| 5 | POST | `/api/v1/projects` | V1+V2 | Create + `storyDescription` |
+| 6 | GET | `/api/v1/projects/[id]` | V1 | Detail + ownership |
+| 7 | PATCH | `/api/v1/projects/[id]` | V1 | Update metadata |
+| 8 | DELETE | `/api/v1/projects/[id]` | V1 | Soft delete |
+| 9 | POST | `/api/v1/generate` | V1+V2 | SSE + `log` event + `storyDescription` |
+| 10 | GET | `/api/v1/settings/providers` | V1 | List provider (key mask) |
+| 11 | POST | `/api/v1/settings/providers` | V1 | Save provider (encrypt) |
+| 12 | PATCH | `/api/v1/settings/providers/[id]` | V1 | Update provider |
+| 13 | DELETE | `/api/v1/settings/providers/[id]` | V1 | Hapus provider |
+| 14 | POST | `/api/v1/settings/providers/[id]/test` | V1 | Test connection |
+| 15 | POST | `/api/v1/upload` | V1+V2 | Multi-file + 6-tipe + auto-classify |
+| 16 | **POST** | **`/api/v1/upload/classify`** | **V2 BARU** | **Trigger Vision LLM classification** |
+| 17 | DELETE | `/api/v1/upload` | V1 | Hapus Blob + ref |
+| 18 | GET | `/api/v1/projects/[id]/export` | V1 | Export JSON/markdown |
+| 19 | GET | `/api/v1/projects/[id]/characters` | V1 | List karakter |
+| 20 | GET | `/api/v1/projects/[id]/scenes` | V1 | List adegan |
+| 21 | GET | `/api/v1/projects/[id]/image-prompts` | V1+V2 | List + 6-tipe filter |
+| 22 | GET | `/api/v1/projects/[id]/logs` | V1+V2 | History + `logsJson` |
+| 23 | **GET** | **`/api/v1/dashboard/stats`** | **V2 BARU** | **Enriched dashboard data** |
+
+---
+
+## 8. Schema DB (9 tabel + 3 kolom V2 nullable)
+
+3 kolom baru V2 (additive, nullable, backward-compatible):
+
+| Tabel | Kolom Baru | Tipe | Alasan |
+|---|---|---|---|
+| `projects` | `story_description` | TEXT nullable | Deskripsi cerita dari generate form |
+| `asset_references` | `ai_classification` | TEXT nullable | JSON hasil Vision LLM classification |
+| `generation_logs` | `logs_json` | TEXT nullable | JSON array real-time logs |
+
+Migration: tambah kolom di `schema.ts` -> `pnpm db:generate` -> `pnpm db:push`.
+
+---
+
+## 9. Environment Variables (12 keys total)
+
+| Env key | V1/V2 | Wajib | Deskripsi |
+|---|---|---|---|
+| `TURSO_DATABASE_URL` | V1 | YA | URL Turso DB |
+| `TURSO_AUTH_TOKEN` | V1 | YA | Token auth Turso |
+| `ENCRYPTION_KEY` | V1 | YA | Key AES-256-GCM (32 byte base64) |
+| `NEXTAUTH_SECRET` | V1 | YA | Secret NextAuth JWT |
+| `NEXTAUTH_URL` | V1 | YA (prod) | URL deploy |
+| `BLOB_READ_WRITE_TOKEN` | V1 | YA | Token Vercel Blob |
+| `USE_VERCEL_BLOB` | V1 | Opsional | Flag dev Blob vs FS |
+| `NEXT_PUBLIC_APP_URL` | V1 | YA | URL publik client |
+| `VISION_LLM_PROVIDER` | **V2** | YA | `'openai'` atau `'google'` |
+| `VISION_LLM_API_KEY` | **V2** | YA | API key Vision LLM (server-only) |
+| `VISION_LLM_MODEL` | **V2** | YA | Model ID Vision (mis. `gpt-4o`) |
+| `VISION_LLM_BASE_URL` | **V2** | Opsional | Custom base URL Vision |
+
+Guard wajib di init:
+```ts
+if (!process.env.ENCRYPTION_KEY) throw new Error('Missing ENCRYPTION_KEY');
+if (!process.env.TURSO_DATABASE_URL) throw new Error('Missing TURSO_DATABASE_URL');
+if (!process.env.NEXTAUTH_SECRET) throw new Error('Missing NEXTAUTH_SECRET');
+```
+
+---
+
+## 10. Verifikasi Per Task
 
 | Command | Fungsi | Sukses bila |
 |---|---|---|
-| `pnpm lint` | ESLint + next lint | 0 error, 0 warning |
-| `pnpm typecheck` | `tsc --noEmit` | 0 error |
-| `pnpm test` | Vitest run | pass |
-| `pnpm test --coverage` | Vitest coverage | >= 80% unit/integration |
+| `pnpm lint` | ESLint | 0 error |
+| `pnpm typecheck` | tsc --noEmit | 0 error |
+| `pnpm test --coverage` | Vitest coverage | >= 80% |
 | `pnpm test:e2e` | Playwright | critical path green |
-| `pnpm build` | next build | sukses tanpa error |
-| `pnpm db:generate` | drizzle-kit generate | SQL migration terbuat di `drizzle/` |
-| `pnpm db:push` | drizzle-kit push | tabel terbentuk di Turso |
-| `Test-Path -LiteralPath "<file>"` | cek file output ada | True |
-
-CI gate: PR tidak merge bila `lint`/`typecheck`/`test`/`e2e`/`build` fail.
+| `pnpm build` | next build | sukses |
+| `pnpm db:generate` | drizzle-kit generate | SQL terbuat |
+| `pnpm db:push` | drizzle-kit push | kolom terbentuk |
 
 ---
 
-## 7. Definition of Done Final (Semua Fase)
+## 11. Definition of Done Final
 
-**Fase 1 DoD (WAJIB semua — AGENTS.md §15):**
-- [ ] Semua task F1-01..F1-12 selesai.
-- [ ] `pnpm build` pass tanpa error.
-- [ ] `pnpm lint` 0 error 0 warning.
-- [ ] `pnpm typecheck` 0 error.
-- [ ] `pnpm test --coverage` >= 80% unit/integration.
-- [ ] `pnpm test:e2e` critical path green (login → set provider → generate Shorts → save → export JSON).
-- [ ] Deploy Vercel preview sukses + URL jalan.
-- [ ] Env vars lengkap di Vercel (TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, ENCRYPTION_KEY, NEXTAUTH_SECRET, NEXTAUTH_URL, NEXT_PUBLIC_APP_URL).
-- [ ] Schema DB 9 entitas ter-migrate ke Turso (`pnpm db:push` sukses).
-- [ ] NextAuth login jalan. Protected routes redirect `/login` bila unauth.
-- [ ] Provider test connection OK (`POST /api/v1/settings/providers/[id]/test`).
-- [ ] Generate SSE hasil valid `PromptPackageSchema` (Zod parse pass).
-- [ ] Export JSON download `.json` valid.
-- [ ] API key user terenkripsi di DB + mask `****` di response.
-
-**Fase 2 DoD:** Fase 1 DoD tetap hold + upload referensi jalan (multipart → Blob → AssetReference, `reference_filename` terisi), Tutorial mode jalan (8-20 adegan), export markdown jalan (PRD §8.3 struktur), i18n toggle ID/EN jalan (label + pesan error).
-
-**Fase 3 DoD:** Fase 2 DoD tetap hold + konsistensi check UI visible (warning mismatch FR-12), history `generation_logs` jalan, template library judul jalan, UI polish match UIUX_SPEC §2 design tokens (`--primary #7c3aed`, Inter + JetBrains Mono, spacing 4px, radius 6px), WCAG 2.1 AA (axe 0 violation), telemetri KPI log, rate limit 10 req/min/user jalan.
-
-**Cross-fase:**
-- [ ] Semua 30 larangan CODING_RULES §13 (L01-L30) dipatuhi.
-- [ ] Tidak ada `any` (L06) tanpa `// eslint-disable` + alasan.
-- [ ] Tidak ada secret di client-side.
-- [ ] Tidak ada LLM call / decrypt di Client Component (L24, L25).
-- [ ] Server Component default, Client Component minimal.
-- [ ] Conventional commit + PR review, no direct push `main` (L20).
-- [ ] Repo GitHub `https://github.com/agrianwahab29/promptflow.git` ter-push.
+**Cross-fase DoD:**
+- [ ] Semua 38 larangan CODING_RULES §13 (L01-L38) dipatuhi
+- [ ] Tidak ada `any` (L06) tanpa `// eslint-disable` + alasan
+- [ ] Tidak ada secret di client-side
+- [ ] Tidak ada LLM call / decrypt di Client Component
+- [ ] Conventional commit + PR review, no direct push `main`
+- [ ] Semua 23 endpoint berfungsi
+- [ ] Schema V2: 3 kolom nullable ter-migrate
+- [ ] Coverage >= 80% unit/integration
+- [ ] E2E critical path green
+- [ ] Deploy Vercel preview sukses
 
 ---
 
-## 8. Asumsi Konfirmasi User
+## 12. Asumsi yang Berlaku
 
-Daftar asumsi lintas dokumen yang **TIDAK ADA BUKTI eksplisit** di RAG-CONTEXT (AGENTS.md §16). Konfirmasi user bila ragu sebelum locking implementasi. **Bila user tidak respons dalam batas wajar, pakai asumsi default yang sudah didokumenkan** (jangan blok eksekusi).
-
-| ID | Asumsi default | Dampak bila salah |
+| ID | Asumsi | Status |
 |---|---|---|
-| SRS-A1 / CR-A4 | Auth = NextAuth **credentials** provider (email+password) | Bila OAuth → provider config beda |
-| SRS-A2 / CR-A5 | i18n = **next-intl** | Bisa native App Router i18n |
-| SRS-A3 / CR-A1 | ORM = **Drizzle** (bukan Prisma/raw libsql) | Arsitektur beda |
-| SRS-A4 / CR-A2 | Enkripsi = **AES-256-GCM via env `ENCRYPTION_KEY`** | Bisa secret manager |
-| SRS-A5 / CR-A3 | Storage gambar prod = **Vercel Blob** | Bisa S3/R2 |
-| SRS-A7 / CR-A? | 9router `http://localhost:20128/v1` valid lokal, Bearer/none auth | Bila tidak valid → hapus dari enum provider |
-| SRS-A8 | Default model LLM per provider = user input (no hardcode) | Bila default list → add hint UI |
-| SRS-A10 | Batas tokoh default **10 per project** | Zod schema + UI hint beda |
-| SRS-A11 | Jumlah adegan: **shorts 3-6, tutorial 8-20** | Prompt template beda |
-| SRS-A12 | Latency target: **Shorts <= 60s, Tutorial <= 180s** end-to-end streaming | NFR-P1/P2 beda |
-| SRS-A13 | Auto-fallback provider = **manual switch** (bukan otomatis) fase awal | Logic beda |
-| SRS-A14 / CR-A7 | Retry LLM **3x backoff** | `llm-client.ts` beda |
-| SRS-A15 / CR-A8 | Rate limit generate **10 req/min/user** | Middleware beda |
-| SRS-A16 | **Soft delete** project (`deleted_at`) | API_CONTRACT 204 beda |
-| SRS-A17 | Dev lokal upload FS `public/references/`, prod Vercel Blob | Bila prod juga FS → tidak persisten Vercel |
-| SRS-A19 | Vercel function timeout: Hobby 10s, Pro 60s/300s | Pecah generate per komponen |
-| CR-A15 | Password hash = **bcryptjs** | Bisa argon2 |
-| CR-A16 | Session strategy = **JWT cookie** | Bisa Turso adapter DB session |
-| CR-A17 | File upload max **10MB** | Zod + Blob config beda |
-| API-A1 | Prefix API = **`/api/v1/*`** | Bila `/api/*` → update kontrak + struktur |
-| NFR-I2 | Konten generate LLM bahasa ikut judul | Bila toggle bahasa output → prompt beda |
-| UX-A1 | Brand accent = violet `#7c3aed` | Bisa diubah user |
-| UX-A2 | Font = Inter + JetBrains Mono | Bisa Geist |
-
-**Aturan:** bila user konfirmasi berbeda dari asumsi, update dokumen terkait (SRS/PRD/UIUX_SPEC/API_CONTRACT) + catat di commit + sesuaikan implementasi. Jangan ubah scope tanpa konfirmasi (Larangan §10).
+| V2-A1 | Vision LLM tersedia (GPT-4o/Gemini Vision) | Perlu konfirmasi provider |
+| V2-A2 | Deskripsi cerita = optional, max 500 char | ASUMSI |
+| V2-A3 | Real-time logs = Collapsible, default OFF | ASUMSI |
+| V2-A4 | Dashboard = cards + tables + charts | ASUMSI |
+| V2-A5 | Upload di generate = pre-submit | ASUMSI |
+| V2-A6 | Role = 6 opsi | Dikonfirmasi |
+| V2-A7 | Push GitHub = public | ASUMSI |
+| V2-A8 | AI SDK tetap v4 | Dikonfirmasi kode |
+| V2-A9 | Schema additive only | Dikonfirmasi |
+| V2-A10 | Vision LLM key dari env | Dikonfirmasi |
+| V2-A11 | Auto-trigger classify saat upload | ASUMSI |
+| V2-A12 | Batch classify max 5 | ASUMSI |
+| V2-A13 | Confidence threshold 0.7 | ASUMSI |
+| V2-A14 | Recharts untuk chart | ASUMSI |
+| V2-A15 | Retry 2x + backoff 8000ms | Dikonfirmasi kode |
+| V2-A16 | Upload max 10MB | ASUMSI |
+| V2-A17 | Pagination 20/page max 100 | ASUMSI |
 
 ---
 
-## 9. Penutup
+## 13. Larangan Eksekusi
 
-Mulai eksekusi sekarang. Otonom sampai selesai. Baca AGENTS.md + rujukan product-docs/ dulu, lalu eksekusi Setup Awal → Fase 1 → Fase 2 → Fase 3. Verifikasi per task (§6). Capai DoD final (§7). Hormati aturan kerja (§5) + 30 larangan CODING_RULES §13 + WARN-001/WARN-002. Bila ragu pada asumsi (§8), konfirmasi user; bila user tidak respons, pakai asumsi default yang sudah didokumenkan, lanjut eksekusi.
+- **Jangan ubah scope** tanpa konfirmasi user. OOS per PRD §11 + BRD §5.2 tetap out.
+- **Jangan skip aset wajib** (schema DB, upload flow, AI classify, real-time logs, dashboard, pagination, test).
+- **Jangan langgar CODING_RULES §13** (L01-L38). Baca sebelum coding.
+- **Jangan halusinasi** field/endpoint/rule. Pakai fakta bersitasi.
+- **Jangan tukar stack** (Drizzle → Prisma, next-intl → native, Vercel Blob → S3) tanpa konfirmasi.
+- **Jangan pakai AI SDK v6.** Kode = v4. Upgrade v6 = OOS V2.
+- **Jangan pakai `generateObject`** untuk generate. Kode pakai direct HTTP + retry 2x.
+- **Jangan push `main` langsung** (L20). Lewat PR + review.
+- **Jangan commit secret** ke repo. `.env.local` di `.gitignore`.
+- **Jangan skip test**. CI gate wajib.
+- **Jangan tambah dark mode toggle** di V2 (deferred V3, L38).
+- **Jangan query Drizzle langsung di dashboard page** (L32, L37). Repository pattern.
 
-**Larangan eksekusi:**
-- Jangan ubah scope tanpa konfirmasi user. Out of scope PRD §9 + SRS §2.2 (OOS-T1..T10) tetap out.
-- Jangan skip aset wajib (schema DB, NextAuth, provider config, generate SSE, export, i18n, test).
-- Jangan langgar CODING_RULES §13 (L01-L30). Baca sebelum coding.
-- Jangan halusinasi field/endpoint/rule. Pakai fakta bersitasi, tandai ASUMSI bila tidak ada bukti.
-- Jangan tukar stack (Drizzle → Prisma, next-intl → native, Vercel Blob → S3) tanpa konfirmasi user.
-- Jangan push `main` langsung (L20). Lewat PR + review.
-- Jangan commit secret ke repo. `.env.local` di `.gitignore`.
-- Jangan skip test. CI gate wajib.
+---
+
+## 14. Rollback Plan
+
+Bila sesuatu gagal:
+1. **Schema migration gagal:** `drizzle-kit push` rollback via manual SQL `ALTER TABLE ... DROP COLUMN` (SQLite 3.35+).
+2. **Vision LLM tidak tersedia:** Disable auto-classify. Fallback ke manual select (6 opsi). ClassificationResult tampilkan "AI tidak tersedia".
+3. **Dashboard over-engineering:** Mulai simple cards + tables dulu. Chart deferred ke Fase C lanjutan.
+4. **Upload flow breaking V1:** Backward compat: project detail tetap view refs read-only. Upload di project detail DIHAPUS dari UI, tapi endpoint tetap.
+5. **Git push expose secrets:** Review `.gitignore` sebelum push. `git rm --cached .env.local` bila ter-commit.
+
+---
+
+## 15. File Output
+
+Simpan prompt ini ke:
+```
+C:\laragon\www\PromptFlow\product-docs\EXECUTION-PROMPT.md
+```
+
+---
+
+## 16. Penutup
+
+Mulai eksekusi sekarang. Otonom sampai selesai. Baca AGENTS.md + rujukan product-docs/ dulu, lalu eksekusi Fase A -> B/C (paralel) -> D. Verifikasi per task. Capai DoD final. Hormati aturan kerja + 38 larangan CODING_RULES.
 
 **Lapor di akhir (format wajib):**
 
 ```
-## Laporan Eksekusi PromptFlow
+## Laporan Eksekusi PromptFlow V2
 
 ### Status DoD
-- Fase 1 DoD: [PASS/PARTIAL/FAIL] — bukti per item
-- Fase 2 DoD: [PASS/PARTIAL/FAIL] — bukti per item
-- Fase 3 DoD: [PASS/PARTIAL/FAIL] — bukti per item
+- Fase A DoD: [PASS/PARTIAL/FAIL] — bukti per item
+- Fase B DoD: [PASS/PARTIAL/FAIL] — bukti per item
+- Fase C DoD: [PASS/PARTIAL/FAIL] — bukti per item
+- Fase D DoD: [PASS/PARTIAL/FAIL] — bukti per item
 - Cross-fase: [PASS/PARTIAL/FAIL]
 
 ### Verifikasi
@@ -303,11 +386,11 @@ Mulai eksekusi sekarang. Otonom sampai selesai. Baca AGENTS.md + rujukan product
 - pnpm db:push: [sukses]
 - Deploy Vercel preview URL: [URL]
 
-### File Dibuat (path absolut)
-- [daftar file kunci: src/lib/db/schema.ts, src/lib/ai/llm-client.ts, src/app/api/v1/generate/route.ts, dst.]
+### File Dibuat/Dimodifikasi
+- [daftar file V2 baru + file V1 yang diubah]
 
-### Asumsi Konfirmasi User
-- [daftar asumsi yang dipakai, status konfirmasi user bila ada]
+### Asumsi yang Dipakai
+- [daftar asumsi + status]
 
 ### Blocker / Catatan
 - [bila ada]
@@ -318,5 +401,5 @@ Mulai sekarang. Otonom. Laporkan saat selesai.
 ---
 
 **Dibuat oleh:** docgen-exec-prompt subagent
-**Tanggal:** 2026-06-19
-**Versi:** 1.0
+**Tanggal:** 2026-06-20
+**Versi:** 2.0

@@ -1,178 +1,145 @@
-# Business Requirement Document (BRD)
-## PromptFlow — Sistem Automation Alur Animasi Berbasis AI
+# Business Requirement Document (BRD) V2.0
+## PromptFlow — Upgrade V2: Otomasi Prompt Animasi AI
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran faktual:** `product-docs/RAG-CONTEXT.md` (bersitasi per klaim penting)
+> **Sumber kebenaran faktual:** `product-docs/RAG-CONTEXT.md` (bersitasi per klaim)
 > **GitHub:** https://github.com/agrianwahab29/promptflow.git
+> **Catatan:** V1 sudah built dan berjalan. Dokumen ini fokus pada justifikasi bisnis upgrade V2.
 
 ---
 
 ## 1. Ringkasan Eksekutif
 
-**PromptFlow** adalah aplikasi web fullstack yang mengotomasi penyusunan prompt
-animasi berbasis AI. Pengguna input judul animasi, (opsional) gambar referensi
-tokoh/background, dan durasi target. Sistem memanggil LLM multi-provider untuk
-menghasilkan satu paket prompt terstruktur: deskripsi adegan, naskah voiceover,
-image prompt per-tokoh & per-background, deskripsi karakter konsisten, adegan
-berurut, gaya gambar (3D/2D + rasio), dan ditutup pesan moral.
+**PromptFlow** adalah web app fullstack untuk otomasi penyusunan prompt animasi AI.
+V1 sudah terbangun lengkap: 9 tabel DB, auth NextAuth, upload Vercel Blob,
+generate SSE streaming, export JSON/markdown, i18n dwibahasa, 21 endpoint API.
+Kode berjalan di Laragon localhost.
 
-Output aplikasi adalah **prompt teks** (bukan file media) yang siap user copy ke
-tool image/video generation eksternal.
+**Upgrade V2** menambah 8 fitur utama yang meningkatkan produktivitas kreator
+animasi AI secara signifikan:
 
-**Proyek greenfield** — tidak ada kode, schema, atau aset existing. Semua dibangun
-dari nol.
+1. **Image reference dipindah ke generate page** — upload multi-file + role
+   classification langsung di form generate, mengurangi friction workflow.
+2. **Deskripsi singkat cerita** — field baru di generate form agar LLM punya
+   konteks naratif lebih kaya, menghasilkan prompt lebih akurat.
+3. **Real-time processing logs** — show/hide toggle untuk transparency proses
+   generate, meningkatkan trust user terhadap sistem.
+4. **Dashboard enrichment** — metrics lebih kaya (charts, per-provider breakdown,
+   recent activity) untuk monitoring produktivitas.
+5. **Konsistensi UI** — design tokens, loading states, error boundaries.
+6. **SQA testing menyeluruh** — coverage >= 80%, E2E critical path.
+7. **Page navigation optimization** — pagination, streaming, caching.
+8. **Push ke GitHub** — version control + deployment pipeline.
 
-Konteks teknis (dari RAG-CONTEXT.md):
-- Stack final: Next.js App Router + Vercel AI SDK v6 + `@ai-sdk/openai-compatible`
-  + Turso/libSQL + Tailwind v4 + shadcn/ui. Deploy Vercel.
-  - Sitasi: `RAG-CONTEXT.md §2.1`
-- Multi-provider LLM: Ollama cloud (`https://ollama.com/v1`), OpenRouter
-  (`https://openrouter.ai/api/v1`), 9router (`http://localhost:20128/v1`, proxy
-  custom user). User pilih/input model, base URL, API key di pengaturan.
-  - Sitasi: `RAG-CONTEXT.md §5.1, §5.2`
-- Output = prompt-prompt teks. Dikonfirmasi user.
-  - Sitasi: `RAG-CONTEXT.md §9 G10, G12`
-
-**Nilai bisnis inti:** hemat waktu 80% penyusunan prompt animasi manual,
-hasilkan karakter konsisten lintas adegan, dan beri fleksibilitas biaya via
-dukungan multi-provider LLM.
+**Nilai bisnis V2:** hemat waktu tambahan 30% vs V1, meningkatkan retensi user,
+memperkuat diferensiasi via AI-powered image classification, dan mempersiapkan
+scale ke production deployment.
 
 ---
 
 ## 2. Latar Belakang Bisnis & Problem Statement
 
-### 2.1 Konteks Pasar
+### 2.1 Status V1
 
-Pasar AI image/video generation berkembang pesat. Kreator animasi AI,
-YouTuber, edukator, dan indie studio animasi mengandalkan tool seperti
-Midjourney, Kling, DALL-E, dan lainnya untuk produksi konten.
+V1 PromptFlow sudah memecahkan problem inti: otomasi susun prompt animasi dari
+input minimal (judul + durasi + gaya). Namun, analisis kode dan user feedback
+mengidentifikasi beberapa gap yang menghalangi produktivitas optimal:
 
-Namun, **bottleneck utama bukan generate gambar, melainkan menyusun prompt yang
-konsisten.** Saat menyusun alur animasi multi-adegan manual:
-
-1. **Lambat.** Setiap adegan butuh deskripsi tokoh, background, voiceover, dan
-   image prompt terpisah. Tokoh utama muncul di banyak adegan -> deskripsi harus
-   diulang konsisten.
-2. **Inkonsistensi karakter.** Tanpa struktur deskripsi yang stabil, tokoh
-   utama berubah wajah/pakaian antar adegan. Literatur prompt engineering
-   mengkonfirmasi: konsistensi karakter dicapai via deskripsi terstruktur
-   (nama, rambut, wajah, pakaian, latar, aksi) yang diulang lintas prompt +
-   reference image.
-   - Sitasi: `RAG-CONTEXT.md §6` (mengacu https://kling.ai/blog/ai-character-consistency-guide ; https://glibatree.com/proven-consistent-character-method/)
-3. **Tidak terstandar.** Setiap kreator punya format sendiri -> sulit
-   reproducibility, sulit kolaborasi tim.
-4. **Mahal kalau salah prompt.** Generate ulang gambar = buang kredit API.
-   Prompt buruk = output jelek = biaya terbuang.
-
-### 2.2 Problem yang PromptFlow Selesaikan
-
-| # | Problem | Dampak Bisnis |
+| # | Gap V1 | Dampak Bisnis |
 |---|---|---|
-| P1 | Susun prompt konsisten manual lambat | Waktu produksi tinggi, throughput kreator rendah |
-| P2 | Inkonsistensi karakter lintas adegan | Output jelek, rework, biaya API terbuang |
-| P3 | Tidak ada standar format prompt | Sulit reproducibility & kolaborasi tim |
-| P4 | Tergantung satu provider LLM = rigid biaya | Tidak bisa optimasi biaya/kualitas per proyek |
-| P5 | Naskah voiceover & adegan susun terpisah | Workflow terfragmentasi, kesalahan kontekstual |
+| G1 | Upload gambar referensi ada di project detail, bukan generate page | User harus buka 2 halaman berbeda untuk upload + generate, workflow terfragmentasi |
+| G2 | Tidak ada deskripsi cerita di generate form | LLM hanya dapat judul, prompt kurang kontekstual, perlu manual edit |
+| G3 | Tidak ada real-time logs | User tidak tahu proses generate sampai mana, anxiety, tidak bisa debug |
+| G4 | Dashboard hanya 3 kartu KPI | Tidak ada insight produktivitas, tidak bisa track improvement |
+| G5 | Tidak ada loading/error states | UX buruk saat loading, perceived performance rendah |
+| G6 | Tidak ada pagination di projects list | Lambat saat project banyak, scalability concern |
+| G7 | Kode belum di-version control | Tidak bisa collaborate, rollback, atau deploy otomatis |
 
-**PromptFlow menjawab** dengan: satu input (judul + referensi + durasi) ->
-LLM generate seluruh paket prompt terstruktur (karakter master konsisten +
-adegan berurut + voiceover + image prompt per tokoh/background) -> output
-siap pakai.
+- Sitasi: `RAG-CONTEXT.md §9 (V2-1 s/d V2-10)`, `RAG-CONTEXT.md §8 (analisis kode V1)`
 
-Konsistensi karakter dijamin via struktur Character master (nama, gaya rambut,
-wajah/asal, pakaian atas, pakaian bawah, alas kaki, latar belakang, aksi) yang
-dirujuk lintas adegan, bukan duplikasi deskripsi per scene.
-- Sitasi: `RAG-CONTEXT.md §4 (Catatan konsistensi karakter), §6`
+### 2.2 Problem yang V2 Selesaikan
+
+| # | Problem V2 | Dampak Bisnis | Solusi V2 |
+|---|---|---|---|
+| P-V2-1 | Workflow upload + generate terpisah halaman | Waktu terbuang navigasi, friction tinggi | Pindahkan upload ke generate page |
+| P-V2-2 | LLM kurang konteks cerita | Prompt kurang akurat, perlu rework | Tambah field deskripsi cerita |
+| P-V2-3 | Tidak ada transparansi proses generate | User tidak trust, tidak bisa debug | Real-time logs dengan toggle |
+| P-V2-4 | Dashboard tidak informatif | Tidak bisa monitor produktivitas | Dashboard enrichment dengan charts |
+| P-V2-5 | UI tidak konsisten (loading/error) | Perceived performance rendah | Loading states + error boundaries |
+| P-V2-6 | Projects list lambat | Scalability concern | Pagination + navigation optimization |
+| P-V2-7 | Kode tidak di-version control | Tidak bisa collaborate/deploy | Push ke GitHub |
 
 ---
 
 ## 3. Tujuan Bisnis & KPI
 
-### 3.1 Tujuan Bisnis
+### 3.1 Tujuan Bisnis V2
 
 | ID | Tujuan | Deskripsi |
 |---|---|---|
-| BO1 | Hemat waktu penyusunan prompt animasi | Turunkan waktu susun prompt konsisten manual >= 80% vs. cara manual |
-| BO2 | Konsistensi karakter lintas adegan | Karakter utama stabil (wajah, pakaian, atribut) di seluruh adegan output |
-| BO3 | Fleksibilitas biaya via multi-provider | Dukung >= 3 provider LLM (Ollama cloud, OpenRouter, 9router + custom) agar user pilih model per proyek sesuai budget |
-| BO4 | Output prompt siap pakai & terstandar | Output JSON structured + opsi export markdown, siap copy ke tool image/video gen |
-| BO5 | Adopsi kreator solo & indie studio | Onboarding cepat, UI dwibahasa (ID + EN) |
+| BO-V2-1 | Tingkatkan produktivitas workflow | Kurangi langkah dari upload ke generate dari 2 halaman jadi 1 halaman |
+| BO-V2-2 | Tingkatkan kualitas output prompt | Deskripsi cerita ke LLM lebih kontekstual, prompt lebih akurat |
+| BO-V2-3 | Tingkatkan trust & transparency | Real-time logs, user tahu proses, reduced anxiety |
+| BO-V2-4 | Tingkatkan retensi user | Dashboard enrichment, user bisa track produktivitas, stickiness |
+| BO-V2-5 | Siap production deployment | GitHub + testing + optimization, deploy ke Vercel prod |
 
-### 3.2 KPI Bisnis Terukur
+### 3.2 KPI Bisnis Terukur V2
 
-| KPI ID | Metrik | Target Awal | Cara Ukur | Sumber Data |
+| KPI ID | Metrik | Target | Cara Ukur | Sumber Data |
 |---|---|---|---|---|
-| K1 | Jumlah project dibuat | >= 100 project/bulan (3 bulan pasca-launch) | Count record Project | DB Turso |
-| K2 | Jumlah prompt dihasilkan | >= 1.000 prompt/bulan (3 bulan) | Count ImagePrompt + VoiceoverScript | DB Turso |
-| K3 | % user kembali (retention) | >= 30% weekly retention | Unique user active di >= 2 minggu berbeda | Session DB |
-| K4 | % user pakai >= 1 provider | >= 70% user konfigurasi Setting provider | Count Setting non-empty / total user | DB Turso |
-| K5 | Latency rata-rata generasi | <= 30 detik per project (streaming) | Avg waktu dari submit ke selesai generate | Telemetri Vercel |
-| K6 | Konsistensi karakter (survey) | >= 80% user puas konsistensi karakter | Survey NPS/kuesioner pasca-generate | Form feedback |
-| K7 | Hemat waktu (survey) | >= 80% user akui hemat waktu vs manual | Survey pasca-generate | Form feedback |
-
-> **Catatan K3/K6/K7:** Memerlukan sistem login untuk identifikasi user.
-> RAG-CONTEXT.md menyatakan **TIDAK ADA BUKTI** sistem multi-user/auth existing
-> -> **ASUMSI** app multi-user dengan login dasar (NextAuth) per paket konteks
-> orchestrator. PRD harus konfirmasi.
-> - Sitasi: `RAG-CONTEXT.md §7, §9 G2`
+| K-V2-1 | Waktu upload ke generate | <= 30 detik (dari 2+ menit V1) | Timing dari upload submit ke generate submit | Telemetri frontend |
+| K-V2-2 | Akurasi prompt (survey) | >= 85% user puas kualitas prompt | Survey pasca-generate | Form feedback |
+| K-V2-3 | Feature adoption rate | >= 60% user pakai deskripsi cerita | Count generate dengan storyDescription terisi | DB projects |
+| K-V2-4 | Log feature usage | >= 40% user aktifkan real-time logs | Count toggle on di generate page | Frontend telemetry |
+| K-V2-5 | Dashboard page views | >= 50% user buka dashboard minimal 1x/minggu | Page view count | Analytics |
+| K-V2-6 | Test coverage | >= 80% unit, 100% critical E2E | Vitest coverage + Playwright pass | CI pipeline |
+| K-V2-7 | Page load time | <= 2s (LCP), <= 100ms (FID) | Core Web Vitals | Lighthouse / Vercel Analytics |
 
 ---
 
 ## 4. Stakeholder & Kepentingan
 
-| Stakeholder | Peran | Kepentingan | Harapan dari PromptFlow |
+| Stakeholder | Peran | Kepentingan V2 | Harapan |
 |---|---|---|---|
-| Kreator solo (YouTuber / content creator) | Pengguna utama | Produksi animasi AI cepat, murah, konsisten | Hemat waktu, output siap pakai, biaya rendah |
-| Indie studio animasi | Pengguna tim | Standarisasi prompt, kolaborasi, reproducibility | Format terstandar, multi-provider, export markdown |
-| Tim edukasi / edukator | Pengguna akademik | Materi edukasi animasi terstruktur, pesan moral | Adegan berurut + pesan moral, naskah voiceover |
-| Bos Agrian | Pemilik & sponsor | ROI, adopsi, validasi pasar | KPI terpenuhi, adoption growth, biaya terkendali |
-| Provider LLM (Ollama, OpenRouter, 9router) | Pihak ketiga infrastruktur | API usage, uptime | Integrasi stabil via `@ai-sdk/openai-compatible` |
-| Vercel & Turso | Platform & DB hosting | Komputasi serverless, penyimpanan | Deploy stabil, function tidak timeout |
-
-> **Catatan:** RAG-CONTEXT.md menyatakan hanya menyebut "user" sebagai aktor.
-> Detail peran kreator/studio/edukator adalah **ASUMSI** dari paket konteks
-> orchestrator, bukan bukti eksplisit RAG.
-> - Sitasi: `RAG-CONTEXT.md §7`
+| Kreator solo (YouTuber / content creator) | Pengguna utama | Workflow lebih cepat, output lebih akurat | Upload + generate satu halaman, deskripsi cerita, logs transparan |
+| Indie studio animasi | Pengguna tim | Monitoring produktivitas, konsistensi | Dashboard enrichment, export data |
+| Tim edukasi / edukator | Pengguna akademik | Kemudahan penggunaan | UI intuitif, loading states jelas |
+| Bos Agrian | Pemilik & sponsor | ROI upgrade, adopsi fitur baru | KPI V2 terpenuhi, siap deploy production |
+| Developer (tim teknis) | Implementer | Kode ter-version control, tested | GitHub repo, test coverage, clean architecture |
 
 ---
 
-## 5. Peluang / Justifikasi Nilai (Mengapa Layak Dikerjakan)
+## 5. Ruang Lingkup V2 (Scope)
 
-### 5.1 Pasar AI Image/Video Boom
+### 5.1 In Scope (Dikerjakan di V2)
 
-Pasar generative AI untuk konten visual tumbuh signifikan. Tool seperti
-Midjourney, Kling, Sora, DALL-E, dan OpenRouter (aggregator LLM) menunjukkan
-permintaan tinggi untuk workflow otomasi prompt.
+| # | Fitur | Detail | Sitasi RAG-CONTEXT |
+|---|---|---|---|
+| S1 | Image reference di generate page | Pindahkan DropzoneUploader dari project detail ke generate page. Upload multi-file tanpa projectId (buat project saat submit). Role classification: tokoh, background, prop, accessory, environment, other | §9 V2-1, V2-2 |
+| S2 | AI image classification | Vision LLM (GPT-4o/Gemini Vision) auto-classify role gambar. Pipeline: upload ke classify ke update asset_references.tipe + label ke inject ke prompt builder | §9 V2-3 |
+| S3 | Field deskripsi cerita | Textarea opsional di generate form. Inject ke buildUserMessage(). Opsional: tambah kolom story_description di projects table | §9 V2-4 |
+| S4 | Real-time processing logs | Extend SSE events dengan type `log`. Frontend: Collapsible panel dengan show/hide toggle. Backend: collect console.log ke buffer ke kirim via SSE | §9 V2-5 |
+| S5 | Dashboard enrichment | Charts (line/bar), per-provider breakdown, recent activity, storage usage, performance trend. Gunakan Recharts atau Tremor | §9 V2-6 |
+| S6 | Konsistensi UI | Loading.tsx per page group, error.tsx boundaries, disabled states, design tokens konsisten | §9 V2-7 |
+| S7 | SQA testing | Jalankan semua test, coverage >= 80%, E2E critical path, manual testing V2 features | §9 V2-8 |
+| S8 | Navigation optimization | Pagination projects list, Suspense boundaries, client-side soft navigation, Next.js Image component | §9 V2-9 |
+| S9 | Push ke GitHub | git init, .gitignore, commit, push ke https://github.com/agrianwahab29/promptflow.git | §9 V2-10 |
 
-### 5.2 Kebutuhan Workflow Automation Prompt Meningkat
+### 5.2 Out of Scope (Tidak Dikerjakan di V2)
 
-Kreator tidak hanya butuh "generate gambar", tapi butuh **menyusun alur cerita
-animasi lengkap**: adegan berurut, karakter konsisten, naskah voiceover, dan
-pesan moral. Tidak ada tool yang mengotomasi seluruh paket ini dalam satu kali
-input.
-
-### 5.3 Justifikasi Nilai
-
-| Justifikasi | Penjelasan |
-|---|---|
-| Hemat waktu 80% | Satu input -> paket prompt lengkap vs. susun manual tiap adegan |
-| Konsistensi terjamin | Struktur Character master + referensi lintas adegan, bukan duplikasi deskripsi |
-| Fleksibilitas biaya | Multi-provider -> user pilih model murah/cepat/berkualitas per proyek |
-| Standar output | JSON structured + export markdown -> reproducibility & kolaborasi tim |
-| Pesan moral built-in | Cocok konten edukasi/anak -> diferensiasi pasar |
-
-### 5.4 Mengapa Sekarang
-
-- AI SDK v6 + `@ai-sdk/openai-compatible` matang untuk multi-provider.
-  - Sitasi: `RAG-CONTEXT.md §2.1, §5.1`
-- Turso (libSQL) tersedia di Vercel Marketplace -> DB serverless SQLite-compatible
-  tanpa pain filesystem tidak persisten.
-  - Sitasi: `RAG-CONTEXT.md §2.1, §2.2` (mengacu https://turso.tech/blog/serverless)
-- Kompetisi belum menyentuh "paket prompt animasi terstruktur + pesan moral"
-  sebagai vertical spesifik.
+| # | Item | Alasan |
+|---|---|---|
+| O1 | Generate file media (gambar/video/audio) | Fokus prompt teks, bukan media generation |
+| O2 | TTS (text-to-speech) | Output = naskah teks |
+| O3 | Mobile native app | Web app responsif dulu |
+| O4 | Sistem pembayaran/monetisasi | Fase awal |
+| O5 | Kolaborasi real-time multi-user | Fase awal: solo per project |
+| O6 | Marketplace template prompt | Fase awal |
+| O7 | Dark mode toggle | Bisa di V3 |
+| O8 | Multi-language output (bahasa prompt) | Ikut judul input dulu |
 
 ---
 
@@ -180,124 +147,133 @@ input.
 
 | ID | Risiko | Dampak | Probabilitas | Mitigasi |
 |---|---|---|---|---|
-| R1 | Dependensi provider LLM (down/rate-limit) | Generasi gagal | Tinggi | Multi-provider fallback (user pilih provider lain), error handling jelas, retry policy |
-| R2 | Kualitas output bervariasi per model | Output inkonsisten/jelek | Tinggi | Rekomendasi model per provider, preview output, rating kualitas |
-| R3 | Biaya API LLM membengkak | User churn karena mahal | Sedang | Estimasi token sebelum generate, budget alert, provider murah default (Ollama) |
-| R4 | Kompetisi cepat | Pangsa pasar tergerus | Sedang | Diferensiasi: paket prompt terstruktur + pesan moral + multi-provider; ship cepat |
-| R5 | Vercel function timeout (generasi panjang) | Output terpotong | Sedang | Streaming SSE (ASUMSI), pecah generate jadi per-adegan, background job. - Sitasi: `RAG-CONTEXT.md §5.4, §9 G6` |
-| R6 | API key user bocor (storage tidak aman) | Kebocoran kredensial, trust hilang | Rendah | Enkripsi API key di Setting. TIDAK ADA BUKTI mekanisme enkripsi -> SRS/CODING_RULES tentukan. - Sitasi: `RAG-CONTEXT.md §9 (rekomendasi #4)` |
-| R7 | 9router proxy custom user tidak stabil/dokumentasi minim | Integrasi 9router gagal | Sedang | 9router = proxy lokal user, TIDAK ADA BUKTI dokumentasi publik. Validasi langsung ke user. - Sitasi: `RAG-CONTEXT.md §5.2, §9 G4` |
-| R8 | Storage gambar referensi di Vercel (filesystem tidak persisten) | Upload hilang saat instance recycle | Tinggi | Pakai Vercel Blob / storage eksternal (ASUMSI rekomendasi). SRS/ARCHITECTURE putuskan. - Sitasi: `RAG-CONTEXT.md §5.4, §6, §9 G3` |
+| R-V2-1 | Vision LLM API cost membengkak | Biaya klasifikasi gambar tinggi | Sedang | Cache classification result di asset_references agar tidak reclassify. Batch classification multiple images satu call. Confidence threshold, manual override bila rendah |
+| R-V2-2 | Vision LLM classification akurasi rendah | Role salah, prompt kurang akurat | Sedang | Tampilkan hasil klasifikasi di UI sebelum submit. Allow manual override. Confidence score visible |
+| R-V2-3 | SSE log events menambah payload size | Latency generate naik | Rendah | Log events lightweight (text saja). Toggle off = no log events dikirim. Buffer & batch log events |
+| R-V2-4 | Dashboard enrichment over-engineering | Development time membengkak | Sedang | Mulai simple cards + tables dulu. Chart library lightweight (Recharts). Hindari real-time dashboard |
+| R-V2-5 | Refactor upload flow breaking existing features | V1 upload di project detail rusak | Rendah | Backward compatible: project detail tetap bisa view refs. Upload baru di generate page. Test coverage tinggi |
+| R-V2-6 | Git push expose secrets | API key / env bocor ke public repo | Rendah | .gitignore lengkap (node_modules, .env.local, .next, public/references). Review sebelum push |
+| R-V2-7 | V2 scope terlalu besar | Delay delivery | Sedang | Prioritize: S1-S3 = MUST, S4-S6 = SHOULD, S7-S9 = COULD. Ship incrementally |
+| R-V2-8 | AI SDK version mismatch (docs v6, code v4) | Confusion developer | Rendah | Kode = ground truth. Update docs sesuai kode. ASUMSI: upgrade SDK = out of scope V2 |
 
 ---
 
-## 7. Asumsi & Batasan Bisnis
+## 7. Benefit Realisasi
 
-### 7.1 Asumsi
+### 7.1 Benefit Langsung
 
-| ID | Asumsi | Status Bukti RAG | Catatan |
-|---|---|---|---|
-| A1 | App multi-user dengan login dasar (NextAuth) | TIDAK ADA BUKTI eksplisit | Dari paket konteks orchestrator. RAG menyatakan hanya menyebut "user". - Sitasi: `RAG-CONTEXT.md §7, §9 G2` |
-| A2 | Bahasa UI dwibahasa: Indonesia + EN | TIDAK ADA BUKTI | Dari paket konteks orchestrator. RAG menyatakan TIDAK ADA BUKTI preferensi bahasa. - Sitasi: `RAG-CONTEXT.md §9 G5` |
-| A3 | Batas tokoh default 10 per project | TIDAK ADA BUKTI | Dari paket konteks orchestrator. RAG menyatakan TIDAK ADA BUKTI batas tokoh. - Sitasi: `RAG-CONTEXT.md §9 G11` |
-| A4 | Output JSON structured + opsi export markdown | TIDAK ADA BUKTI format spesifik | Dari paket konteks orchestrator. RAG merekomendasikan JSON structured. - Sitasi: `RAG-CONTEXT.md §9 G9, §11 #1` |
-| A5 | Upload gambar referensi via Vercel Blob | ASUMSI rekomendasi | RAG: TIDAK ADA BUKTI preferensi storage. - Sitasi: `RAG-CONTEXT.md §6, §9 G3` |
-| A6 | Streaming SSE untuk generasi panjang | ASUMSI | RAG: ASUMSI streaming SSE, TIDAK ADA BUKTI preferensi user. - Sitasi: `RAG-CONTEXT.md §5.4, §9 G6` |
-| A7 | 9router proxy custom user valid lokal | TIDAK ADA BUKTI eksternal | RAG: base URL `http://localhost:20128/v1` dari paket user, proxy lokal. - Sitasi: `RAG-CONTEXT.md §5.2, §9 G4` |
-| A8 | Default model LLM per provider | TIDAK ADA BUKTI | RAG: TIDAK ADA BUKTI model default. SRS list rekomendasi. - Sitasi: `RAG-CONTEXT.md §9 G8` |
-| A9 | Target pengguna = kreator animasi AI, YouTuber, edukator, indie studio | TIDAK ADA BUKTI eksplisit | Dari paket konteks orchestrator. RAG hanya menyebut "user". - Sitasi: `RAG-CONTEXT.md §7` |
-| A10 | Enkripsi API key user saat disimpan | TIDAK ADA BUKTI mekanisme | RAG: rekomendasi SRS/CODING_RULES tentukan (mis. AES via env key). - Sitasi: `RAG-CONTEXT.md §11 #4` |
-
-### 7.2 Batasan Bisnis
-
-| ID | Batasan | Dampak |
+| Benefit | Estimasi Dampak | Bukti |
 |---|---|---|
-| B1 | Output aplikasi = prompt teks, BUKAN file media (gambar/video/audio) | User copy prompt ke tool eksternal. Dikonfirmasi user. - Sitasi: `RAG-CONTEXT.md §9 G10, G12` |
-| B2 | Voiceover = naskah teks, BUKAN TTS audio | Dikonfirmasi user. - Sitasi: `RAG-CONTEXT.md §9 G12` |
-| B3 | Deploy di Vercel (serverless) | Filesystem tidak persisten -> SQLite file lokal tidak boleh di prod. - Sitasi: `RAG-CONTEXT.md §2.2, §5.4` |
-| B4 | DB = Turso/libSQL (SQLite-compatible via HTTP) | Bukan SQLite file murni. Dikonfirmasi resmi. - Sitasi: `RAG-CONTEXT.md §2.1, §2.2` |
-| B5 | Multi-provider via `@ai-sdk/openai-compatible` | Semua provider harus OpenAI-compatible. Ollama cloud pakai `https://ollama.com/v1`. - Sitasi: `RAG-CONTEXT.md §5.1, §5.2` |
-| B6 | Greenfield, mulai dari nol | Tidak ada kode/schema/aset existing. - Sitasi: `RAG-CONTEXT.md §1, §3, §8` |
+| Workflow lebih cepat | Upload + generate = 1 halaman, hemat 50% navigasi | V1: 2 halaman terpisah. V2: 1 halaman |
+| Output lebih akurat | Deskripsi cerita, LLM konteks lebih kaya, prompt lebih spesifik | ASUMSI: tergantung kualitas deskripsi user |
+| Transparansi proses | Real-time logs, user tahu progress, reduced support tickets | ASUMSI: tergantung adoption |
+| Monitoring produktivitas | Dashboard enrichment, bisa track trend, data-driven decisions | Data sudah ada di DB, tinggal visualize |
+| Siap production | GitHub + testing, deploy Vercel prod, accessible publik | Infrastructure sudah ada |
+
+### 7.2 Benefit Tidak Langsung
+
+| Benefit | Dampak Jangka Panjang |
+|---|---|
+| User retention meningkat | Dashboard + workflow smooth, user kembali |
+| Diferensiasi pasar | AI image classification, fitur unik vs kompetitor |
+| Scalability terbukti | Pagination + optimization, siap handle banyak user |
+| Code quality terjaga | Test coverage + linting, maintainability tinggi |
+| Collaboration enable | GitHub, bisa invite contributor |
 
 ---
 
-## 8. Ruang Lingkup Bisnis
+## 8. Asumsi & Ketergantungan
 
-### 8.1 In Scope (Dikerjakan)
+### 8.1 Asumsi V2
 
-1. Aplikasi web fullstack PromptFlow (frontend + backend satu repo Next.js).
-2. Input user: judul animasi, (opsional) gambar referensi tokoh/background,
-   durasi target, gaya gambar (3D/2D + rasio).
-3. Multi-provider LLM integration: Ollama cloud, OpenRouter, 9router + custom
-   (user input base URL + API key + model).
-   - Sitasi: `RAG-CONTEXT.md §5.1, §5.2`
-4. Generate paket prompt terstruktur:
-   - Deskripsi adegan berurut
-   - Naskah voiceover per adegan
-   - Image prompt per-tokoh & per-background (list)
-   - Deskripsi karakter konsisten (nama, gaya rambut, wajah/asal, pakaian
-     atas, pakaian bawah, alas kaki, latar belakang, aksi)
-   - Karakter pendukung / hewan
-   - Gaya gambar (3D/2D + rasio)
-   - Pesan moral penutup
-5. Konsistensi karakter lintas adegan via Character master + referensi.
-   - Sitasi: `RAG-CONTEXT.md §4, §6`
-6. Output JSON structured + opsi export markdown.
-7. Pengaturan user: pilih/input provider, model, base URL, API key (terenkripsi).
-8. Login dasar multi-user (NextAuth) — **ASUMSI**, PRD konfirmasi.
-   - Sitasi: `RAG-CONTEXT.md §7, §9 G2`
-9. UI dwibahasa Indonesia + EN — **ASUMSI**, UIUX_SPEC konfirmasi.
-   - Sitasi: `RAG-CONTEXT.md §9 G5`
-10. Deploy Vercel + Turso DB.
-    - Sitasi: `RAG-CONTEXT.md §2.1`
+| ID | Asumsi | Status Bukti | Dampak bila Salah |
+|---|---|---|---|
+| VA-1 | Vision LLM tersedia untuk image classification | Perlu konfirmasi provider mana | Pipeline V2-3 tidak bisa jalan |
+| VA-2 | Deskripsi cerita field = optional textarea | Perlu konfirmasi required/optional | Schema + form design beda |
+| VA-3 | Real-time logs = collapsible panel | Perlu konfirmasi UI pattern | Frontend design beda |
+| VA-4 | Dashboard enrichment = simple cards + tables + charts | Perlu konfirmasi complexity | Dependencies + development time beda |
+| VA-5 | Upload di generate page = pre-submit | Perlu konfirmasi flow | UX flow beda |
+| VA-6 | Role classification: tokoh, background, prop, accessory, environment, other | Perlu konfirmasi opsi | Schema + UI beda |
+| VA-7 | Push ke GitHub = public repo | Perlu konfirmasi visibility | .gitignore scope beda |
+| VA-8 | Vercel deploy target | Perlu konfirmasi masih Laragon atau Vercel | Env vars beda |
+| VA-9 | AI SDK version tetap v4 (tidak upgrade) | ASUMSI: upgrade = out of scope V2 | Bila upgrade, breaking changes |
+| VA-10 | Tidak ada schema migration untuk V2 | Kolom tipe = text tanpa CHECK constraint | Bila perlu migration, tambah task |
 
-### 8.2 Out of Scope (Tidak Dikerjakan)
-
-1. Generate file media (gambar/video/audio) langsung di aplikasi.
-   - Sitasi: `RAG-CONTEXT.md §9 G10`
-2. TTS (text-to-speech) voiceover audio. Output = naskah teks.
-   - Sitasi: `RAG-CONTEXT.md §9 G12`
-3. API image generation bawaan (Midjourney/Kling/DALL-E). User copy prompt ke
-   tool eksternal.
-4. Mobile native app (iOS/Android). Web app responsif dulu.
-5. Sistem pembayaran/monetisasi (fase awal).
-6. Kolaborasi real-time multi-user dalam satu project (fase awal: solo per
-   project).
-7. Marketplace template prompt (fase awal).
-
-### 8.3 Ketergantungan Bisnis
+### 8.2 Ketergantungan V2
 
 | ID | Ketergantungan | Pemilik | Status |
 |---|---|---|---|
-| D1 | Akun & API key Ollama cloud | User | User sediakan sendiri |
-| D2 | Akun & API key OpenRouter | User | User sediakan sendiri |
-| D3 | Proxy 9router jalan lokal (`http://localhost:20128/v1`) | User | ASUMSI valid lokal. - Sitasi: `RAG-CONTEXT.md §5.2, §9 G4` |
-| D4 | Akun Vercel + Turso | Bos Agrian / tim | Sedikan untuk deploy |
-| D5 | Storage gambar referensi (Vercel Blob / eksternal) | Bos Agrian / tim | ASUMSI rekomendasi. - Sitasi: `RAG-CONTEXT.md §6, §9 G3` |
+| VD-1 | Vision LLM API (GPT-4o / Gemini Vision) | User / Bos Agrian | Perlu API key + akses |
+| VD-2 | Chart library (Recharts / Tremor) | Developer | Install via pnpm |
+| VD-3 | Akun GitHub + repo access | Bos Agrian | Perlu push access |
+| VD-4 | Vercel project setup (untuk deploy) | Bos Agrian | Perlu connect repo |
+| VD-5 | Turso DB production | Bos Agrian | Sudah ada dari V1 |
 
 ---
 
-## 9. Referensi
+## 9. Timeline & Milestone
+
+### 9.1 Fase Implementasi
+
+| Fase | Scope | Estimasi Durasi | Milestone |
+|---|---|---|---|
+| **Fase A: Core V2** | S1 (upload di generate) + S3 (deskripsi cerita) + S9 (push GitHub) | 2-3 hari | Upload + generate flow baru jalan, kode di GitHub |
+| **Fase B: Intelligence** | S2 (AI image classification) + S4 (real-time logs) | 3-4 hari | Vision classification jalan, logs visible |
+| **Fase C: Dashboard & Polish** | S5 (dashboard enrichment) + S6 (UI consistency) | 2-3 hari | Dashboard informatif, UI konsisten |
+| **Fase D: Quality & Deploy** | S7 (SQA testing) + S8 (navigation optimization) | 2-3 hari | Coverage >= 80%, performance OK, siap deploy |
+
+**Total estimasi: 9-13 hari kerja**
+
+### 9.2 Milestone Detail
+
+| Milestone | Target | Deliverable |
+|---|---|---|
+| M1: Upload Flow Redesign | Fase A selesai | DropzoneUploader di generate page, multi-file upload, role select extended |
+| M2: GitHub Init | Fase A selesai | Repo ter-push, .gitignore lengkap, README updated |
+| M3: AI Classification | Fase B selesai | Vision LLM classify uploaded images, result visible di UI |
+| M4: Real-time Logs | Fase B selesai | SSE log events, Collapsible log panel, show/hide toggle |
+| M5: Dashboard v2 | Fase C selesai | Charts, per-provider breakdown, recent activity |
+| M6: Quality Gate | Fase D selesai | Coverage >= 80%, E2E green, performance OK |
+| M7: Production Ready | Semua fase | Deploy Vercel prod, semua V2 features jalan |
+
+### 9.3 Dependency Graph
+
+```
+Fase A (Core) -> Fase B (Intelligence) -> Fase D (Quality)
+                    |
+                    +-> Fase C (Dashboard) -> Fase D (Quality)
+```
+
+Fase A harus selesai dulu (upload flow = foundation untuk classification).
+Fase B dan C bisa paralel. Fase D = final validation.
+
+---
+
+## 10. Referensi
 
 | Dokumen | Path |
 |---|---|
 | RAG-CONTEXT (sumber kebenaran) | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
+| BRD V1 (base) | `C:\laragon\www\PromptFlow\product-docs\BRD.md` |
+| README | `C:\laragon\www\PromptFlow\README.md` |
 | GitHub repo | https://github.com/agrianwahab29/promptflow.git |
 
-### Sitasi eksternal kunci (dari RAG-CONTEXT.md §10)
+### Sitasi Kunci dari RAG-CONTEXT.md
 
-| Sitasi | Klaim didukung |
+| Section | Klaim |
 |---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | Multi-provider via `@ai-sdk/openai-compatible` |
-| https://openrouter.ai/docs/api/reference/authentication | Base URL OpenRouter |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat endpoint |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js setup |
-| https://turso.tech/blog/serverless | Vercel filesystem tidak persisten -> Turso solusi |
-| https://kling.ai/blog/ai-character-consistency-guide | Konsistensi karakter via deskripsi terstruktur |
-| https://glibatree.com/proven-consistent-character-method | Metode konsistensi karakter terstruktur |
+| §1 Ringkasan Temuan | V1 sudah built, 9 tabel DB, 21 endpoint, i18n dwibahasa |
+| §8 Analisis Kode V1 | Bukti per file: generate-form, dropzone-uploader, dashboard, prompt-builder |
+| §9 Analisis Kebutuhan V2 | 10 item spesifik V2-1 s/d V2-10 dengan sitasi perubahan |
+| §11 Gap Analysis | 3 gap kritis (GAP-1: image analysis, GAP-2: upload location, GAP-3: git init) |
+| §12 Asumsi V2 | 8 asumsi yang perlu konfirmasi user |
 
 ---
 
-**Dokumen ini fokus pada NILAI BISNIS. Spesifikasi teknis detail ada di SRS,
-arsitektur di PROJECT_ARCHITECTURE, data di DATABASE_SCHEMA, aturan kode di
+**Dokumen ini fokus pada NILAI BISNIS upgrade V2. Spesifikasi teknis detail ada di
+SRS, arsitektur di PROJECT_ARCHITECTURE, data di DATABASE_SCHEMA, aturan kode di
 CODING_RULES. BRD tidak membangun deliverable akhir.**
+
+**Dibuat oleh:** docgen-brd subagent
+**Tanggal:** 2026-06-20
+**Versi:** 2.0

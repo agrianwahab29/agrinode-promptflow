@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { CreateProviderConfigInputSchema } from '@/lib/validation/schemas';
 import { errorResponse, successResponse } from '@/lib/api/error';
-import { createProviderConfig, findByName, listProviderConfigs, toProviderConfigDTO } from '@/lib/db/repositories/provider-config.repo';
+import { createProviderConfig, findByName, listProviderConfigs, toProviderConfigDTO, setActiveProvider } from '@/lib/db/repositories/provider-config.repo';
 import { encryptToString } from '@/lib/crypto/aes';
 
 export const runtime = 'nodejs';
@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
   const existing = await findByName(userId, parsed.data.name);
   if (existing) return errorResponse('CONFLICT', 409, 'Nama provider sudah dipakai', { field: 'name' });
   const enc = encryptToString(parsed.data.apiKey);
+  const existingConfigs = await listProviderConfigs(userId);
+  const isFirst = existingConfigs.length === 0;
   const created = await createProviderConfig({
     userId,
     provider: parsed.data.provider,
@@ -32,7 +34,10 @@ export async function POST(req: NextRequest) {
     baseUrl: parsed.data.baseUrl,
     model: parsed.data.model,
     apiKeyEncrypted: enc,
-    isActive: parsed.data.isActive ?? 0,
+    isActive: isFirst ? 1 : (parsed.data.isActive ?? 1),
   });
+  if (isFirst) {
+    await setActiveProvider(created.id, userId);
+  }
   return successResponse(toProviderConfigDTO(created), 201);
 }

@@ -1,983 +1,946 @@
-# Software Requirement Specification (SRS)
-## PromptFlow — Workflow Engine Otomasi Prompt Animasi AI
+# Software Requirement Specification (SRS) V2.0
+## PromptFlow -- Upgrade V2: Workflow Engine Otomasi Prompt Animasi AI
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran faktual:** `product-docs/RAG-CONTEXT.md` + `product-docs/BRD.md` + `product-docs/MRD.md` + `product-docs/PRD.md` (bersitasi per klaim penting)
+> **Sumber kebenaran:** product-docs/RAG-CONTEXT.md + PRD V2.0 + BRD V2.0 + MRD V2.0
 > **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Root proyek:** `C:\laragon\www\PromptFlow`
-> **Catatan:** SRS = dokumen paling teknis & paling eksekutabel. Tiap fitur PRD (FR-01..FR-19) punya realisasi teknis di sini. Detail skema data penuh di `DATABASE_SCHEMA.md`, kontrak API penuh di `API_CONTRACT.md`, arsitektur penuh di `PROJECT_ARCHITECTURE.md`.
+> **Root proyek:** C:\laragon\www\PromptFlow
+> **Catatan:** V1 sudah built & berjalan. SRS V2 ini OVERWRITE SRS V1. Fokus pada upgrade teknis V2.
 
 ---
 
 ## Daftar Isi
 
-1. Pendahuluan & Tujuan
-2. Lingkup Teknis
-3. Arsitektur High-Level
-4. Tech Stack & Versi
-5. Spesifikasi Fungsional Teknis
-6. Data Model Overview
-7. Interface/API Overview
-8. Constraint Teknis
-9. Keamanan
-10. Tahapan Implementasi
-11. Verifikasi & Test
-12. Asumsi Teknis
-13. Referensi
+1. Pendahuluan
+2. Gambaran Umum Produk
+3. Kebutuhan Spesifik
+4. Arsitektur Sistem
+5. Tech Stack & Versi (LOCKED)
+6. Spesifikasi Fungsional Detail V2
+7. Data Model & Perubahan Schema
+8. Interface / API / Integrasi
+9. Constraint Teknis
+10. Keamanan
+11. Performa
+12. Tahapan Implementasi V2
+13. Verifikasi & Pengujian
+14. Asumsi
 
 ---
 
-## 1. Pendahuluan & Tujuan
+## 1. Pendahuluan
 
 ### 1.1 Tujuan Dokumen
 
-SRS ini menjabarkan spesifikasi teknis eksekutabel untuk PromptFlow — web app
-fullstack otomasi susun prompt animasi AI. Output aplikasi = teks prompt
-terstruktur (JSON + opsi export markdown), BUKAN file media.
-- Sitasi: `PRD.md 1.2` ; `BRD.md 1` ; `RAG-CONTEXT.md 9 G10, G12`
+SRS V2 ini menjabarkan spesifikasi teknis eksekutabel untuk **upgrade V2** PromptFlow. V1 sudah terbangun: 9 tabel DB, auth NextAuth, upload Vercel Blob, generate SSE streaming, export JSON/markdown, i18n dwibahasa, 21 endpoint API. Kode berjalan di Laragon localhost.
 
-SRS menjembatani PRD (kebutuhan produk) ke implementasi konkret: arsitektur,
-tech stack, endpoint/server action, alur data LLM, validasi Zod, data model,
-constraint serverless, keamanan, tahapan implementasi, verifikasi.
+V2 menambah 10 fitur:
+1. Image reference dipindah ke generate page (multi-file + role classification)
+2. AI image classification via Vision LLM
+3. Field deskripsi singkat cerita
+4. Real-time processing logs (SSE + show/hide toggle)
+5. Dashboard enrichment (stats, charts, activity)
+6. Konsistensi UI (loading.tsx, error.tsx, design tokens)
+7. SQA testing menyeluruh (>=80% coverage)
+8. Navigation optimization (pagination, Suspense, prefetch)
+9. Push ke GitHub
+10. Extended role classification (6 opsi)
 
-### 1.2 Konteks Teknis Inti
+Situs: PRD V2.0 S1.1, BRD V2.0 S1, RAG-CONTEXT.md S9
 
-| Aspek | Nilai | Bukti |
+### 1.2 Lingkup Dokumen
+
+| Aspek | V1 (pertahankan) | V2 (baru) |
 |---|---|---|
-| Tipe | Web app fullstack Next.js App Router (frontend + backend satu repo) | `PRD.md 1.2` |
-| Inti fungsi | Otomasi susun prompt animasi terstruktur dari input minimal (judul + durasi + opsi referensi) | `PRD.md 1.1` |
-| Output | Paket prompt teks terstruktur (JSON + opsi markdown) | `PRD.md 8.2` ; ASUMSI A4 `RAG-CONTEXT.md 9 G9` |
-| Stack | Next.js App Router + Vercel AI SDK v6 + `@ai-sdk/openai-compatible` + Turso/libSQL + Tailwind v4 + shadcn/ui + Vercel Blob + NextAuth.js + Zod | `RAG-CONTEXT.md 2.1` ; paket konteks |
-| Multi-provider | Ollama cloud (`https://ollama.com/v1`), OpenRouter (`https://openrouter.ai/api/v1`), 9router (`http://localhost:20128/v1`) + custom | `RAG-CONTEXT.md 5.1, 5.2` |
-| Deploy | Vercel (serverless) + Turso DB | `RAG-CONTEXT.md 2.1, 2.2` |
-| Status | Greenfield (tidak ada kode/schema/aset existing) | `RAG-CONTEXT.md 1` |
+| Upload gambar | Di project detail page | Di generate page (multi-file + AI classify) |
+| Deskripsi cerita | TIDAK ADA | Textarea opsional di generate form |
+| Role classification | 2 opsi (tokoh/background) | 6 opsi (tokoh/background/prop/accessory/environment/other) |
+| AI image analysis | TIDAK ADA | Vision LLM auto-classify |
+| Real-time logs | TIDAK ADA | SSE log events + Collapsible panel |
+| Dashboard | 3 kartu KPI | 6-8 kartu + charts + breakdown |
+| Loading states | TIDAK ADA | loading.tsx + error.tsx + Suspense |
+| Pagination | TIDAK ADA | Projects list pagination |
+| Test coverage | Partial | >=80% unit, 100% critical E2E |
+| Version control | TIDAK ADA | GitHub repo |
 
-### 1.3 Stakeholder Teknis
+### 1.3 Definisi & Akronim
 
-| Stakeholder | Kepentingan Teknis | Sitasi |
-|---|---|---|
-| Bos Agrian | ROI, adopsi, biaya terkendali | `BRD.md 4` |
-| Kreator solo/studio/edukator | Output siap pakai, konsistensi karakter, biaya rendah | `MRD.md 3` (ASUMSI persona) |
-| Provider LLM (Ollama/OpenRouter/9router) | API usage stabil | `BRD.md 4` |
-| Vercel & Turso | Platform hosting | `BRD.md 4` |
+| Istilah | Definisi |
+|---|---|
+| PromptPackage | Output JSON terstruktur hasil generate |
+| SSE | Server-Sent Events |
+| Vision LLM | Model LLM yang memproses gambar (GPT-4o, Gemini Vision) |
+| AI Classification | Vision LLM menganalisis gambar dan mengklasifikasi role |
+| Asset Reference | Metadata upload gambar referensi |
+| Character Master | Deskripsi karakter konsisten lintas adegan |
+| Drizzle ORM | TypeScript ORM untuk Turso/libSQL |
+| Turso | Database libSQL (SQLite-compatible) via HTTP |
 
 ---
 
-## 2. Lingkup Teknis
+## 2. Gambaran Umum Produk
 
-### 2.1 In Scope Teknis
+### 2.1 Perspektif Produk
 
-1. Web app Next.js App Router fullstack (frontend + backend satu repo).
-   - Sitasi: `PRD.md 8.1`
-2. Input user: judul animasi, durasi target, gaya gambar (3D/2D + rasio),
-   (opsional) referensi gambar tokoh/background.
-   - Sitasi: `PRD.md 3.1 (US-01, US-02, US-10), 3.2 (US-15)`
-3. Multi-provider LLM integration via `@ai-sdk/openai-compatible`
-   `createOpenAICompatible`: Ollama cloud, OpenRouter, 9router + custom.
-   - Sitasi: `RAG-CONTEXT.md 5.1, 5.2`
-4. Generate paket prompt terstruktur (scenes[] berurut, voiceover per scene,
-   image_prompts per tokoh & per background, character_profiles konsisten,
-   supporting_characters, style, moral_message).
-   - Sitasi: `PRD.md 8.2`
-5. Konsistensi karakter lintas adegan via Character master + referensi.
-   - Sitasi: `RAG-CONTEXT.md 4 (catatan), 6`
-6. Output JSON structured + export markdown.
-   - Sitasi: `PRD.md 8.2, 8.3`
-7. Pengaturan user: provider, base URL, model, API key (terenkripsi).
-   - Sitasi: `PRD.md 5 (FR-13, FR-14)`
-8. Login dasar NextAuth multi-user (SHOULD).
-   - Sitasi: `PRD.md 5 (FR-18)` ; ASUMSI A1 `BRD.md 7.1`
-9. UI dwibahasa ID + EN (SHOULD).
-   - Sitasi: `PRD.md 5 (FR-19)` ; ASUMSI A2 `BRD.md 7.1`
-10. Upload referensi gambar via Vercel Blob (SHOULD).
-    - Sitasi: `PRD.md 5 (FR-17)` ; ASUMSI A5 `RAG-CONTEXT.md 6, 9 G3`
-11. Save project + CRUD.
-    - Sitasi: `PRD.md 5 (FR-15)`
-12. Deploy Vercel + Turso DB.
-    - Sitasi: `RAG-CONTEXT.md 2.1`
+PromptFlow = web app fullstack Next.js App Router. Frontend + backend satu repo. Deploy Vercel serverless + Turso DB + Vercel Blob. Multi-provider LLM via @ai-sdk/openai-compatible.
 
-### 2.2 Out of Scope Teknis
+Situs: PRD V2.0 S1.2, RAG-CONTEXT.md S2.1
 
-| # | Out of Scope | Alasan | Bukti |
+### 2.2 Karakteristik Pengguna
+
+| Karakteristik | Nilai |
+|---|---|
+| Tipe user | Kreator solo, indie studio, edukator |
+| Level teknis | Rendah-sedang |
+| Device | Desktop + mobile (responsive) |
+| Bahasa | Indonesia + English |
+| Auth | NextAuth credentials |
+| Role | User (default) -- tidak ada admin/RBAC |
+
+Situs: MRD V2.0 S3.1, RAG-CONTEXT.md S6
+
+### 2.3 Ketergantungan Eksternal
+
+| ID | Dependency | Pemilik | Status |
 |---|---|---|---|
-| OOS-T1 | Generate file media (gambar/video/audio) langsung | Output = teks prompt | `BRD.md 8.2 #1` ; `RAG-CONTEXT.md 9 G10` |
-| OOS-T2 | TTS voiceover audio | Output = naskah teks | `BRD.md 8.2 #2` ; `RAG-CONTEXT.md 9 G12` |
-| OOS-T3 | Integrasi langsung API image gen (Midjourney/Kling/DALL-E) | User copy prompt manual | `BRD.md 8.2 #3` |
-| OOS-T4 | Mobile native app (iOS/Android) | Web responsif dulu | `BRD.md 8.2 #4` |
-| OOS-T5 | Payment/subscription | Fase awal fokus adoption | `BRD.md 8.2 #5` |
-| OOS-T6 | Kolaborasi real-time multi-user dalam satu project | Fase awal solo per project | `BRD.md 8.2 #6` |
-| OOS-T7 | Marketplace template prompt | Fase akhir | `BRD.md 8.2 #7` |
-| OOS-T8 | Auto-fallback provider otomatis | User manual switch fase awal | ASUMSI P-A13 `PRD.md 10.2` |
-| OOS-T9 | Animasi/motion preview di app | Output = teks | `RAG-CONTEXT.md 9 G10` |
-| OOS-T10 | SQLite file lokal di Vercel prod | Filesystem tidak persisten | `RAG-CONTEXT.md 2.2, 5.4` |
-
-### 2.3 Ketergantungan Teknis
-
-| ID | Dependency | Pemilik | Status | Sitasi |
-|---|---|---|---|---|
-| TD1 | API key Ollama cloud | User | User sediakan | `BRD.md 8.3 D1` |
-| TD2 | API key OpenRouter | User | User sediakan | `BRD.md 8.3 D2` |
-| TD3 | Proxy 9router jalan lokal (`http://localhost:20128/v1`) | User | ASUMSI valid lokal | `RAG-CONTEXT.md 5.2, 9 G4` |
-| TD4 | Akun Vercel + Turso (URL + token) | Bos Agrian/tim | Sediakan untuk deploy | `BRD.md 8.3 D4` |
-| TD5 | Vercel Blob store (untuk gambar referensi prod) | Bos Agrian/tim | ASUMSI rekomendasi | `RAG-CONTEXT.md 6, 9 G3` |
-| TD6 | `@ai-sdk/openai-compatible` matang (structured output, streaming) | Vercel/AI SDK | Dikonfirmasi | `RAG-CONTEXT.md 5.1` |
-| TD7 | Turso resmi di Vercel Marketplace | Turso/Vercel | Dikonfirmasi | `RAG-CONTEXT.md 2.1` |
-| TD8 | Env `ENCRYPTION_KEY` (AES-256-GCM untuk API key user) | Bos Agrian/tim | Sediakan di Vercel env | ASUMSI P-A10 `PRD.md 10.2` |
+| TD-1 | Vision LLM API (GPT-4o / Gemini Vision) | User | Perlu API key |
+| TD-2 | Akun GitHub + repo access | Bos Agrian | Perlu push access |
+| TD-3 | Vercel project setup | Bos Agrian | Perlu connect repo |
+| TD-4 | Turso DB production | Bos Agrian | Sudah ada V1 |
+| TD-5 | API key Ollama/OpenRouter | User | User sediakan via UI |
+| TD-6 | Chart library (Recharts / Tremor) | Developer | Install via pnpm |
 
 ---
-## 3. Arsitektur High-Level
 
-### 3.1 Pendekatan Arsitektur
+## 3. Kebutuhan Spesifik
 
-PromptFlow = web app fullstack Next.js App Router. Frontend (React Server
-Components + Client Components) dan backend (Route Handlers + Server Actions)
-dalam satu repo. Tidak ada microservice terpisah fase awal. Deploy Vercel
-serverless.
-- Sitasi: `PRD.md 1.2, 8.1` ; `RAG-CONTEXT.md 2.1`
+### 3.1 Kebutuhan Fungsional (V2 BARU)
 
-DB Turso/libSQL (SQLite-compatible via HTTP) — pilihan wajib karena Vercel
-filesystem tidak persisten. SQLite file lokal TIDAK boleh di prod.
-- Sitasi: `RAG-CONTEXT.md 2.2, 5.4`
+| ID | Requirement | MoSCoW | Mapping PRD |
+|---|---|---|---|
+| FR-V2-01 | Image reference di generate page (multi-file + role classification) | MUST | F-V2-01, US-V2-01, US-V2-02 |
+| FR-V2-02 | AI image classification via Vision LLM | MUST | F-V2-02, US-V2-03, US-V2-04 |
+| FR-V2-03 | Extended role classification (6 opsi) | MUST | F-V2-03, US-V2-03 |
+| FR-V2-04 | Field deskripsi singkat cerita | MUST | F-V2-04, US-V2-05 |
+| FR-V2-05 | Real-time processing logs (SSE + Collapsible) | SHOULD | F-V2-05, US-V2-06, US-V2-07 |
+| FR-V2-06 | Dashboard enrichment (charts, breakdown, activity) | SHOULD | F-V2-06, US-V2-08, US-V2-09 |
+| FR-V2-07 | Konsistensi UI (loading.tsx, error.tsx, tokens) | SHOULD | F-V2-07, US-V2-10 |
+| FR-V2-08 | SQA testing menyeluruh (>=80% coverage) | SHOULD | F-V2-08, US-V2-12 |
+| FR-V2-09 | Navigation optimization (pagination, Suspense) | SHOULD | F-V2-09, US-V2-11 |
+| FR-V2-10 | Push ke GitHub | SHOULD | F-V2-10, US-V2-12 |
 
-### 3.2 Layer Arsitektur
+### 3.2 Kebutuhan Non-Fungsional (V2 tambahan)
 
-```
+| ID | Requirement | Target | MoSCoW |
+|---|---|---|---|
+| NFR-V2-P1 | Page transition | <= 200ms | SHOULD |
+| NFR-V2-P2 | Dashboard load | <= 1.5s | SHOULD |
+| NFR-V2-P3 | AI classification latency | <= 5s per gambar | MUST |
+| NFR-V2-P4 | Real-time log latency | <= 100ms server ke UI | SHOULD |
+| NFR-V2-U1 | loading.tsx per page group | Skeleton/spinner | SHOULD |
+| NFR-V2-U2 | error.tsx boundary per page group | Error + retry + home link | SHOULD |
+| NFR-V2-U3 | Disabled state saat loading | Semua form field disabled | SHOULD |
+| NFR-V2-U4 | Pagination di projects list | Page numbers + prev/next | SHOULD |
+| NFR-V2-T1 | Unit test coverage | >= 80% | SHOULD |
+| NFR-V2-T2 | E2E critical path | 100% pass | SHOULD |
+
+### 3.3 Out of Scope V2
+
+| # | Item | Alasan |
+|---|---|---|
+| OOS-V2-1 | Dark mode toggle | Bisa V3 |
+| OOS-V2-2 | Multi-language output prompt | Ikut judul input |
+| OOS-V2-3 | AI SDK upgrade v4 ke v6 | Breaking changes |
+| OOS-V2-4 | Schema migration besar-besaran | Additive columns only |
+| OOS-V2-5 | Auto-fallback provider otomatis | Manual switch fase awal |
+| OOS-V2-6 | Marketplace template prompt | Fase akhir |
+| OOS-V2-7 | Kolaborasi real-time multi-user | Fase awal solo per project |
+
+---
+
+## 4. Arsitektur Sistem
+
+### 4.1 Pendekatan Arsitektur
+
+V2 mempertahankan arsitektur V1 (monolith Next.js App Router) dan menambah layer baru:
+
+`
 +------------------------------------------------------------------+
 |  Layer 1: Presentation (App Router pages + components)           |
-|  - src/app/(dashboard)/  UI pages (generate, projects, settings) |
-|  - src/components/        shadcn/ui + custom UI                   |
-|  - Client Components      interactive (form, streaming display)  |
-|  - Server Components      data fetch (list project, detail)      |
+|  - Generate page: DropzoneUploader + AI classify + LogViewer     |
+|  - Dashboard: Charts + metric cards + activity table             |
+|  - Projects: Pagination + Suspense boundaries                    |
+|  - loading.tsx + error.tsx per page group                        |
 +------------------------------------------------------------------+
-         |  Server Actions + fetch /api/*
+         |  Server Actions + fetch /api/v1/*
          v
 +------------------------------------------------------------------+
-|  Layer 2: API / Server Actions (backend logic)                   |
-|  - src/app/api/          Route Handlers                           |
-|    /api/projects         CRUD project                            |
-|    /api/generate         streaming SSE generate prompt           |
-|    /api/settings/providers  CRUD provider config                 |
-|    /api/upload           Vercel Blob upload                      |
-|    /api/export           JSON + markdown export                   |
-|    /api/auth/*           NextAuth handler                        |
-|  - Server Actions         mutation (save project, save setting)  |
+|  Layer 2: API / Route Handlers (backend)                         |
+|  - POST /api/v1/generate (SSE + log events)                      |
+|  - POST /api/v1/upload (multi-file + auto-classify)              |
+|  - POST /api/v1/upload/classify (trigger AI classify)            |
+|  - GET /api/v1/projects (pagination)                             |
+|  - GET /api/v1/dashboard/stats (enrichment data)               |
+|  - 21 endpoint V1 tetap backward-compatible                      |
 +------------------------------------------------------------------+
          |  panggil lib/*
          v
 +------------------------------------------------------------------+
 |  Layer 3: lib/ (core logic, server-only)                          |
-|  - lib/ai/               provider factory + generate pipeline     |
-|    provider.factory.ts   createOpenAICompatible init              |
-|    generate.ts           generateObject + Zod schema             |
-|    prompts/              system prompt template per komponen     |
-|  - lib/db/               Turso client + Drizzle ORM              |
-|    client.ts             libSQL client + Drizzle instance         |
-|    schema.ts             Drizzle table definitions                |
-|    queries/              query helper per entitas                |
-|  - lib/storage/          Vercel Blob helper                       |
-|    blob.ts               upload, get URL, delete                 |
-|  - lib/auth/             NextAuth config                          |
-|    config.ts             providers, session, callbacks           |
-|  - lib/crypto/           AES-256-GCM encrypt/decrypt API key       |
-|    aes.ts                encrypt, decrypt, mask                   |
-|  - lib/validation/       Zod schema (input + LLM structured output)|
-|    schemas.ts            input form + LLM output schema           |
+|  - lib/ai/provider-registry.ts  createOpenAICompatible           |
+|  - lib/ai/prompt-builder.ts     system + user message            |
+|  - lib/ai/llm-client.ts         generatePromptPackage + retry    |
+|  - lib/ai/image-classifier.ts   NEW: Vision LLM classify         |
+|  - lib/ai/consistency-checker.ts                                |
+|  - lib/db/repositories/*.ts     9 repos + V2 queries             |
+|  - lib/storage/blob.ts          Vercel Blob + local FS           |
+|  - lib/auth/config.ts           NextAuth credentials + JWT       |
+|  - lib/crypto/aes.ts            AES-256-GCM                     |
+|  - lib/validation/schemas.ts    Zod + PromptPackageSchema        |
+|  - lib/export/markdown.template.ts                              |
 +------------------------------------------------------------------+
          |  external call
          v
 +------------------------------------------------------------------+
 |  Layer 4: External Services                                       |
-|  - LLM provider (Ollama cloud / OpenRouter / 9router / custom)    |
+|  - LLM provider (Ollama / OpenRouter / 9router / custom)         |
+|  - Vision LLM (GPT-4o / Gemini Vision) untuk classification      |
 |  - Turso DB (libSQL via HTTP)                                     |
 |  - Vercel Blob (gambar referensi)                                 |
-|  - NextAuth store (Turso adapter atau JWT)                       |
 +------------------------------------------------------------------+
-```
+`
 
-### 3.3 Alur Data Inti (Generate Prompt)
+### 4.2 Flow V2: Upload + AI Classification
 
-```
-[User submit form]
+`
+[User drag-drop gambar di generate page]
     |
     v
-[Server Action / POST /api/generate]
-    |-- validasi input (Zod: title, duration, style, refs)
-    |-- load ProviderConfig user (decrypt API key server-side)
-    |-- init provider via createOpenAICompatible({name,apiKey,baseURL})
-    |-- panggil generateObject / streamText dengan system prompt + Zod schema
+[POST /api/v1/upload -- multipart]
+    |-- validasi: mime image/*, max 10MB
+    |-- upload ke Vercel Blob / local FS
+    |-- simpan AssetReference (tanpa projectId dulu)
+    |
     v
-[LLM Provider] --streaming SSE--> [Server] --stream--> [Client]
-    |-- partial JSON / token mengalir
-    |-- client render real-time per komponen
+[Auto-trigger POST /api/v1/upload/classify]
+    |-- kirim gambar ke Vision LLM (GPT-4o / Gemini)
+    |-- prompt: Classify role: character/background/prop/accessory/environment/other
+    |-- parse response -> update AssetReference
+    |
     v
-[LLM selesai] -> [full structured JSON validasi Zod]
-    |-- post-check konsistensi karakter (FR-12)
-    |-- (opsional) save Project + result ke Turso
+[Frontend: tampilkan hasil klasifikasi]
+    |-- thumbnail + role badge + nama + confidence
+    |-- manual override: user bisa ubah role
+    |-- fallback ke manual select jika Vision LLM gagal
+`
+
+Situs: RAG-CONTEXT.md S9 V2-3, PRD V2.0 S5 (FR-V2-02)
+
+### 4.3 Flow V2: Generate dengan Story Description + Logs
+
+`
+[User submit generate form]
+    |-- title + storyDescription (opsional) + duration + style + refs
+    |
     v
-[Client: tampilkan paket prompt + tombol export]
-```
+[POST /api/v1/generate -- SSE]
+    |-- validasi Zod (termasuk storyDescription field baru)
+    |-- resolve provider + decrypt API key
+    |-- buildUserMessage() -> inject storyDescription
+    |
+    |-- SSE events:
+    |   data: {"type":"stage","stage":"starting","message":"..."}
+    |   data: {"type":"log","level":"info","message":"[generate] Resolving provider..."}
+    |   data: {"type":"stage","stage":"character_profiles","message":"..."}
+    |   ...
+    |   data: {"type":"done","result":<full JSON>,"logs":[...]}
+    |
+    v
+[Frontend: stage tracker + LogViewer Collapsible]
+    |-- toggle show/hide logs
+    |-- log per stage + timestamp + level badge
+`
 
-### 3.4 Struktur Folder Asumsi
+### 4.4 Flow V2: Dashboard Enrichment
 
-(Turun dari `RAG-CONTEXT.md 3`, ASUMSI — bukan fakta proyek. Detail final di
-`PROJECT_ARCHITECTURE.md`.)
-
-```
-PromptFlow/
-  product-docs/
-  src/
-    app/
-      api/
-        projects/route.ts          # GET list, POST create
-        projects/[id]/route.ts     # GET detail, PUT update, DELETE
-        generate/route.ts          # POST streaming SSE
-        settings/providers/route.ts
-        upload/route.ts
-        export/route.ts
-        auth/[...nextauth]/route.ts
-      (dashboard)/
-        generate/page.tsx
-        projects/page.tsx
-        projects/[id]/page.tsx
-        settings/page.tsx
-      layout.tsx
-      page.tsx
-    lib/
-      ai/
-        provider.factory.ts
-        generate.ts
-        prompts/
-      db/
-        client.ts
-        schema.ts
-        queries/
-      storage/
-        blob.ts
-      auth/
-        config.ts
-      crypto/
-        aes.ts
-      validation/
-        schemas.ts
-    components/
-      ui/            # shadcn/ui
-      generate/      # form + streaming display
-      projects/      # list + detail
-      settings/      # provider form
-    i18n/            # dwibahasa ASUMSI
-  public/
-    references/      # dev-only upload ASUMSI
-  drizzle.config.ts  # ASUMSI Drizzle
-  next.config.ts
-  tailwind.config.ts # v4
-  package.json
-  .env.local
-  .env.example
-```
+`
+[GET /api/v1/dashboard/stats]
+    |-- query: total projects, successful generations, avg duration
+    |-- query: per-provider breakdown (avg duration, success rate)
+    |-- query: recent 5 projects
+    |-- query: weekly trend (projects per minggu)
+    |-- query: storage usage (total files, total size)
+    |
+    v
+[Frontend: 6-8 metric cards + charts + tables]
+    |-- Line chart: projects per minggu (Recharts)
+    |-- Bar chart: success vs fail ratio
+    |-- Table: per-provider breakdown
+    |-- Table: recent 5 projects + status
+    |-- Card: storage usage
+`
 
 ---
 
-## 4. Tech Stack & Versi
+## 5. Tech Stack & Versi (LOCKED)
 
-### 4.1 Tabel Tech Stack
+> **Penting:** Semua versi di bawah dari package.json (ground truth). AI SDK = v4, BUKAN v6.
 
-| Lapisan | Teknologi | Versi target | Justifikasi | Sitasi |
-|---|---|---|---|---|
-| Frontend+Backend | Next.js (App Router) | stabil terkini per 2025 (15+/16+) | Fullstack satu repo, RSC, Server Actions, deploy Vercel native | `RAG-CONTEXT.md 2.1` ; https://nextjs.org/docs |
-| Runtime | Node.js (Vercel serverless) | versi yang didukung Vercel stabil terkini | Vercel default | ASUMSI |
-| Styling | Tailwind CSS | v4 | shadcn/ui v4 support, modern | `RAG-CONTEXT.md 2.1` ; https://ui.shadcn.com/docs/tailwind-v4 |
-| Komponen UI | shadcn/ui | latest stabil | Copy-paste component, integrasi Next.js+Tailwind | `RAG-CONTEXT.md 2.1` ; https://ui.shadcn.com/docs/installation/next |
-| AI orchestration | Vercel AI SDK + `@ai-sdk/openai-compatible` | AI SDK v6 (latest stabil) | Multi-provider OpenAI-compatible, structured output, streaming, tool calling | `RAG-CONTEXT.md 2.1, 5.1` ; https://ai-sdk.dev/providers/openai-compatible-providers |
-| Validasi | Zod | stabil terkini per 2025 | Schema validasi input + LLM structured output (`generateObject`) | ASUMSI (AI SDK depend on Zod) |
-| DB | Turso (libSQL, SQLite-compatible via HTTP) | latest stabil | Vercel filesystem tidak persisten -> DB remote HTTP wajib | `RAG-CONTEXT.md 2.1, 2.2, 5.4` ; https://docs.turso.tech/sdk/ts/guides/nextjs |
-| ORM | Drizzle ORM | stabil terkini per 2025 | Type-safe, ringan, dukung Turso/libSQL, migration | ASUMSI (paket konteks orchestrator; RAG menyebut raw @libsql/client atau Prisma sebagai alternatif - `RAG-CONTEXT.md 2.1, 9 G7`) |
-| DB client | `@libsql/client` (di bawah Drizzle) | latest stabil | Drizzle pakai libSQL driver untuk Turso | https://docs.turso.tech/sdk/ts/guides/nextjs |
-| Storage gambar | Vercel Blob | latest stabil | Persisten di Vercel, URL publik rujuk nama file | ASUMSI A5 `RAG-CONTEXT.md 6, 9 G3` ; https://vercel.com/docs/vercel-blob |
-| Auth | NextAuth.js (Auth.js) | stabil terkini per 2025 (v5+) | Login dasar multi-user, session JWT/cookie, protected routes | ASUMSI A1/P-A1 `BRD.md 7.1` ; `PRD.md 5 (FR-18)` |
-| Enkripsi | Node `crypto` (AES-256-GCM) | native Node | Enkripsi API key user saat simpan, decrypt server-side | ASUMSI P-A10 `PRD.md 10.2` ; `RAG-CONTEXT.md 11 #4` |
-| i18n | next-intl ATAU native App Router i18n | stabil terkini per 2025 | UI dwibahasa ID + EN | ASUMSI A2 `BRD.md 7.1` ; `PRD.md 5 (FR-19)` (TIDAK ADA BUKTI preferensi lib - `RAG-CONTEXT.md 9 G5`) |
-| Deploy | Vercel | n/a | Serverless auto-scale, edge, native Next.js | `RAG-CONTEXT.md 2.1` |
-| Test unit | Vitest | stabil terkini per 2025 | Cepat, native ESM, cocok Next.js | ASUMSI (best practice) |
-| Test e2e | Playwright | stabil terkini per 2025 | E2E browser automation | ASUMSI (best practice) |
-| Lint | ESLint + next lint | stabil terkini per 2025 | Next.js default | ASUMSI |
-| Format | Prettier (opsional) | stabil terkini per 2025 | Konsistensi style | ASUMSI |
+| Lapisan | Teknologi | Versi (package.json) | Justifikasi |
+|---|---|---|---|
+| Framework | Next.js | ^15.1.0 | App Router, RSC, Server Actions, Vercel native |
+| UI Library | React + ReactDOM | ^19.0.0 | Latest stable |
+| AI SDK | ai (Vercel AI SDK) | ^4.0.0 | Multi-provider, structured output. CATATAN: docs sebut v6, kode = v4 |
+| AI Provider | @ai-sdk/openai-compatible | ^1.0.0 | Multi-provider OpenAI-compat |
+| Validasi | Zod | ^3.24.0 | Schema input + LLM structured output |
+| Auth | next-auth | 5.0.0-beta.25 | Credentials provider, JWT session |
+| Auth Core | @auth/core | ^0.37.0 | NextAuth core |
+| Password Hash | bcryptjs | ^2.4.3 | User password hashing |
+| DB Client | @libsql/client | ^0.14.0 | Turso/libSQL driver |
+| ORM | drizzle-orm | ^0.38.0 | Type-safe, lightweight, Turso support |
+| ORM Kit | drizzle-kit | ^0.30.0 | Migration generate + push |
+| Storage | @vercel/blob | ^0.27.0 | Vercel Blob upload |
+| i18n | next-intl | ^3.26.0 | Dwibahasa ID + EN |
+| Icons | lucide-react | ^0.468.0 | Icon library |
+| Form | react-hook-form | ^7.54.0 | Form management |
+| Form Resolvers | @hookform/resolvers | ^3.10.0 | Zod integration |
+| Toast | sonner | ^1.7.0 | Toast notification |
+| UI Primitives | Radix UI (14 paket) | ^1.1.0--^1.2.0 | shadcn/ui foundation |
+| UI Helpers | clsx + tailwind-merge + cva | ^2.1.1 / ^2.5.0 / ^0.7.1 | Class utilities |
+| TypeScript | typescript | ^5.7.0 | Type safety |
+| Tailwind CSS | tailwindcss | ^4.0.0 | CSS-first styling |
+| PostCSS | @tailwindcss/postcss + postcss + autoprefixer | ^4.0.0 / ^8.4.0 / ^10.4.0 | Build pipeline |
+| Test Unit | vitest | ^2.1.0 | Unit + integration test |
+| Test Coverage | @vitest/coverage-v8 | ^2.1.0 | Coverage reporting |
+| Test E2E | @playwright/test | ^1.49.0 | E2E browser test |
+| Lint | eslint + eslint-config-next | ^9.17.0 / ^15.1.0 | Code quality |
+| TS ESLint | @typescript-eslint/eslint-plugin + @typescript-eslint/parser | ^8.18.0 | TS lint rules |
+| Format | prettier + prettier-plugin-tailwindcss | ^3.4.0 / ^0.6.0 | Code formatting |
+| Package Manager | pnpm | 11.7.0 | Fast, disk-efficient |
+| Runtime | Node.js (server-only) | N/A | Server-side only |
+| DB Engine | Turso (libSQL via HTTP) | latest | Vercel serverless DB |
+| V2 Baru | Recharts atau Tremor | latest stabil | Dashboard charts |
 
-### 4.2 Catatan Tech Stack
+**KETIDAKSESUAIAN VERSI:** Product docs V1 menyebut AI SDK v6 tapi package.json mencatat ai: ^4.0.0. **Kode = ground truth.** SRS V2 pakai v4. Tidak upgrade ke v6 = out of scope.
 
-1. **Next.js App Router**: pakai React Server Components untuk data fetch
-   (list project, detail), Client Components untuk interaksi (form generate,
-   streaming display).
-2. **AI SDK v6**: `createOpenAICompatible` untuk multi-provider. Pakai
-   `generateObject` (structured output via Zod) bila provider dukung
-   `supportsStructuredOutputs: true`. Fallback `streamText` + parse JSON
-   manual bila tidak. `RAG-CONTEXT.md 5.1, 11 #1`
-3. **Turso vs SQLite murni**: Turso wajib karena Vercel serverless filesystem
-   tidak persisten. SQLite file lokal hanya untuk dev lokal (ASUMSI), prod
-   WAJIB Turso remote. `RAG-CONTEXT.md 2.2, 5.4`
-4. **Drizzle vs Prisma vs raw @libsql/client**: RAG menyebut raw
-   `@libsql/client` atau Prisma sebagai opsi (`RAG-CONTEXT.md 2.1, 9 G7`).
-   SRS memilih **Drizzle ORM** (ASUMSI orchestrator) karena type-safe, ringan,
-   migration bawaan, dukung libSQL. Keputusan final bisa diubah di
-   `DATABASE_SCHEMA.md`/`PROJECT_ARCHITECTURE.md` bila user prefer Prisma.
-5. **Vercel Blob**: ASUMSI untuk gambar referensi prod. URL publik rujuk nama
-   file di prompt teks. Dev lokal bisa pakai filesystem `public/references/`
-   (ASUMSI). `RAG-CONTEXT.md 6`
-6. **NextAuth**: ASUMSI provider credentials atau magic link. TIDAK ADA BUKTI
-   preferensi (`RAG-CONTEXT.md 9 G2`). SRS rekomendasi credentials sederhana
-   fase awal (ASUMSI).
-7. **next-intl**: ASUMSI untuk dwibahasa. Bisa diganti native App Router i18n
-   bila user prefer. TIDAK ADA BUKTI preferensi (`RAG-CONTEXT.md 9 G5`).
-8. **Versi library**: RAG tidak sebut spesifik nomor versi (kecuali "AI SDK v6",
-   "Tailwind v4", "Prisma 5.4+"). Untuk library lain (NextAuth, Drizzle,
-   Zod, Vitest, Playwright) SRS tulis "stabil terkini per 2025" + catat asumsi.
-
----
-## 5. Spesifikasi Fungsional Teknis
-
-Mapping tiap PRD Functional Requirement (FR-01..FR-19) ke realisasi teknis:
-endpoint/server action, alur data, format request/response LLM, validasi Zod.
-
-> **Pola LLM call seragam:** server init provider via
-> `createOpenAICompatible({ name, apiKey, baseURL })`, panggil
-> `generateObject` (structured output + Zod schema) bila provider dukung
-> `supportsStructuredOutputs: true`, fallback `streamText` + parse JSON.
-> System prompt template di `lib/ai/prompts/`. Sitasi: `RAG-CONTEXT.md 5.1, 11 #1`
-
-### FR-01: Input Judul Animasi
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint/UI | Client form di `/generate` (Client Component) -> Server Action `createProject` / POST `/api/generate` |
-| Input field | `title: string` (Zod `z.string().min(3).max(200).trim()`) |
-| Validasi | Zod schema `lib/validation/schemas.ts` `TitleSchema`. Trim whitespace otomatis. Sanitize HTML (escape `<>"'&`) sebelum pass ke prompt. |
-| Proses | `title` di-inject ke system prompt LLM sebagai topik utama. Disimpan di record Project. |
-| Output | `title` di root JSON hasil generate + di record Project. |
-| Error | Zod parse fail -> 400 + pesan bahasa aktif (ID/EN, FR-19). |
-| Bukti | `PRD.md 5 (FR-01)` |
-
-### FR-02: Input Durasi Target
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint/UI | Select `duration_type` (`shorts`/`tutorial`) + numeric `target_seconds` opsional override |
-| Validasi | Zod `DurationSchema`: `duration_type: z.enum(['shorts','tutorial'])`, `target_seconds: z.number().int().positive().optional()`. Aturan: shorts `target_seconds > 180` -> 400. Tutorial di luar 420-900 -> warning (boleh proceed, return flag `warning`). |
-| Proses | Hitung perkiraan jumlah adegan (ASUMSI P-A12: shorts 3-6, tutorial 8-20). Pass `duration_target` + `duration_type` + `estimated_scenes` ke system prompt LLM. |
-| Output | `duration_target` + `duration_type` di record Project + root JSON. LLM generate `scenes[]` sesuai target. |
-| Error | 400 jika `duration_type` invalid / shorts > 180s. |
-| Bukti | `PRD.md 5 (FR-02)` ; ASUMSI P-A12 `PRD.md 10.2` |
-
-### FR-03 & FR-09: Generate Deskripsi Adegan Berurut
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | POST `/api/generate` (streaming SSE) atau Server Action `generatePromptPackage` |
-| Input | `title`, `duration_target`, `style`, `aspect_ratio`, `character_profiles` (dari FR-07), `reference_images[]` (opsional) |
-| System prompt | Template `lib/ai/prompts/scenes.system.ts`. Instruksi: generate `scenes[]` urut sesuai `estimated_scenes`, tiap scene: `order` (number 1..N), `description` (apa yang terjadi), `voiceover_script` (FR-04), `image_prompts` (FR-06 per scene varian). Reference karakter via `character_id`/nama, BUKAN duplikasi deskripsi (FR-07 master). |
-| LLM call | `generateObject({ model, schema: PromptPackageSchema, system, messages })`. Streaming partial via `streamObject` bila provider dukung. |
-| Output | `scenes[]` array di structured JSON. |
-| Konsistensi | Post-check: tiap `scenes[].image_prompts.characters[].target` harus match `character_profiles[].nama`. Mismatch -> warning (FR-12). |
-| Error | Provider timeout -> streaming partial disimpan (ASUMSI NFR-R2). Retry 3x backoff (ASUMSI NFR-R3). Provider gagal total -> error jelas + opsi switch provider (FR-13). |
-| Bukti | `PRD.md 5 (FR-03, FR-09)` |
-
-### FR-04: Generate Naskah Voiceover
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama FR-03 (generate paket). `voiceover_script` field per scene. |
-| Input | `title`, `duration_target`, target penonton (ASUMSI infer dari judul/style), `scenes[]` |
-| System prompt | Template `lib/ai/prompts/voiceover.system.ts`. Instruksi: generate `voiceover_script` per scene, ekspresi sesuai judul & audiens, bahasa ikut judul (ASUMSI NFR-I2). |
-| Output | `voiceover_script: string` per scene (teks, BUKAN audio). |
-| Catatan | TTS out of scope (`BRD.md 8.2 #2`, OOS-T2). |
-| Bukti | `PRD.md 5 (FR-04)` |
-
-### FR-05: Auto-buat Deskripsi Karakter & Background jika Tidak Ada Referensi
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama generate paket. |
-| Input | `title`, `reference_images[]` (opsional) |
-| Proses | Branch di system prompt: jika `reference_images` kosong -> LLM invent `character_profiles[]` + `image_prompts.backgrounds[]` sesuai judul. Jika ada -> pakai referensi (FR-17, inject `reference_filename`). |
-| Output | `character_profiles[]` + `image_prompts.backgrounds[]` lengkap. |
-| Bukti | `PRD.md 5 (FR-05)` |
-
-### FR-06: Generate Image Prompt per Tokoh & per Background (List)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama generate paket. |
-| Input | `character_profiles[]`, `scenes[]`, `reference_images[]` (opsional) |
-| System prompt | Template `lib/ai/prompts/image_prompts.system.ts`. Instruksi: generate list `image_prompts.characters[]` (1 prompt per tokoh, N tokoh = N prompt) & `image_prompts.backgrounds[]` (1 per tempat). Tiap item: `target` (nama tokoh/tempat), `prompt_text` (detail visual konsisten dengan `character_profiles`), `reference_filename` (nama file upload atau null). Jika ada referensi -> rujuk `reference_filename` dalam `prompt_text`. |
-| Output | `image_prompts.characters[]` + `image_prompts.backgrounds[]` di root JSON + varian per scene di `scenes[].image_prompts`. |
-| Konsistensi | `prompt_text` tokoh WAJIB konsisten dengan `character_profiles` (nama, rambut, wajah, pakaian, alas kaki). |
-| Bukti | `PRD.md 5 (FR-06)` ; pola rujuk nama file = konvensi teks `RAG-CONTEXT.md 6` |
-
-### FR-07: Deskripsi Tokoh Terstruktur Konsisten
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama generate paket. |
-| Input | `title`, daftar tokoh (dari LLM atau user input opsional ASUMSI) |
-| Struktur WAJIB | Zod `CharacterProfileSchema`: per karakter `nama: string`, `gayarambut: string`, `wajah_asal: string`, `pakaian_atas: string`, `pakaian_bawah: string`, `alas_kaki: string`, `deskripsi_latar: string`, `aksi: string`, `peran: z.enum(['utama','lain','pendamping'])`. |
-| Proses | LLM generate `character_profiles[]` sekali (master) via `generateObject` dengan schema. Dirujuk lintas adegan via nama/id, BUKAN duplikasi deskripsi per scene. |
-| Output | `character_profiles[]` array master di root JSON. |
-| Konsistensi | WAJIB stabil lintas `scenes[]` (FR-12). Identitas (nama, wajah, pakaian) tetap; `aksi` & `deskripsi_latar` boleh berubah per scene. |
-| Bukti | Struktur SELARAS praktik prompt engineering. `RAG-CONTEXT.md 4 (catatan), 6` (mengacu https://kling.ai/blog/ai-character-consistency-guide ; https://glibatree.com/proven-consistent-character-method/) ; `PRD.md 5 (FR-07)` |
-
-### FR-08: Deskripsi Karakter Pendukung / Hewan + Aksi
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama generate paket. |
-| Input | `title`, `scenes[]` |
-| System prompt | Instruksi: identifikasi karakter pendukung/hewan per scene + aksi. |
-| Output | `supporting_characters[]` (per scene atau global) dengan `nama: string`, `tipe: z.enum(['pendukung','hewan'])`, `aksi: string`. |
-| Bukti | `PRD.md 5 (FR-08)` |
-
-### FR-10: Pilih Gaya Gambar + Rasio Aspect
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint/UI | Select `style: z.enum(['3D','2D'])` + select `aspect_ratio: z.enum(['16:9','9:16','1:1']).or(z.string())` (custom allowed) |
-| Proses | Pass ke system prompt LLM sebagai constraint visual. Di-inject ke image prompts. |
-| Output | `style` + `aspect_ratio` di root JSON + di-inject ke `image_prompts`. |
-| Bukti | `PRD.md 5 (FR-10)` |
-
-### FR-11: Pesan Moral Penutup
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Sama generate paket. |
-| Input | `title`, `scenes[]`, tone (ASUMSI infer dari judul — default positif/edukatif) |
-| System prompt | Instruksi: generate `moral_message` di akhir paket, positif/edukatif. |
-| Output | `moral_message: string` di root JSON. |
-| Bukti | `PRD.md 5 (FR-11)` ; `BRD.md 5.3` |
-
-### FR-12: Konsistensi Visual Karakter Lintas Adegan
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Aturan | Identitas (nama, gaya rambut, wajah/asal, pakaian atas/bawah, alas kaki) WAJIB stabil lintas `scenes[]`. `aksi` & `deskripsi_latar` BOLEH berubah. |
-| Mekanisme | Character master (FR-07) dirujuk via id/nama di `scenes[]`, bukan duplikasi. Zod schema enforce `scenes[].image_prompts.characters[].target` reference `character_profiles[].nama`. |
-| Validasi post-generate | Helper `lib/ai/consistency-check.ts`: banding `character_profiles` identitas vs reference di `scenes[]`. Mismatch -> warning (return flag, tidak block save). |
-| Bukti | `RAG-CONTEXT.md 4 (catatan)` ; `PRD.md 5 (FR-12)` |
-
-### FR-13: Multi-Provider LLM Setting
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | GET/POST/PUT/DELETE `/api/settings/providers` (Server Action `saveProviderConfig`) |
-| Input form | `provider: z.enum(['ollama','openrouter','9router','custom'])`, `base_url: z.string().url()`, `model: string`, `api_key: string` (password field) |
-| Base URL default | Ollama: `https://ollama.com/v1` ; OpenRouter: `https://openrouter.ai/api/v1` ; 9router: `http://localhost:20128/v1` ; custom: user input. |
-| Provider factory | `lib/ai/provider.factory.ts`: `createOpenAICompatible({ name: provider, apiKey: decrypt(key), baseURL })`. Hanya server-side. `RAG-CONTEXT.md 5.1` |
-| Auth header | OpenRouter: `Authorization: Bearer`, opsional `HTTP-Referer`, `X-OpenRouter-Title`. Ollama cloud: Bearer. 9router: ASUMSI Bearer/none (TIDAK ADA BUKTI - `RAG-CONTEXT.md 9 G4`). Pass via `createOpenAICompatible` opsi `headers`. |
-| Output | ProviderConfig tersimpan (API key terenkripsi FR-14). Provider aktif dipakai saat generate. |
-| Fallback | Provider gagal -> error jelas + opsi switch manual (ASUMSI P-A13: tidak auto-fallback fase awal). |
-| Bukti | `RAG-CONTEXT.md 5.1, 5.2` ; `PRD.md 5 (FR-13)` |
-
-### FR-14: Enkripsi API Key
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Aturan | API key WAJIB dienkripsi saat simpan DB, TIDAK diekspos ke client. |
-| Mekanisme | `lib/crypto/aes.ts`: AES-256-GCM via env `ENCRYPTION_KEY` (32 byte base64). `encrypt(plaintext): {iv, ciphertext, tag}`, `decrypt({iv, ciphertext, tag}): plaintext`. ASUMSI P-A10 (`RAG-CONTEXT.md 11 #4`). |
-| Proses | Encrypt sebelum save DB (ProviderConfig.api_key_encrypted). Decrypt hanya server-side saat panggil LLM di `provider.factory.ts`. |
-| Response client | API response provider config: `api_key` = mask `****` (tampilkan 4 char terakhir). TIDAK pernah return plaintext. |
-| Bukti | `BRD.md 6 R6` ; `PRD.md 5 (FR-14)` ; ASUMSI P-A10 `RAG-CONTEXT.md 11 #4` |
-
-### FR-15: Save Project + CRUD
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Create | POST `/api/projects` (Server Action). Simpan: `title`, `duration_target`, `duration_type`, `style`, `aspect_ratio`, `reference_images[]` (metadata), `result` (JSON hasil generate, serialize), `user_id`, `created_at`. |
-| Read/List | GET `/api/projects?page=N&limit=M`. Paginate per user (filter `user_id`). Server Component fetch. |
-| Detail | GET `/api/projects/[id]`. Ownership check: `project.user_id === session.user.id`. |
-| Update | PUT `/api/projects/[id]`. Update metadata + re-generate (overwrite `result`). |
-| Delete | DELETE `/api/projects/[id]`. Cascade: hapus reference images metadata + hasil. Soft/hard delete (ASUMSI soft delete fase awal dengan flag `deleted_at`). |
-| Validasi | Ownership check semua operasi (butuh FR-18 login). |
-| DB | Turso/libSQL via Drizzle. Entitas lihat section 6. |
-| Bukti | `PRD.md 5 (FR-15)` ; `RAG-CONTEXT.md 4` |
-
-### FR-16: Export Hasil (JSON + Markdown)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | GET `/api/export?projectId=X&format=json` atau `?format=markdown` |
-| Format JSON | Response `Content-Type: application/json`, header `Content-Disposition: attachment; filename="<title>.json"`. Body = structured JSON (PRD 8.2). |
-| Format Markdown | Route handler transform JSON -> markdown via template `lib/export/markdown.template.ts`. Struktur: judul+metadata, profil karakter (master), karakter pendukung, adegan urut (deskripsi+voiceover+image prompt tokoh/background+reference_filename), image prompt master list, pesan moral. Response `Content-Type: text/markdown`, download `.md`. |
-| Proses | Server route handler. Tidak generate ulang, pakai `result` tersimpan di Project. |
-| Output | File download via browser. |
-| Bukti | `PRD.md 5 (FR-16), 8.3` |
-
----
-### FR-17: Upload Referensi Gambar + Rujuk Nama File (SHOULD)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | POST `/api/upload` (multipart/form-data) |
-| Input | `reference_images[]` dengan field `tipe: z.enum(['tokoh','background'])` + `label: string` + file `image` (mime `image/*`, max size ASUMSI 10MB) |
-| Storage | `lib/storage/blob.ts`: upload ke Vercel Blob via `put()`, dapatkan `url` publik + `filename`. ASUMSI A5 (`RAG-CONTEXT.md 6, 9 G3`). Dev lokal: simpan ke `public/references/` (ASUMSI, tidak persisten di Vercel prod). |
-| Metadata | Simpan record `AssetReference` (filename, path/url, tipe, project_id, created_at) ke Turso. |
-| Saat generate | Inject `reference_filename` ke image prompt teks (FR-06): mis `"Character 'Hero' — reference image: hero-ref.png. Maintain visual consistency with this reference."`. |
-| Output | `image_prompts.characters[].reference_filename` & `image_prompts.backgrounds[].reference_filename` terisi nama file. |
-| Catatan | Filesystem Vercel tidak persisten -> WAJIB Vercel Blob/S3/R2 di prod. `RAG-CONTEXT.md 5.4, 6` |
-| Bukti | `PRD.md 5 (FR-17)` ; ASUMSI A5 `RAG-CONTEXT.md 6, 9 G3` |
-
-### FR-18: Login Dasar NextAuth (SHOULD)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Mekanisme | NextAuth.js (Auth.js) v5+ di `lib/auth/config.ts`. ASUMSI provider credentials sederhana fase awal (TIDAK ADA BUKTI preferensi - `RAG-CONTEXT.md 9 G2`). Bisa pakai Turso adapter untuk session store atau JWT cookie. |
-| Session | JWT/cookie session. Protected routes: `/projects`, `/settings`, `/generate`, `/api/projects`, `/api/settings`. Middleware `lib/auth/middleware.ts` redirect ke `/login` jika unauth. |
-| Endpoint | `/api/auth/[...nextauth]/route.ts` (handler NextAuth). |
-| Dampak | Dibutuhkan untuk KPI retention (K3) & ownership project. `BRD.md 3.2 catatan` |
-| Bukti | ASUMSI A1/P-A1 `BRD.md 7.1` ; `PRD.md 5 (FR-18)` ; `RAG-CONTEXT.md 7, 9 G2` |
-
-### FR-19: UI Dwibahasa ID + EN (SHOULD)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Mekanisme | i18n via `next-intl` (ASUMSI) di `src/i18n/`. Locale `id` + `en`. Toggle di header. Persisten via cookie. |
-| Scope | UI label, pesan error, placeholder, tombol. Konten generate LLM bahasa sesuai input/judul (ASUMSI NFR-I2 ikut judul). |
-| File | `src/i18n/messages/id.json`, `src/i18n/messages/en.json`. |
-| Bukti | ASUMSI A2/P-A2 `BRD.md 7.1` ; `PRD.md 5 (FR-19)` ; `RAG-CONTEXT.md 9 G5` |
-
-### FR-20..FR-22 (COULD) & FR-23..FR-28 (WONT)
-
-Detail ditangguhkan ke fase akhir. Asumsi di `MRD.md 10` & `PRD.md 10.2`. SRS
-fase awal tidak spesifikasikan. F-23 (payment) WONT `BRD.md 8.2 #5`. F-24
-(media gen) WONT OOS-T1. F-25 (TTS) WONT OOS-T2.
+Situs: RAG-CONTEXT.md S2 (Tech Stack Tabel), package.json:22-81
 
 ---
 
-## 6. Data Model Overview
+## 6. Spesifikasi Fungsional Detail V2
 
-> **Catatan:** Overview di sini. Detail penuh tabel, kolom, tipe, index,
-> constraint, migration, seed di `DATABASE_SCHEMA.md`. SRS hanya definisikan
-> entitas + atribut kunci + relasi.
+### 6.1 FR-V2-01: Image Reference di Generate Page
 
-### 6.1 Entitas & Atribut Kunci
+| Aspek | Realisasi Teknis |
+|---|---|
+| Lokasi | Generate page (/generate) -- bukan project detail |
+| Komponen | DropzoneUploader dipindah dari projects/[id]/page.tsx:78 ke generate-form.tsx |
+| Upload flow | 1) User drag-drop multi-file di generate form. 2) Upload ke storage. 3) Metadata simpan di asset_references (tanpa projectId). 4) List refs muncul di form sebelum submit. |
+| Multi-file | Sudah didukung dropzone-uploader.tsx:72 (multiple attribute). Max 10MB per file, mime image/(png|jpe?g|gif|webp|svg+xml) |
+| Backward compat | Project detail page tetap view refs (read-only). Upload di project detail DIHAPUS dari UI. |
+| Submit flow | Generate submit -> buat project (draft) -> attach refs ke project -> generate prompt |
+| Dampak schema | TIDAK perlu migration |
+| Komponen baru | AssetPreviewList -- menampilkan daftar gambar yang sudah di-upload dengan thumbnail + role badge + nama |
 
-| Entitas | Atribut kunci | Relasi | Bukti |
-|---|---|---|---|
-| `User` | `id`, `email`, `name`, `created_at` | 1:N Project, 1:N ProviderConfig | ASUMSI A1 `BRD.md 7.1` ; `RAG-CONTEXT.md 7, 9 G2` |
-| `ProviderConfig` | `id`, `user_id`, `provider` (ollama/openrouter/9router/custom), `base_url`, `model`, `api_key_encrypted` (AES-256-GCM), `created_at`, `updated_at` | N:1 User | `PRD.md 5 (FR-13, FR-14)` ; `RAG-CONTEXT.md 4 (Setting)` |
-| `Project` | `id`, `user_id`, `title`, `duration_type`, `duration_target_seconds`, `style_type` (3D/2D), `aspect_ratio`, `result_json` (TEXT serialize hasil generate), `status`, `created_at`, `updated_at`, `deleted_at` (soft) | N:1 User, 1:N AssetReference, 1:N GenerationLog | `RAG-CONTEXT.md 4 (Project)` ; `PRD.md 5 (FR-15)` |
-| `AssetReference` | `id`, `project_id`, `tipe` (tokoh/background), `filename`, `blob_url`, `label`, `created_at` | N:1 Project | `RAG-CONTEXT.md 4 (ReferenceImage)` ; `PRD.md 5 (FR-17)` |
-| `Character` | `id`, `project_id`, `nama`, `gayarambut`, `wajah_asal`, `pakaian_atas`, `pakaian_bawah`, `alas_kaki`, `deskripsi_latar`, `aksi`, `peran` (utama/lain/pendamping) | N:1 Project | `RAG-CONTEXT.md 4 (Character)` ; `PRD.md 5 (FR-07)` |
-| `Scene` | `id`, `project_id`, `order`, `description`, `voiceover_script`, `created_at` | N:1 Project, 1:N ImagePrompt | `RAG-CONTEXT.md 4 (Scene)` ; `PRD.md 5 (FR-03, FR-04)` |
-| `ImagePrompt` | `id`, `scene_id` (nullable untuk master list root), `project_id`, `tipe` (tokoh/background), `target` (nama tokoh/tempat), `prompt_text`, `reference_filename` (nullable) | N:1 Scene (varian per scene) atau N:1 Project (master list root) | `RAG-CONTEXT.md 4 (ImagePrompt)` ; `PRD.md 5 (FR-06)` |
-| `GenerationLog` | `id`, `project_id`, `provider`, `model`, `duration_ms`, `status` (success/fail/partial), `error_message`, `created_at` | N:1 Project | ASUMSI (telemetri, KPI K5 `BRD.md 3.2`) |
-| `SupportingCharacter` | `id`, `project_id` atau `scene_id`, `nama`, `tipe` (pendukung/hewan), `aksi` | N:1 Project atau N:1 Scene | `PRD.md 5 (FR-08)` |
+Situs: RAG-CONTEXT.md S9 V2-1, PRD V2.0 S5 (FR-V2-01), dropzone-uploader.tsx:1-97
 
-### 6.2 Catatan Desain Data
+### 6.2 FR-V2-02: AI Image Classification via Vision LLM
 
-1. **Character master + Scene reference:** `Character` = master konsisten
-   per project. `Scene` reference karakter via `nama`/id, BUKAN duplikasi
-   deskripsi per scene. Ini enforce konsistensi FR-07/FR-12.
-   - Sitasi: `RAG-CONTEXT.md 4 (catatan konsistensi karakter)`
-2. **ImagePrompt dua tipe:** (a) master list root (`scene_id` null, 1 per
-   tokoh/tempat global), (b) varian per scene (`scene_id` terisi, aksi/latar
-   beda per adegan). `PRD.md 8.2 catatan field`.
-3. **result_json:** hasil generate disimpan serialize TEXT di `Project.result_json`
-   untuk export cepat & history. Entitas terpisah (`Scene`, `Character`,
-   `ImagePrompt`) untuk query/filter/relasi bila perlu (ASUMSI, bisa hanya
-   simpan JSON saja fase awal bila query entitas tidak dibutuhkan — keputusan
-   `DATABASE_SCHEMA.md`).
-4. **API key enkripsi:** `ProviderConfig.api_key_encrypted` = JSON
-   `{iv, ciphertext, tag}` (AES-256-GCM). TIDAK ada kolom plaintext.
-   - Sitasi: ASUMSI P-A10 `RAG-CONTEXT.md 11 #4`
-5. **Soft delete:** `Project.deleted_at` nullable. ASUMSI fase awal soft
-   delete untuk retention/history.
-6. **Batas tokoh:** ASUMSI P-A3 default 10 per project (`BRD.md 7.1 A3`).
-   Validasi di Zod schema input.
+| Aspek | Realisasi Teknis |
+|---|---|
+| Endpoint | POST /api/v1/upload/classify (baru) atau auto-trigger saat upload |
+| Input | assetReferenceId (atau auto-trigger setelah upload) |
+| Vision LLM | GPT-4o Vision ATAU Gemini Vision (tergantung provider aktif) |
+| Prompt | Analyze this image and classify its role in an animation project. Return JSON: {role, name, description, confidence} |
+| Output | {role, name, description, confidence} |
+| Update DB | asset_references.tipe = role, asset_references.label = name, asset_references.ai_classification = JSON string |
+| Confidence threshold | 0.7 -- di bawah threshold = warning, suggest manual override |
+| Manual override | User bisa ubah role via dropdown di UI sebelum submit |
+| Fallback | Vision LLM gagal -> manual select (V1 behavior: tokoh/background) |
+| Cache | Simpan hasil di asset_references.ai_classification agar tidak reclassify |
+| Rate limit | Batch classify max 5 gambar per call |
+| Dampak schema | Tambah kolom ai_classification (TEXT nullable) di asset_references |
+| Komponen baru | ClassificationResult -- thumbnail + role badge + nama + deskripsi + confidence bar + override dropdown |
+
+Situs: RAG-CONTEXT.md S9 V2-3, PRD V2.0 S5 (FR-V2-02), RAG-CONTEXT.md S10 B
+
+### 6.3 FR-V2-03: Extended Role Classification (6 Opsi)
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| Opsi tipe | tokoh, background, prop, accessory, environment, other |
+| Zod update | GenerateReferenceSchema.type: z.enum(['tokoh','background','prop','accessory','environment','other']) |
+| Upload validation | upload/route.ts:32-33 -- extend dari 2 opsi ke 6 opsi |
+| DropzoneUploader | Select options: 6 opsi (dari hanya tokoh/background) |
+| Prompt builder | Inject tipe ke LLM context: Referensi: wahab.jpg (tokoh), meja.jpg (prop) |
+| ImagePrompt tipe | schema.ts:104 -- tetap text tanpa CHECK constraint |
+| Dampak schema | TIDAK perlu migration |
+
+Situs: RAG-CONTEXT.md S9 V2-2, PRD V2.0 S5 (FR-V2-03), schemas.ts:106-109
+
+### 6.4 FR-V2-04: Field Deskripsi Singkat Cerita
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| UI | Textarea opsional di generate form, di bawah field judul |
+| Validasi | Optional. Max 500 char. Trim whitespace. |
+| Zod | GenerateInputSchema: tambah storyDescription: z.string().max(500).optional() |
+| Prompt injection | buildUserMessage(): tambah Deskripsi cerita:  bila terisi |
+| DB opsional | Tambah kolom story_description (TEXT nullable) di projects table |
+| Save flow | Simpan di projects.story_description saat create project |
+| Dampak schema | Tambah kolom story_description (TEXT nullable) di projects |
+
+Situs: RAG-CONTEXT.md S9 V2-4, PRD V2.0 S5 (FR-V2-04), generate-form.tsx:178-238
+
+### 6.5 FR-V2-05: Real-time Processing Logs
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| SSE events | Extend protocol: tambah event type log |
+| Log event format | data: {"type":"log","level":"info","message":"[generate] Starting...","timestamp":"..."} |
+| Level | info, warn, error |
+| Backend | Collect console.log ke buffer array. Kirim via SSE setiap ada log baru. |
+| Frontend | LogViewer component -- Collapsible panel di bawah stage tracker |
+| Toggle | Switch show/hide. Default OFF. Toggle ON = terima log events. |
+| UI | Log per stage + timestamp + level badge (info=blue, warn=yellow, error=red) |
+| Persistence | Opsional: tambah kolom logs_json (TEXT nullable) di generation_logs |
+| Dampak schema | Opsional: tambah logs_json (TEXT nullable) di generation_logs |
+
+Situs: RAG-CONTEXT.md S9 V2-5, PRD V2.0 S5 (FR-V2-05), generate/route.ts:20-27
+
+### 6.6 FR-V2-06: Dashboard Enrichment
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| Endpoint | Extend GET /api/v1/dashboard/stats response |
+| Metrics baru | Total projects, successful generations, avg duration, total uploads, success rate, active providers |
+| Charts | Line chart: projects per minggu. Bar chart: success vs fail ratio. Library: Recharts atau Tremor. |
+| Per-provider | Table: provider name, avg duration, success rate, total calls |
+| Recent activity | Table: 5 project terbaru + status + tanggal |
+| Storage usage | Card: total files, total size |
+| Refactor | Dashboard queries pindah dari direct Drizzle ke repository pattern |
+| Dampak schema | TIDAK perlu |
+| Performance | Dashboard load <= 1.5s |
+
+Situs: RAG-CONTEXT.md S9 V2-6, PRD V2.0 S5 (FR-V2-06), dashboard/page.tsx:1-72
+
+### 6.7 FR-V2-07: Konsistensi UI
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| loading.tsx | Tambah loading.tsx di: /generate, /projects, /projects/[id], /dashboard, /settings |
+| error.tsx | Tambah error.tsx boundary per page group: error message + retry button + link home |
+| Disabled state | Semua form field disabled saat generating/loading |
+| Empty state | Ilustrasi + pesan + CTA untuk empty projects, empty results |
+| Design tokens | Primary violet #7c3aed, font Inter, spacing 4px base, radius 6px |
+| Badge variants | Pastikan: success, secondary, destructive, info tersedia |
+| Loading skeleton | Skeleton cards di projects list via Suspense |
+
+Situs: RAG-CONTEXT.md S9 V2-7, PRD V2.0 S5 (FR-V2-07)
+
+### 6.8 FR-V2-08: SQA Testing Menyeluruh
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| Unit test | Vitest -- target >= 80% coverage unit/integration |
+| E2E test | Playwright -- critical path: login -> set provider -> upload + classify -> generate -> save -> export |
+| Lint | ESLint (next lint) -- 0 error, 0 warning |
+| Type check | tsc --noEmit -- 0 error |
+| Build | next build -- sukses tanpa error |
+| Manual test | Semua V2 features |
+| Performance test | Latency: Shorts <= 60s, Tutorial <= 180s, Dashboard <= 1.5s, Page transition <= 200ms |
+| CI gate | PR tidak merge bila lint/typecheck/test/e2e/build fail |
+
+Situs: RAG-CONTEXT.md S9 V2-8, PRD V2.0 S5 (FR-V2-08)
+
+### 6.9 FR-V2-09: Navigation Optimization
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| Pagination | Projects list: ?page=1&limit=20. UI: page numbers + prev/next. Server-side. |
+| Suspense | Tambah Suspense boundaries di projects list, dashboard, generate page |
+| loading.tsx | Streaming SSR via Next.js App Router loading states |
+| Client-side nav | Next.js Link component untuk soft navigation |
+| Image optimization | Next.js Image component untuk thumbnails |
+| Prefetch | Next.js Link prefetch=true untuk navigasi umum |
+
+Situs: RAG-CONTEXT.md S9 V2-9, PRD V2.0 S5 (FR-V2-09)
+
+### 6.10 FR-V2-10: Push ke GitHub
+
+| Aspek | Realisasi Teknis |
+|---|---|
+| Repo | https://github.com/agrianwahab29/promptflow.git |
+| Init | git init di root proyek |
+| .gitignore | node_modules, .env.local, .next, public/references, *.tsbuildinfo, drizzle/meta |
+| Commit | Conventional commits: feat(scope): ..., fix(scope): ... |
+| Branch | main branch. Feature branches: feat/v2-upload, feat/v2-classification |
+| Remote | git remote add origin https://github.com/agrianwahab29/promptflow.git |
+| Push | git push -u origin main |
+
+Situs: RAG-CONTEXT.md S9 V2-10, PRD V2.0 S5 (FR-V2-10), BRD V2.0 S5.1 S9
 
 ---
-## 7. Interface/API Overview
 
-> **Catatan:** Overview di sini. Detail penuh endpoint, method, request/response
-> schema, status code, auth, error envelope, pagination di `API_CONTRACT.md`.
+## 7. Data Model & Perubahan Schema
 
-### 7.1 Route Overview
+### 7.1 Schema Existing V1 (9 tabel -- pertahankan)
 
-| Route | Method | Fungsi | Auth | Bukti |
-|---|---|---|---|---|
-| `/api/auth/[...nextauth]` | GET/POST | NextAuth handler login/logout/session | NextAuth | `PRD.md 5 (FR-18)` |
-| `/api/projects` | GET | List project per user (paginate) | wajib | `PRD.md 5 (FR-15)` |
-| `/api/projects` | POST | Create project + simpan hasil generate | wajib | `PRD.md 5 (FR-15)` |
-| `/api/projects/[id]` | GET | Detail project by id (ownership check) | wajib | `PRD.md 5 (FR-15)` |
-| `/api/projects/[id]` | PUT | Update metadata + re-generate | wajib | `PRD.md 5 (FR-15)` |
-| `/api/projects/[id]` | DELETE | Soft/hard delete + cascade | wajib | `PRD.md 5 (FR-15)` |
-| `/api/generate` | POST | Generate paket prompt (streaming SSE) | wajib | `PRD.md 5 (FR-03..FR-12)` |
-| `/api/settings/providers` | GET | List provider config per user (mask key) | wajib | `PRD.md 5 (FR-13)` |
-| `/api/settings/providers` | POST | Save provider config (encrypt key) | wajib | `PRD.md 5 (FR-13, FR-14)` |
-| `/api/settings/providers/[id]` | PUT | Update provider config | wajib | `PRD.md 5 (FR-13)` |
-| `/api/settings/providers/[id]` | DELETE | Hapus provider config | wajib | `PRD.md 5 (FR-13)` |
-| `/api/upload` | POST | Upload gambar referensi (multipart) -> Vercel Blob | wajib | `PRD.md 5 (FR-17)` |
-| `/api/export` | GET | Export JSON / markdown (`?projectId&format`) | wajib | `PRD.md 5 (FR-16)` |
-
-### 7.2 Pola Streaming SSE `/api/generate`
-
-```
-POST /api/generate
-Content-Type: application/json
-Body: { title, duration_type, target_seconds?, style, aspect_ratio, reference_images? }
-
-Response: text/event-stream (SSE)
-  data: { "type": "partial", "field": "character_profiles", "delta": "..." }
-  data: { "type": "partial", "field": "scenes", "delta": "..." }
-  ...
-  data: { "type": "done", "result": <full structured JSON> }
-  data: { "type": "error", "message": "...", "provider": "..." }
-```
-
-- Pakai AI SDK `streamObject` / `streamText` -> ReadableStream -> SSE response.
-- Client render real-time per komponen (NFR-U1, NFR-U2).
-- Token mulai mengalir < 10s (NFR-P3). ASUMSI A6 `RAG-CONTEXT.md 5.4, 9 G6`.
-
-### 7.3 Error Envelope (ASUMSI)
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR" | "PROVIDER_ERROR" | "AUTH_ERROR" | "TIMEOUT" | "INTERNAL",
-    "message": "string (bahasa aktif)",
-    "details": { } 
-  }
-}
-```
-
-- HTTP status: 400 (validation), 401 (auth), 404 (not found), 429 (rate limit),
-  500 (internal), 502/504 (provider timeout).
-- ASUMSI format. Detail final di `API_CONTRACT.md`.
-
----
-
-## 8. Constraint Teknis
-
-### 8.1 Vercel Serverless Constraint
-
-| Constraint | Dampak | Mitigasi | Bukti |
-|---|---|---|---|
-| Filesystem tidak persisten | SQLite file lokal hilang saat instance recycle | WAJIB Turso/libSQL remote HTTP. TIDAK boleh SQLite file di prod. | `RAG-CONTEXT.md 2.2, 5.4` |
-| Function timeout | Generasi multi-prompt panjang berisiko timeout | Streaming SSE (token mengalir < 10s, NFR-P3). Vercel plan: Hobby 10s, Pro 60s/300s (ASUMSI plan-specific). Pecah generate per komponen bila perlu. | `RAG-CONTEXT.md 5.4, 9 G6` ; ASUMSI A6 |
-| Upload gambar di FS lokal | Hilang saat recycle | Vercel Blob untuk prod. Dev lokal `public/references/` (ASUMSI). | `RAG-CONTEXT.md 5.4, 6` |
-| Tidak ada native queue gratis | Job background panjang | ASUMSI streaming SSE synchronous. Bila perlu background job, pakai layanan eksternal (ASUMSI fase akhir). | `RAG-CONTEXT.md 5.4` |
-
-### 8.2 Turso/libSQL Constraint
-
-| Constraint | Dampak | Mitigasi | Bukti |
-|---|---|---|---|
-| Akses via HTTP | Latency query < 500ms (NFR-P5) | Drizzle ORM + `@libsql/client`. Pool koneksi Drizzle. | `RAG-CONTEXT.md 2.2` |
-| Env config | `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` via Vercel env | Drizzle client init di `lib/db/client.ts`. | https://docs.turso.tech/sdk/ts/guides/nextjs |
-| SQLite-compatible | Fitungsi SQLite subset | Hindari fitur PostgreSQL-specific. Pakai tipe SQLite. | `RAG-CONTEXT.md 2.1` |
-
-### 8.3 Multi-Provider LLM Constraint
-
-| Constraint | Dampak | Mitigasi | Bukti |
-|---|---|---|---|
-| Semua provider WAJIB OpenAI-compatible | Ollama cloud pakai `https://ollama.com/v1` (bukan native `/api`) | `createOpenAICompatible`. Ollama native REST = out. | `RAG-CONTEXT.md 5.1, 5.2` ; https://docs.openclaw.ai/providers/ollama-cloud |
-| Structured output tidak semua provider dukung | `supportsStructuredOutputs` bervariasi | Cek capability provider. Bila tidak dukung -> fallback `streamText` + parse JSON manual + validasi Zod. | `RAG-CONTEXT.md 5.1, 11 #1` |
-| 9router `http://localhost:20128/v1` hanya lokal | Tidak reachable dari Vercel prod | 9router hanya untuk dev/lokal user. Prod: user pakai Ollama cloud/OpenRouter/custom. Server-side call only (TIDAK expose ke client). | `RAG-CONTEXT.md 5.2, 9 G4` ; ASUMSI P-A7 |
-| API key per provider berbeda format | Ollama Bearer, OpenRouter Bearer+header opsional, 9router ASUMSI | Pass via `createOpenAICompatible` opsi `headers`. OpenRouter: `HTTP-Referer`, `X-OpenRouter-Title` opsional. | `RAG-CONTEXT.md 5.2, 5.3` |
-| Rate limit provider | Generasi gagal | Retry 3x backoff (NFR-R3). Error jelas + opsi switch manual. | ASUMSI NFR-R3 ; `PRD.md 5 (FR-13)` |
-
-### 8.4 API Key Enkripsi Constraint
-
-| Constraint | Dampak | Mitigasi | Bukti |
-|---|---|---|---|
-| API key user WAJIB enkripsi saat simpan | Kebocoran kredensial | AES-256-GCM via env `ENCRYPTION_KEY` (32 byte). `lib/crypto/aes.ts`. | ASUMSI P-A10 `RAG-CONTEXT.md 11 #4` |
-| API key TIDAK expose ke client | Response mask `****` | Helper mask di API response. Decrypt hanya server-side di `provider.factory.ts`. | `BRD.md 6 R6` ; `PRD.md 5 (FR-14)` |
-| `ENCRYPTION_KEY` env wajib ada | App gagal decrypt | Vercel env var. `.env.example` dokumentasi. | ASUMSI TD8 |
-
-### 8.5 Vercel Blob Constraint
-
-| Constraint | Dampak | Mitigasi | Bukti |
-|---|---|---|---|
-| Vercel Blob butuh token `BLOB_READ_WRITE_TOKEN` | Upload gagal bila env kosong | Env var Vercel. `lib/storage/blob.ts` init. | ASUMSI A5 `RAG-CONTEXT.md 6` |
-| URL publik rujuk nama file | Prompt teks rujuk URL/filename | `reference_filename` di image prompt = filename dari Blob. | `RAG-CONTEXT.md 6` |
-| Dev lokal tanpa Blob | Upload ke FS lokal (tidak persisten di Vercel) | ASUMSI dev pakai `public/references/`, prod pakai Blob. Flag env `USE_VERCEL_BLOB`. | ASUMSI |
-
-### 8.6 Output Format Constraint
-
-| Constraint | Spesifikasi | Bukti |
+| # | Tabel | Status V2 |
 |---|---|---|
-| Output utama | JSON structured (PRD 8.2 schema). Validasi Zod `PromptPackageSchema`. | `PRD.md 8.2` ; ASUMSI A4 `RAG-CONTEXT.md 9 G9` |
-| Export alternatif | Markdown `.md` (PRD 8.3 struktur). Route `/api/export?format=markdown`. | `PRD.md 8.3` |
-| TIDAK generate media | Output = teks prompt saja. OOS-T1. | `BRD.md 8.2 #1` ; `RAG-CONTEXT.md 9 G10` |
-| TIDAK TTS | Voiceover = naskah teks. OOS-T2. | `BRD.md 8.2 #2` ; `RAG-CONTEXT.md 9 G12` |
+| 1 | users | Tetap |
+| 2 | provider_configs | Tetap |
+| 3 | projects | Tambah kolom opsional |
+| 4 | asset_references | Tambah kolom opsional |
+| 5 | characters | Tetap |
+| 6 | scenes | Tetap |
+| 7 | image_prompts | Tetap |
+| 8 | generation_logs | Tambah kolom opsional |
+| 9 | supporting_characters | Tetap |
 
-### 8.7 Zod Schema Constraint (LLM Structured Output)
+Situs: RAG-CONTEXT.md S4, schema.ts:1-163
 
-Zod schema `PromptPackageSchema` di `lib/validation/schemas.ts` WAJIB match
-PRD 8.2 JSON schema:
+### 7.2 Perubahan Schema V2 (ADDITIVE -- tidak breaking)
 
-```ts
+| Tabel | Kolom Baru | Tipe | Nullable | Alasan |
+|---|---|---|---|---|
+| projects | story_description | TEXT | YA | Simpan deskripsi cerita dari generate form |
+| asset_references | ai_classification | TEXT | YA | Simpan hasil analisis Vision LLM (JSON string) |
+| generation_logs | logs_json | TEXT | YA | Simpan real-time logs (JSON array) |
+
+Catatan:
+- Semua kolom baru = nullable -> tidak breaking existing data
+- Kolom tipe di asset_references tetap TEXT tanpa CHECK constraint -> extended enum di app layer (Zod)
+- Migration: drizzle-kit generate -> review SQL -> drizzle-kit push
+
+Situs: PRD V2.0 S8.2, RAG-CONTEXT.md S9 V2-3, V2-4, V2-5
+
+### 7.3 Validasi Enum V2 (App Layer -- Zod)
+
+| Schema | V1 | V2 (baru) |
+|---|---|---|
+| GenerateReferenceSchema.type | z.enum(['tokoh', 'background']) | z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']) |
+| GenerateInputSchema | title, durationType, durationTargetSeconds, styleType, aspectRatio, references | + storyDescription: z.string().max(500).optional() |
+
+### 7.4 Relasi (tetap dari V1)
+
+- users 1:N -> provider_configs, projects
+- projects 1:N -> asset_references, characters, scenes, image_prompts, generation_logs, supporting_characters
+- scenes 1:N -> image_prompts (scene_id nullable), supporting_characters (scene_id nullable)
+
+### 7.5 PromptPackageSchema (Source of Truth LLM Output -- tetap)
+
+`	s
 const PromptPackageSchema = z.object({
   title: z.string(),
   duration_target: z.object({ type: z.enum(['shorts','tutorial']), seconds: z.number() }),
   style: z.object({ type: z.enum(['3D','2D']), aspect_ratio: z.string() }),
-  character_profiles: z.array(z.object({
-    nama: z.string(),
-    gayarambut: z.string(),
-    wajah_asal: z.string(),
-    pakaian_atas: z.string(),
-    pakaian_bawah: z.string(),
-    alas_kaki: z.string(),
-    deskripsi_latar: z.string(),
-    aksi: z.string(),
-    peran: z.enum(['utama','lain','pendamping']),
-  })),
-  scenes: z.array(z.object({
-    order: z.number(),
-    description: z.string(),
-    voiceover_script: z.string(),
-    image_prompts: z.object({
-      characters: z.array(z.object({
-        target: z.string(), prompt_text: z.string(), reference_filename: z.string().nullable(),
-      })),
-      backgrounds: z.array(z.object({
-        target: z.string(), prompt_text: z.string(), reference_filename: z.string().nullable(),
-      })),
-    }),
-  })),
+  character_profiles: z.array(CharacterProfileSchema),
+  scenes: z.array(SceneSchema),
   image_prompts: z.object({
-    characters: z.array(z.object({
-      target: z.string(), prompt_text: z.string(), reference_filename: z.string().nullable(),
-    })),
-    backgrounds: z.array(z.object({
-      target: z.string(), prompt_text: z.string(), reference_filename: z.string().nullable(),
-    })),
+    characters: z.array(ImagePromptItemSchema),
+    backgrounds: z.array(ImagePromptItemSchema),
   }),
-  supporting_characters: z.array(z.object({
-    nama: z.string(), tipe: z.enum(['pendukung','hewan']), aksi: z.string(),
-  })),
+  supporting_characters: z.array(SupportingCharacterSchema),
   moral_message: z.string(),
 });
-```
+`
 
-- Pakai dengan `generateObject({ model, schema: PromptPackageSchema, system, messages })`.
-- Sitasi: `PRD.md 8.2` ; `RAG-CONTEXT.md 11 #1` (rekomendasi structured output)
-
----
-
-## 9. Keamanan
-
-### 9.1 Tabel Keamanan
-
-| ID | Requirement | Implementasi | Bukti |
-|---|---|---|---|
-| SEC-01 | API key user dienkripsi saat simpan | AES-256-GCM `lib/crypto/aes.ts`, env `ENCRYPTION_KEY`. | ASUMSI P-A10 `RAG-CONTEXT.md 11 #4` ; `BRD.md 6 R6` |
-| SEC-02 | API key TIDAK expose ke client | Mask `****` di API response. Decrypt server-side only. | `BRD.md 6 R6` ; `PRD.md 5 (FR-14)` |
-| SEC-03 | Provider call server-side only | `lib/ai/provider.factory.ts` + `lib/ai/generate.ts` server-only. `import 'server-only'`. TIDAK ada panggilan LLM dari Client Component. | ASUMSI (best practice) |
-| SEC-04 | 9router localhost hanya server-side | 9router `http://localhost:20128/v1` tidak reachable dari client. Validasi: hanya user dev lokal pakai. | ASUMSI P-A7 `RAG-CONTEXT.md 5.2, 9 G4` |
-| SEC-05 | CSRF protection | Next.js built-in CSRF untuk Server Actions + Route Handlers. NextAuth CSRF token. | ASUMSI (Next.js default) |
-| SEC-06 | Input sanitization (XSS) | Zod validasi + escape HTML pada `title` & field teks sebelum render/prompt. | ASUMSI NFR-S3 `PRD.md 6.2` |
-| SEC-07 | Ownership check RBAC dasar | Middleware + server check: `project.user_id === session.user.id`. User hanya akses resource miliknya. | ASUMSI NFR-S6 `PRD.md 6.2` |
-| SEC-08 | Env secret management | `ENCRYPTION_KEY`, `TURSO_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`, `NEXTAUTH_SECRET` di Vercel env. `.env.example` tanpa value asli. | ASUMSI (best practice) |
-| SEC-09 | HTTPS only | Vercel default HTTPS. | `RAG-CONTEXT.md 2.1` ; NFR-S5 `PRD.md 6.2` |
-| SEC-10 | Rate limit endpoint generate | ASUMSI 10 req/min/user. Middleware rate limit. | ASUMSI NFR-S4 `PRD.md 6.2` |
-| SEC-11 | Auth protected routes | Middleware `lib/auth/middleware.ts`. Protected: `/projects`, `/settings`, `/generate`, `/api/*` (kecuali `/api/auth`). | `PRD.md 5 (FR-18)` |
-| SEC-12 | NextAuth secret | `NEXTAUTH_SECRET` env wajib. | ASUMSI (NextAuth default) |
-
----
-## 10. Tahapan Implementasi
-
-Urut, actionable. Tiap fase menghasilkan shipable increment.
-
-### Fase 1: Skeleton + DB + Auth + Provider + Generate Shorts + Export JSON (MUST core)
-
-| # | Langkah | Detail | Bukti |
-|---|---|---|---|
-| F1-01 | Init proyek Next.js | `create-next-app` App Router + TypeScript + Tailwind v4. Install shadcn/ui. | `RAG-CONTEXT.md 2.1` |
-| F1-02 | Setup Turso + Drizzle | Buat DB Turso, dapatkan URL+token. Install `@libsql/client` + `drizzle-orm` + `drizzle-kit`. `lib/db/client.ts`, `lib/db/schema.ts` (entitas section 6). Migration awal. | `RAG-CONTEXT.md 2.1, 2.2` ; https://docs.turso.tech/sdk/ts/guides/nextjs |
-| F1-03 | Setup NextAuth | Install NextAuth v5+. `lib/auth/config.ts` credentials provider (ASUMSI). Middleware protected routes. | `PRD.md 5 (FR-18)` |
-| F1-04 | Provider factory + crypto | `lib/ai/provider.factory.ts` `createOpenAICompatible`. `lib/crypto/aes.ts` AES-256-GCM. `lib/db/schema.ts` ProviderConfig. | `PRD.md 5 (FR-13, FR-14)` ; `RAG-CONTEXT.md 5.1` |
-| F1-05 | Zod schema + prompt templates | `lib/validation/schemas.ts` `PromptPackageSchema` (section 8.7). `lib/ai/prompts/*.system.ts` (scenes, voiceover, character, image_prompts, moral). | `PRD.md 8.2` ; `RAG-CONTEXT.md 11 #1` |
-| F1-06 | Generate endpoint streaming | `/api/generate` SSE. `lib/ai/generate.ts` `generateObject`/`streamObject`. Post-check konsistensi (FR-12). | `PRD.md 5 (FR-03..FR-12)` |
-| F1-07 | UI generate (Shorts) | Form input (title, duration_type=shorts, style, aspect_ratio). Streaming display per komponen. Copy-to-clipboard. | `PRD.md 3.1 (US-01..US-12)` ; NFR-U1/U2/U4 |
-| F1-08 | Project CRUD | `/api/projects` + Server Actions. List/detail/update/delete. Ownership check. | `PRD.md 5 (FR-15)` |
-| F1-09 | Export JSON | `/api/export?format=json`. Download `.json`. | `PRD.md 5 (FR-16)` |
-| F1-10 | Settings provider UI | Form provider + base URL + model + API key. Save encrypt. Mask display. | `PRD.md 5 (FR-13, FR-14)` |
-| F1-11 | Deploy Vercel | Deploy preview. Set env: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`. | `RAG-CONTEXT.md 2.1` |
-
-**Fase 1 Definition of Done:** user bisa login, set provider, generate paket
-prompt Shorts, save project, export JSON. Semua MUST FR-01..FR-16 jalan.
-
-### Fase 2: Upload Referensi + Tutorial + Markdown + Dwibahasa (SHOULD)
-
-| # | Langkah | Detail | Bukti |
-|---|---|---|---|
-| F2-01 | Vercel Blob setup | Install `@vercel/blob`. `lib/storage/blob.ts`. Env `BLOB_READ_WRITE_TOKEN`. | `PRD.md 5 (FR-17)` ; ASUMSI A5 |
-| F2-02 | Upload endpoint + UI | `/api/upload` multipart. Form upload gambar referensi (tipe tokoh/background). Simpan `AssetReference`. | `PRD.md 5 (FR-17)` |
-| F2-03 | Inject reference_filename | Generate prompt rujuk `reference_filename` di image prompt (FR-06, FR-17). | `PRD.md 5 (FR-17)` |
-| F2-04 | Generate Tutorial | Support `duration_type=tutorial` (7-15 menit, 8-20 adegan ASUMSI P-A12). Adjust prompt template. | `PRD.md 5 (FR-02)` |
-| F2-05 | Export Markdown | `/api/export?format=markdown`. Template `lib/export/markdown.template.ts` (PRD 8.3 struktur). | `PRD.md 5 (FR-16), 8.3` |
-| F2-06 | i18n dwibahasa | Install `next-intl` (ASUMSI). `src/i18n/messages/id.json`, `en.json`. Toggle ID/EN. | `PRD.md 5 (FR-19)` ; ASUMSI A2 |
-
-**Fase 2 DoD:** upload referensi jalan, Tutorial mode jalan, export markdown
-jalan, UI dwibahasa.
-
-### Fase 3: Polish UI + Konsistensi + History + Template (COULD + polish)
-
-| # | Langkah | Detail | Bukti |
-|---|---|---|---|
-| F3-01 | Konsistensi post-check UI | Tampilkan warning mismatch karakter (FR-12). | `PRD.md 5 (FR-12)` |
-| F3-02 | History generasi | `GenerationLog` entitas. UI history per project. Compare/rollback (ASUMSI F-21 COULD). | `PRD.md 4 (F-21)` |
-| F3-03 | Template library judul | Library judul animasi populer (ASUMSI F-20 COULD). | `PRD.md 4 (F-20)` |
-| F3-04 | Polish UI/UX | Loading state, error state, empty state, animasi micro. WCAG AA (NFR-A1). | `PRD.md 6.5, 6.6` |
-| F3-05 | Telemetri KPI | Log `GenerationLog` untuk KPI K1-K7. Dashboard sederhana (ASUMSI). | `BRD.md 3.2` |
-| F3-06 | Rate limit | Middleware rate limit endpoint generate (NFR-S4). | `PRD.md 6.2` |
-
-**Fase 3 DoD:** konsistensi check visible, history jalan, template library
-jalan, UI polish, telemetri KPI.
+Situs: AGENTS.md S9, PRD V2.0 S8.2
 
 ---
 
-## 11. Verifikasi & Test
+## 8. Interface / API / Integrasi
 
-### 11.1 Test Strategy
+### 8.1 Endpoint Existing V1 (21 endpoint -- tetap)
 
-| Level | Tool | Scope | Target coverage | Bukti |
-|---|---|---|---|---|
-| Unit | Vitest | `lib/ai`, `lib/db`, `lib/crypto`, `lib/validation`, `lib/storage`, `lib/export` | >= 80% (ASUMSI) | ASUMSI (best practice) |
-| Integration | Vitest + Turso test DB | API route handlers + Server Actions + DB query | >= 70% (ASUMSI) | ASUMSI |
-| E2E | Playwright | Flow: login -> set provider -> generate Shorts -> save -> export JSON. Upload referensi -> generate Tutorial -> export markdown. | Critical path 100% | ASUMSI |
-| Lint | ESLint (`next lint`) + tsc | Seluruh `src/` | 0 error, 0 warning (ASUMSI strict) | ASUMSI |
-| Build | `next build` | Production build | Sukses tanpa error | ASUMSI |
-| Type check | `tsc --noEmit` | Type safety | 0 error | ASUMSI |
+Semua 21 endpoint V1 tetap backward-compatible.
 
-### 11.2 Test Case Kunci (mapping AC PRD)
+Situs: RAG-CONTEXT.md S3, API_CONTRACT.md S5
 
-| AC PRD | Test case | Level | Bukti |
+### 8.2 Perubahan Endpoint V2 (additive)
+
+| Endpoint | Perubahan |
+|---|---|
+| POST /api/v1/generate | Extend SSE events: tambah log event type. Tambah field storyDescription di request. |
+| POST /api/v1/upload | tipe field extended ke 6 opsi. Response tambah ai_classification. |
+| POST /api/v1/projects | Tambah field opsional story_description di request body. |
+| GET /api/v1/projects | Pagination via ?page=&limit=. Response: {data[], pagination{page, limit, total, totalPages}}. |
+| GET /api/v1/dashboard/stats | Extend response: {totalProjects, successfulGenerations, avgDuration, perProviderBreakdown[], recentProjects[], storageUsage, weeklyTrend[]}. |
+
+### 8.3 Endpoint Baru V2
+
+| Method | Path | Auth | Deskripsi |
 |---|---|---|---|
-| AC-01 | Input judul: empty -> 400, < 3 char -> 400, > 200 -> 400, valid -> pass | Unit (Zod) + E2E | `PRD.md 7 (AC-01)` |
-| AC-02 | Durasi shorts > 180 -> 400. Tutorial di luar 420-900 -> warning. | Unit + E2E | `PRD.md 7 (AC-02)` |
-| AC-03/09 | Generate `scenes[]` urut, `order` 1..N, `description` non-kosong, jumlah sesuai durasi. | Integration (mock LLM) + E2E | `PRD.md 7 (AC-03/09)` |
-| AC-04 | Tiap scene `voiceover_script` teks, bukan audio. | Integration | `PRD.md 7 (AC-04)` |
-| AC-05 | Tanpa referensi -> `character_profiles[]` & `image_prompts.backgrounds[]` terisi. | Integration | `PRD.md 7 (AC-05)` |
-| AC-06 | `image_prompts.characters[]` = N untuk N tokoh, `backgrounds[]` = M. | Integration | `PRD.md 7 (AC-06)` |
-| AC-07 | Tiap karakter field lengkap (nama, gayarambut, dst), `peran` valid enum. | Integration (Zod parse) | `PRD.md 7 (AC-07)` |
-| AC-08 | `supporting_characters[]` terisi bila ada, tiap `aksi` non-kosong. | Integration | `PRD.md 7 (AC-08)` |
-| AC-10 | `style` + `aspect_ratio` di root JSON + image prompts. | Integration | `PRD.md 7 (AC-10)` |
-| AC-11 | `moral_message` non-kosong, positif (manual review). | Integration + manual | `PRD.md 7 (AC-11)` |
-| AC-12 | Identitas karakter SAMA di `character_profiles` & `scenes[]` reference. `aksi`/`deskripsi_latar` boleh beda. Mismatch -> warning. | Unit (`consistency-check.ts`) | `PRD.md 7 (AC-12)` |
-| AC-13 | Form provider, base URL pre-fill, save, provider aktif, gagal -> error + switch. | E2E | `PRD.md 7 (AC-13)` |
-| AC-14 | API key enkripsi di DB (bukan plaintext), response mask `****`, decrypt server-only. | Unit (crypto) + integration | `PRD.md 7 (AC-14)` |
-| AC-15 | CRUD project: create, list paginate, detail ownership, update, delete cascade. | Integration + E2E | `PRD.md 7 (AC-15)` |
-| AC-16 | Export JSON valid struktur, export markdown terbaca lengkap. | Integration + E2E | `PRD.md 7 (AC-16)` |
-| AC-17 | Upload multipart, metadata `AssetReference`, `reference_filename` muncul, tanpa referensi -> null fitur tetap jalan. | E2E | `PRD.md 7 (AC-17)` |
-| AC-18 | NextAuth login, protected redirect, scoped per user. | E2E | `PRD.md 7 (AC-18)` |
-| AC-19 | Toggle ID/EN mengubah UI label + pesan error. | E2E | `PRD.md 7 (AC-19)` |
-| NFR-P1 | Shorts <= 60s end-to-end (streaming). | E2E timing | `PRD.md 7 (NFR)` |
-| NFR-P2 | Tutorial <= 180s end-to-end (streaming). | E2E timing | `PRD.md 7 (NFR)` |
-| NFR-P3 | Token mulai mengalir < 10s. | E2E timing | `PRD.md 7 (NFR)` |
-| NFR-S1/S2 | API key enkripsi + mask. | Unit + integration | `PRD.md 7 (NFR)` |
-| NFR-A1 | WCAG AA. | Manual audit + axe (ASUMSI) | `PRD.md 7 (NFR)` |
+| POST | /api/v1/upload/classify | wajib | Trigger AI classification. Input: {assetReferenceId}. Output: {role, name, description, confidence}. |
 
-### 11.3 Definition of Done Teknis (per fase)
+### 8.4 SSE Event Protocol V2
 
-- **Fase 1 DoD:** `next build` sukses, `tsc --noEmit` 0 error, `next lint` 0
-  error, Vitest unit+integration >= 80%/70% coverage, Playwright E2E flow
-  Shorts sukses, deploy Vercel preview jalan.
-- **Fase 2 DoD:** Fase 1 DoD + E2E upload referensi + Tutorial + markdown
-  export + dwibahasa toggle sukses.
-- **Fase 3 DoD:** Fase 2 DoD + konsistensi check UI + history + template
-  library + WCAG AA audit + telemetri KPI.
+`
+POST /api/v1/generate
+Content-Type: application/json
+Body: {
+  title: string,
+  storyDescription?: string,
+  durationType: 'shorts' | 'tutorial',
+  durationTargetSeconds?: number,
+  styleType: '3D' | '2D',
+  aspectRatio: string,
+  references?: Array<{name: string, type: string, filename: string}>
+}
 
-### 11.4 Command Verifikasi (ASUMSI)
+Response: text/event-stream (SSE)
+  data: {"type":"stage","stage":"starting","message":"Memulai generate..."}
+  data: {"type":"log","level":"info","message":"[generate] Resolving provider..."}
+  data: {"type":"progress","stage":"character_profiles","progress":20}
+  data: {"type":"log","level":"info","message":"[llm] Calling GPT-4o..."}
+  data: {"type":"stage","stage":"character_profiles","message":"Profile karakter selesai"}
+  ... (stages: starting -> character_profiles -> scenes -> image_prompts -> supporting_characters -> moral_message)
+  data: {"type":"done","result":<full structured JSON>,"warnings":[...],"logs":[...]}
+  data: {"type":"error","message":"Provider timeout","provider":"openrouter"}
+`
 
-```bash
-npm run lint         # next lint
-npx tsc --noEmit     # type check
-npm run build        # next build
-npm run test         # vitest unit+integration
-npm run test:e2e     # playwright
-npm run coverage     # vitest --coverage
-```
+### 8.5 Error Envelope
+
+`json
+{
+  "error": {
+    "code": "VALIDATION_ERROR | PROVIDER_ERROR | AUTH_ERROR | TIMEOUT | INTERNAL | CLASSIFICATION_ERROR",
+    "message": "string (bahasa aktif)",
+    "details": {}
+  }
+}
+`
+
+HTTP status: 200/201 (ok), 204 (delete), 400 (validation), 401 (auth), 403 (ownership), 404 (not found), 429 (rate limit), 500 (internal), 502/504 (provider timeout).
 
 ---
 
-## 12. Asumsi Teknis
+## 9. Constraint Teknis
 
-| ID | Asumsi | Status Bukti | Dampak | Sitasi |
-|---|---|---|---|---|
-| SRS-A1 | App multi-user dengan login NextAuth credentials | TIDAK ADA BUKTI preferensi provider auth | Pilih credentials sederhana fase awal | `BRD.md 7.1 A1` ; `RAG-CONTEXT.md 9 G2` |
-| SRS-A2 | UI dwibahasa pakai next-intl | TIDAK ADA BUKTI preferensi lib | Bisa diganti native App Router i18n | `BRD.md 7.1 A2` ; `RAG-CONTEXT.md 9 G5` |
-| SRS-A3 | ORM = Drizzle (bukan Prisma/raw libsql) | TIDAK ADA BUKTI preferensi user | RAG menyebut raw @libsql/client atau Prisma alternatif | `RAG-CONTEXT.md 2.1, 9 G7` |
-| SRS-A4 | Enkripsi API key = AES-256-GCM via env `ENCRYPTION_KEY` | TIDAK ADA BUKTI mekanisme spesifik | Bisa defer ke secret manager | `RAG-CONTEXT.md 11 #4` ; `PRD.md 10.2 P-A10` |
-| SRS-A5 | Storage gambar prod = Vercel Blob | ASUMSI rekomendasi | Bisa S3/R2 alternatif | `RAG-CONTEXT.md 6, 9 G3` |
-| SRS-A6 | Streaming SSE untuk generasi panjang | ASUMSI | Hindari Vercel timeout | `RAG-CONTEXT.md 5.4, 9 G6` ; `PRD.md 10.2 P-A6` |
-| SRS-A7 | 9router `http://localhost:20128/v1` valid lokal, Bearer/none auth | TIDAK ADA BUKTI eksternal | Hanya dev lokal, validasi user | `RAG-CONTEXT.md 5.2, 9 G4` |
-| SRS-A8 | Default model LLM per provider: user input (no hardcode default) | TIDAK ADA BUKTI model default | SRS rekomendasi list model per provider di UI hint | `RAG-CONTEXT.md 9 G8` |
-| SRS-A9 | Versi library (NextAuth, Drizzle, Zod, Vitest, Playwright, next-intl) = "stabil terkini per 2025" | TIDAK ADA BUKTI nomor versi spesifik di RAG (kecuali AI SDK v6, Tailwind v4) | Lock versi di package.json saat init | `RAG-CONTEXT.md 2.1` |
-| SRS-A10 | Batas tokoh default 10 per project | TIDAK ADA BUKTI | Validasi Zod input | `BRD.md 7.1 A3` ; `RAG-CONTEXT.md 9 G11` |
-| SRS-A11 | Jumlah adegan: shorts 3-6, tutorial 8-20 | ASUMSI | Pass ke prompt LLM | `PRD.md 10.2 P-A12` |
-| SRS-A12 | Latency Shorts <= 60s, Tutorial <= 180s (streaming) | ASUMSI | NFR-P1/P2 target | `PRD.md 10.2 P-A11` |
-| SRS-A13 | Auto-fallback provider = manual switch (bukan otomatis) fase awal | ASUMSI | Error jelas + opsi switch | `PRD.md 10.2 P-A13` |
-| SRS-A14 | Retry policy LLM = 3x backoff | ASUMSI | NFR-R3 | `PRD.md 6.4 NFR-R3` |
-| SRS-A15 | Rate limit generate = 10 req/min/user | ASUMSI | NFR-S4 | `PRD.md 6.2 NFR-S4` |
-| SRS-A16 | Soft delete project (`deleted_at`) | ASUMSI | Retention/history | (best practice) |
-| SRS-A17 | Dev lokal upload FS `public/references/`, prod Vercel Blob | ASUMSI | Flag env `USE_VERCEL_BLOB` | `RAG-CONTEXT.md 6` |
-| SRS-A18 | Persona target kreator/studio/edukator | TIDAK ADA BUKTI eksplisit | Dari paket konteks orchestrator | `BRD.md 4` ; `RAG-CONTEXT.md 7` |
-| SRS-A19 | Vercel function timeout plan: Hobby 10s, Pro 60s/300s | ASUMSI plan-specific | Cek plan Vercel aktual | `RAG-CONTEXT.md 5.4` |
-| SRS-A20 | Node runtime versi didukung Vercel stabil terkini | ASUMSI | Vercel default | `RAG-CONTEXT.md 2.1` |
+### 9.1 Upload Constraint
+
+| Constraint | Nilai |
+|---|---|
+| Max file size | 10 MB per file |
+| Allowed MIME | image/(png|jpe?g|gif|webp|svg+xml) |
+| Tipe validation | tokoh, background, prop, accessory, environment, other (6 opsi V2) |
+| Storage | Vercel Blob (prod) / local FS public/references/ (dev) |
+| Filename | Sanitized + random UUID suffix, max 60 char base |
+| Max files per upload | ASUMSI 10 files |
+
+### 9.2 Generate Constraint
+
+| Constraint | Nilai |
+|---|---|
+| Runtime | nodejs, maxDuration 600s, force-dynamic |
+| Rate limit | 10 req/min per user |
+| LLM timeout | AbortSignal 240,000ms (4 menit) per call |
+| Max retries | 2 (default) + exponential backoff max 8000ms |
+| LLM max_tokens | 32768 |
+| LLM temperature | 0.7 |
+| Stream mode | Non-streaming di LLM call, SSE streaming dari route ke client |
+
+### 9.3 Auth Constraint
+
+| Constraint | Nilai |
+|---|---|
+| Provider | NextAuth credentials only (email + password) |
+| Session | JWT session strategy |
+| Password | bcryptjs comparison |
+| Protected routes | Semua page + API v1 kecuali auth/health/register |
+| Public paths | login, register, api/auth, api/v1/auth, api/v1/health, _next, favicon, robots |
+
+### 9.4 Validation Constraint
+
+| Schema | Rule |
+|---|---|
+| TitleSchema | min 3, max 200, trim |
+| Duration | shorts max 180s; tutorial 420-900s |
+| Style | enum '3D' \| '2D' |
+| ProviderEnum | 'ollama' \| 'openrouter' \| '9router' \| 'custom' |
+| V2: GenerateReferenceSchema.type | 'tokoh'\|'background'\|'prop'\|'accessory'\|'environment'\|'other' |
+| V2: GenerateInputSchema.storyDescription | z.string().max(500).optional() |
+
+### 9.5 DB Constraint
+
+| Constraint | Nilai |
+|---|---|
+| Dialect | Turso (libSQL via HTTP) |
+| Env | TURSO_DATABASE_URL, TURSO_AUTH_TOKEN (wajib) |
+| Timestamp | Integer unix epoch |
+| PK | Auto-increment id |
+
+### 9.6 Output Format Constraint
+
+| Constraint | Spesifikasi |
+|---|---|
+| Output utama | JSON structured (PromptPackageSchema) |
+| Export markdown | .md download via /api/v1/projects/[id]/export?format=markdown |
+| TIDAK generate media | Output = teks prompt saja |
+| TIDAK TTS | Voiceover = naskah teks |
+
+### 9.7 Vercel Serverless Constraint
+
+| Constraint | Dampak | Mitigasi |
+|---|---|---|
+| Filesystem tidak persisten | SQLite file lokal hilang | WAJIB Turso remote HTTP |
+| Function timeout | Generate panjang berisiko timeout | Streaming SSE (token < 10s) |
+| Upload gambar di FS lokal | Hilang saat recycle | Vercel Blob untuk prod |
 
 ---
 
-## 13. Referensi
+## 10. Keamanan
 
-### 13.1 Dokumen Internal
+### 10.1 Tabel Keamanan
+
+| ID | Requirement | Implementasi |
+|---|---|---|
+| SEC-01 | API key user dienkripsi saat simpan | AES-256-GCM lib/crypto/aes.ts, env ENCRYPTION_KEY 32 byte base64 |
+| SEC-02 | API key TIDAK expose ke client | Response mask **** + 4 char terakhir |
+| SEC-03 | Provider call server-side only | lib/ai/* + lib/crypto/* wajib import server-only |
+| SEC-04 | 9router localhost hanya server-side | http://localhost:20128/v1 tidak reachable dari client |
+| SEC-05 | CSRF protection | Next.js built-in CSRF + NextAuth CSRF token |
+| SEC-06 | Input sanitization (XSS) | Zod validasi + escape HTML <>"'& |
+| SEC-07 | Ownership check | project.user_id === session.user.id semua operasi |
+| SEC-08 | Env secret management | .env.example tanpa value. Guard if (!env) throw di init |
+| SEC-09 | HTTPS only | Vercel default HTTPS |
+| SEC-10 | Rate limit | 10 req/min/user. Header X-RateLimit-*. 429 bila exceed. |
+| SEC-11 | Auth protected routes | Middleware: /projects, /settings, /generate, /api/v1/* (kecuali auth/health) |
+| SEC-12 | No secret client-side | NEXT_PUBLIC_* hanya non-sensitif. API key = server-only |
+| SEC-13 | No LLM call / decrypt client | lib/ai/* + lib/crypto/* server-only |
+| SEC-14 | Password hash | bcryptjs untuk users.password_hash |
+
+### 10.2 30 Larangan (CODING_RULES S13)
+
+L01-L30 wajib dipatuhi. Kunci: L06 (no any), L07 (no hardcoded secret), L12 (no query tanpa user_id), L14 (no string concat SQL), L15 (no dangerouslySetInnerHTML), L16 (no eval), L17 (no process.env.X! tanpa guard), L24 (no LLM call client), L25 (no decrypt client).
+
+---
+
+## 11. Performa
+
+| ID | Metrik | Target | V1/V2 |
+|---|---|---|---|
+| NFR-P1 | Latency Shorts | <= 60s end-to-end | V1 |
+| NFR-P2 | Latency Tutorial | <= 180s end-to-end | V1 |
+| NFR-P3 | Streaming partial SSE | Token < 10s | V1 |
+| NFR-P4 | UI response time | < 2s page load | V1 |
+| NFR-P5 | DB query | < 500ms | V1 |
+| NFR-V2-P1 | Page transition | <= 200ms | V2 |
+| NFR-V2-P2 | Dashboard load | <= 1.5s | V2 |
+| NFR-V2-P3 | AI classification latency | <= 5s per gambar | V2 |
+| NFR-V2-P4 | Real-time log latency | <= 100ms server ke UI | V2 |
+
+---
+
+## 12. Tahapan Implementasi V2
+
+### Fase A: Core V2 (MUST -- 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VA-01 | Git init + .gitignore | git init, .gitignore lengkap, README updated | Repo ter-push ke GitHub |
+| VA-02 | Schema migration V2 | Tambah 3 kolom nullable: projects.story_description, asset_references.ai_classification, generation_logs.logs_json. drizzle-kit generate + push. | Migration sukses, existing data intact |
+| VA-03 | Upload di generate page | Pindahkan DropzoneUploader dari project detail ke generate form. Upload tanpa projectId. Backward compat: project detail view refs. | E2E upload di generate page jalan |
+| VA-04 | Extended role classification | Update GenerateReferenceSchema.type ke 6 opsi. Update DropzoneUploader select. Update upload route validation. | 6 opsi tipe muncul di UI + validasi jalan |
+| VA-05 | Field deskripsi cerita | Tambah storyDescription di GenerateInputSchema. Tambah Textarea di form. Inject ke buildUserMessage(). Simpan di projects.story_description. | E2E: isi deskripsi -> prompt lebih kontekstual |
+| VA-06 | Push ke GitHub | Commit + push ke https://github.com/agrianwahab29/promptflow.git | Repo accessible |
+
+### Fase B: Intelligence (SHOULD -- 3-4 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VB-01 | AI image classifier | lib/ai/image-classifier.ts. Vision LLM call. Prompt untuk classify role. Parse response. Update asset_references. | Unit test classify round-trip |
+| VB-02 | Classification endpoint | POST /api/v1/upload/classify atau auto-trigger saat upload. | E2E: upload -> auto-classify -> result visible |
+| VB-03 | Classification UI | ClassificationResult component. Thumbnail + role badge + nama + confidence + override dropdown. Fallback ke manual select. | E2E: classify result visible, override jalan |
+| VB-04 | Real-time logs | Extend SSE events: tambah log event type. Backend: buffer logs, kirim via SSE. | E2E: log events muncul di SSE stream |
+| VB-05 | LogViewer component | Collapsible panel + show/hide toggle. Log per stage + timestamp + level badge. Default OFF. | E2E: toggle show/hide jalan |
+
+### Fase C: Dashboard & Polish (SHOULD -- 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VC-01 | Dashboard queries | Extend queries: per-provider breakdown, recent 5 projects, weekly trend, storage usage. Refactor ke repository pattern. | Dashboard data lengkap |
+| VC-02 | Dashboard charts | Install Recharts/Tremor. Line chart projects/minggu. Bar chart success vs fail. | Charts render correctly |
+| VC-03 | Dashboard UI | 6-8 metric cards + tables + charts. Load <= 1.5s. | E2E: dashboard load cepat + data benar |
+| VC-04 | loading.tsx | Tambah loading.tsx di: /generate, /projects, /projects/[id], /dashboard, /settings | Skeleton muncul saat loading |
+| VC-05 | error.tsx | Tambah error.tsx per page group: error message + retry + home link | Error boundary jalan |
+| VC-06 | Design tokens | Primary violet #7c3aed, font Inter, spacing 4px, radius 6px. Disabled states. Empty states. | Visual konsisten |
+
+### Fase D: Quality & Deploy (SHOULD -- 2-3 hari)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| VD-01 | Pagination | Projects list: ?page=1&limit=20. UI: page numbers + prev/next. | E2E: pagination jalan |
+| VD-02 | Suspense boundaries | Tambah Suspense di projects list, dashboard, generate page | Streaming SSR jalan |
+| VD-03 | SQA unit test | Jalankan semua test. Coverage >= 80%. Fix failing tests. | pnpm test --coverage >= 80% |
+| VD-04 | SQA E2E test | Critical path: login -> set provider -> upload + classify -> generate -> save -> export | pnpm test:e2e green |
+| VD-05 | Lint + typecheck | pnpm lint 0 error. pnpm typecheck 0 error. | CI gate pass |
+| VD-06 | Performance test | Latency: Shorts <= 60s, Dashboard <= 1.5s, Page transition <= 200ms | Metrics sesuai target |
+| VD-07 | Deploy Vercel | Deploy preview. Set env vars. E2E test di preview URL. | Preview URL jalan |
+
+### Fase Dependency Graph
+
+`
+Fase A (Core) -> Fase B (Intelligence) -> Fase D (Quality)
+                     |
+                     +-> Fase C (Dashboard) -> Fase D (Quality)
+`
+
+Fase A harus selesai dulu (upload flow = foundation untuk classification). Fase B dan C bisa paralel. Fase D = final validation.
+
+---
+
+## 13. Verifikasi & Pengujian
+
+### 13.1 Test Strategy
+
+| Level | Tool | Scope | Target |
+|---|---|---|---|
+| Unit | Vitest (co-located) | lib/ai/*, lib/db/repositories/*, lib/crypto/*, lib/validation/*, lib/storage/*, lib/export/* | >= 80% coverage |
+| Integration | Vitest + Turso test DB | API route handlers + repository queries | >= 70% coverage |
+| E2E | Playwright | Critical path: login -> set provider -> upload + classify -> generate -> save -> export | 100% pass |
+| Lint | ESLint (next lint) | src/** | 0 error, 0 warning |
+| Type check | tsc --noEmit | Type safety | 0 error |
+| Build | next build | Production build | Sukses |
+
+### 13.2 Test Case V2 (mapping AC PRD V2)
+
+| AC PRD V2 | Test case | Level |
+|---|---|---|
+| AC-V2-01 | DropzoneUploader di generate page. Multi-file upload. Backward compat project detail. | E2E |
+| AC-V2-02 | Upload -> Vision LLM classify -> result visible. Manual override. Fallback ke manual. Cache result. | E2E + Unit |
+| AC-V2-03 | 6 opsi tipe: tokoh/background/prop/accessory/environment/other. Zod enum valid. | Unit (Zod) + E2E |
+| AC-V2-04 | Textarea deskripsi cerita. Max 500 char. Inject ke prompt. | Unit + E2E |
+| AC-V2-05 | SSE log events. Collapsible panel. Toggle show/hide. Default OFF. | E2E |
+| AC-V2-06 | Dashboard 6-8 cards + charts + recent + per-provider. Load <= 1.5s. | E2E + Performance |
+| AC-V2-07 | loading.tsx + error.tsx per page group. Disabled states. Design tokens. | Manual + Visual |
+| AC-V2-08 | Coverage >= 80%. E2E green. Lint 0. Typecheck 0. Build pass. | CI |
+| AC-V2-09 | Pagination projects list. Page transition <= 200ms. Suspense. | E2E + Performance |
+| AC-V2-10 | Repo ter-push. .gitignore lengkap. README updated. | Manual |
+
+### 13.3 Command Verifikasi
+
+`ash
+# Setup
+pnpm install
+
+# Dev
+pnpm dev
+
+# Quality gates
+pnpm lint                          # ESLint -- 0 error
+pnpm typecheck                     # tsc --noEmit -- 0 error
+pnpm test --coverage               # Vitest -- >= 80%
+pnpm test:e2e                      # Playwright -- 100% critical
+pnpm build                         # Next.js build -- sukses
+
+# DB
+pnpm db:generate                   # Generate migration SQL
+pnpm db:push                       # Apply ke Turso
+
+# Deploy
+pnpm deploy                        # Vercel deploy
+`
+
+### 13.4 Definition of Done Teknis
+
+**Fase A DoD:**
+- [ ] Git repo ter-push ke GitHub
+- [ ] Schema migration V2 sukses (3 kolom nullable tambah)
+- [ ] Upload di generate page jalan (multi-file)
+- [ ] 6 opsi role classification jalan
+- [ ] Field deskripsi cerita jalan
+- [ ] pnpm build pass
+- [ ] pnpm lint 0 error
+- [ ] pnpm typecheck 0 error
+
+**Fase B DoD:**
+- [ ] AI image classification jalan (Vision LLM)
+- [ ] Classification UI visible + manual override
+- [ ] Real-time log events di SSE
+- [ ] LogViewer Collapsible jalan
+
+**Fase C DoD:**
+- [ ] Dashboard enrichment: 6-8 cards + charts + tables
+- [ ] Dashboard load <= 1.5s
+- [ ] loading.tsx + error.tsx per page group
+- [ ] Design tokens konsisten
+
+**Fase D DoD:**
+- [ ] Pagination projects list jalan
+- [ ] Coverage >= 80% unit/integration
+- [ ] E2E critical path green
+- [ ] Performance targets terpenuhi
+- [ ] Deploy Vercel preview sukses
+
+**Cross-fase DoD:**
+- [ ] Semua 30 larangan CODING_RULES S13 dipatuhi
+- [ ] Tidak ada any tanpa // eslint-disable + alasan
+- [ ] Tidak ada secret di client-side
+- [ ] Tidak ada LLM call / decrypt di Client Component
+- [ ] Server Component default, Client Component minimal
+- [ ] Conventional commit + PR review
+
+---
+
+## 14. Asumsi
+
+| ID | Asumsi | Status | Dampak bila Salah |
+|---|---|---|---|
+| SRS-V2-A1 | Vision LLM tersedia untuk classification (GPT-4o / Gemini Vision) | Perlu konfirmasi provider | Pipeline V2-3 tidak jalan |
+| SRS-V2-A2 | Deskripsi cerita = optional textarea, max 500 char | Perlu konfirmasi | Schema + form beda |
+| SRS-V2-A3 | Real-time logs = Collapsible panel, default OFF | Perlu konfirmasi UI pattern | Frontend design beda |
+| SRS-V2-A4 | Dashboard = simple cards + tables + charts (Recharts/Tremor) | Perlu konfirmasi complexity | Dependencies + dev time beda |
+| SRS-V2-A5 | Upload di generate page = pre-submit (upload dulu, baru generate) | Perlu konfirmasi flow | UX flow beda |
+| SRS-V2-A6 | Role: tokoh/background/prop/accessory/environment/other (6 opsi) | Perlu konfirmasi opsi | Schema + UI beda |
+| SRS-V2-A7 | Push GitHub = public repo | Perlu konfirmasi visibility | .gitignore beda |
+| SRS-V2-A8 | Deploy target Vercel (masih bisa Laragon untuk dev) | Perlu konfirmasi | Env vars beda |
+| SRS-V2-A9 | AI SDK tetap v4 (tidak upgrade ke v6) | ASUMSI: upgrade = OOS V2 | Bila upgrade, breaking changes |
+| SRS-V2-A10 | Tidak ada schema migration besar (kolom additive only) | ASUMSI | Bila perlu migration, tambah task |
+| SRS-V2-A11 | Classification auto-trigger saat upload (seamless UX) | Perlu konfirmasi | Bila manual trigger, flow beda |
+| SRS-V2-A12 | Batch classify max 5 gambar per call | ASUMSI | Bila beda, API cost beda |
+| SRS-V2-A13 | Confidence threshold 0.7 untuk auto-classify | ASUMSI | Bila beda, UI behavior beda |
+| SRS-V2-A14 | Recharts atau Tremor untuk dashboard charts | Perlu konfirmasi library | Dependencies beda |
+| SRS-V2-A15 | Retry policy LLM = 2 attempts + backoff (existing V1) | Dari kode existing | Bila 3x backoff, update llm-client.ts |
+
+---
+
+## 15. Referensi
+
+### 15.1 Dokumen Internal
 
 | Dokumen | Path |
 |---|---|
-| RAG-CONTEXT (sumber kebenaran) | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
-| BRD | `C:\laragon\www\PromptFlow\product-docs\BRD.md` |
-| MRD | `C:\laragon\www\PromptFlow\product-docs\MRD.md` |
-| PRD | `C:\laragon\www\PromptFlow\product-docs\PRD.md` |
-| GitHub repo | https://github.com/agrianwahab29/promptflow.git |
+| RAG-CONTEXT (sumber kebenaran) | C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md |
+| BRD V2.0 | C:\laragon\www\PromptFlow\product-docs\BRD.md |
+| MRD V2.0 | C:\laragon\www\PromptFlow\product-docs\MRD.md |
+| PRD V2.0 | C:\laragon\www\PromptFlow\product-docs\PRD.md |
+| AGENTS.md | C:\laragon\www\PromptFlow\product-docs\AGENTS.md |
+| GitHub | https://github.com/agrianwahab29/promptflow.git |
 
-### 13.2 Sitasi Eksternal Kunci
+### 15.2 Sitasi Eksternal
 
-| Sitasi | Klaim didukung | Bagian SRS |
-|---|---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | `createOpenAICompatible` API, structured output, streaming, tool calling | 4.1, 5, 8.3 |
-| https://openrouter.ai/docs/api/reference/authentication | Base URL OpenRouter `https://openrouter.ai/api/v1`, Bearer, header opsional | 5 (FR-13), 8.3 |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat `https://ollama.com/v1` | 5 (FR-13), 8.3 |
-| https://docs.ollama.com/cloud | Ollama cloud API access, Bearer key | 8.3 |
-| https://docs.openclaw.ai/providers/ollama-cloud | Saran pakai OpenAI-compat provider untuk `/v1/chat/completions` | 8.3 |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js App Router setup, `@libsql/client` | 4.1, 8.2, 10 (F1-02) |
-| https://turso.tech/blog/serverless | Vercel filesystem tidak persisten -> Turso solusi | 4.1, 8.1 |
-| https://vercel.com/marketplace/tursocloud | Turso resmi di Vercel Marketplace | 4.1 |
-| https://ui.shadcn.com/docs/installation/next | shadcn/ui install Next.js | 4.1 |
-| https://ui.shadcn.com/docs/tailwind-v4 | shadcn/ui Tailwind v4 support | 4.1 |
-| https://vercel.com/docs/vercel-blob | Vercel Blob storage | 4.1, 8.5 |
-| https://kling.ai/blog/ai-character-consistency-guide | Konsistensi karakter via deskripsi terstruktur | 5 (FR-07, FR-12) |
-| https://glibatree.com/proven-consistent-character-method | Metode konsistensi karakter terstruktur | 5 (FR-07, FR-12) |
-| https://docs.midjourney.com/hc/en-us/articles/32162917505293-Character-Reference | Midjourney `--cref` butuh image reference (bukan teks filename) | 5 (FR-06, FR-17) |
-
-### 13.3 Catatan Bukti RAG
-
-RAG-CONTEXT.md menandai gap berikut "TIDAK ADA BUKTI" yang relevan SRS:
-- G2 (auth): SRS asumsikan NextAuth credentials (SRS-A1). Validasi user.
-- G3 (storage): SRS asumsikan Vercel Blob (SRS-A5). Validasi user.
-- G4 (9router): SRS asumsikan Bearer/none lokal (SRS-A7). Validasi user.
-- G5 (bahasa UI): SRS asumsikan next-intl (SRS-A2). Validasi UIUX_SPEC.
-- G6 (streaming): SRS asumsikan SSE (SRS-A6). Validasi timeout plan.
-- G7 (ORM): SRS pilih Drizzle (SRS-A3). Bisa diubah di DATABASE_SCHEMA.
-- G8 (model default): SRS user input model, no hardcode (SRS-A8).
-- G9 (format output): SRS JSON structured + Zod (section 8.7).
-- G11 (batas tokoh): SRS default 10 (SRS-A10).
+| Sitasi | Klaim |
+|---|---|
+| https://ai-sdk.dev/providers/openai-compatible-providers | Multi-provider via @ai-sdk/openai-compatible |
+| https://openrouter.ai/docs/api/reference/authentication | Base URL OpenRouter |
+| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat |
+| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js |
+| https://turso.tech/blog/serverless | Vercel FS tidak persisten -> Turso |
+| https://kling.ai/blog/ai-character-consistency-guide | Konsistensi karakter |
+| https://glibatree.com/proven-consistent-character-method | Metode konsistensi karakter |
 
 ---
 
-**Dokumen ini fokus pada SPESIFIKASI TEKNIS EKSEKUTABEL. Tujuan bisnis di BRD,
-pasar di MRD, produk di PRD, arsitektur penuh di PROJECT_ARCHITECTURE, data
-penuh di DATABASE_SCHEMA, kontrak API penuh di API_CONTRACT, aturan kode di
-CODING_RULES. SRS tidak membangun deliverable akhir — hanya spesifikasi.**
+> **Dokumen ini = spesifikasi teknis eksekutabel untuk upgrade V2 PromptFlow.**
+> **Tiap fitur PRD V2 punya realisasi teknis di sini. Detail penuh di**
+> **DATABASE_SCHEMA.md, API_CONTRACT.md, PROJECT_ARCHITECTURE.md, CODING_RULES.md.**
+> **SRS tidak membangun deliverable akhir -- hanya spesifikasi.**
 
 > **Dibuat oleh:** docgen-srs subagent
-> **Tanggal:** 2026-06-19
-> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Versi:** 2.0

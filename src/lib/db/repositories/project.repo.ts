@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { and, eq, desc, isNull, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { projects, type Project } from '@/lib/db/schema';
@@ -17,12 +18,12 @@ export async function listActiveProjects({ userId, page = 1, limit = 20 }: {
   return { data, total, totalPages: Math.ceil(total / limit) };
 }
 
-export async function getProjectById(id: number, userId: number): Promise<Project | null> {
+export const getProjectById = cache(async (id: number, userId: number): Promise<Project | null> => {
   const [row] = await db.select().from(projects)
     .where(and(eq(projects.id, id), eq(projects.userId, userId), isNull(projects.deletedAt)))
     .limit(1);
   return row ?? null;
-}
+});
 
 export async function getProjectRawById(id: number): Promise<Project | null> {
   const [row] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
@@ -31,7 +32,7 @@ export async function getProjectRawById(id: number): Promise<Project | null> {
 
 export async function createProject(input: {
   userId: number; title: string; durationType: string; durationTargetSeconds: number;
-  styleType: string; aspectRatio: string;
+  styleType: string; aspectRatio: string; storyDescription?: string | null;
 }): Promise<Project> {
   const [row] = await db.insert(projects).values({ ...input, status: 'draft' }).returning();
   if (!row) throw new Error('Failed to create project');
@@ -66,6 +67,7 @@ export async function softDeleteProject(id: number, userId: number): Promise<boo
 export function toProjectDTO(row: Project): {
   id: number; userId: number; title: string; durationType: string; durationTargetSeconds: number;
   styleType: string; aspectRatio: string; status: string; resultJson: unknown | null;
+  storyDescription: string | null;
   createdAt: string; updatedAt: string; deletedAt: string | null;
 } {
   return {
@@ -78,6 +80,7 @@ export function toProjectDTO(row: Project): {
     aspectRatio: row.aspectRatio,
     status: row.status,
     resultJson: row.resultJson ? JSON.parse(row.resultJson) : null,
+    storyDescription: row.storyDescription ?? null, // V2
     createdAt: new Date(row.createdAt * 1000).toISOString(),
     updatedAt: new Date(row.updatedAt * 1000).toISOString(),
     deletedAt: row.deletedAt ? new Date(row.deletedAt * 1000).toISOString() : null,

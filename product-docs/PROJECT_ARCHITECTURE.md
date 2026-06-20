@@ -1,139 +1,143 @@
-# Project Architecture — PromptFlow
+# Project Architecture — PromptFlow V2.0
 
-> **Versi:** 1.0
-> **Dibuat:** 2026-06-19
-> **Status:** Draft
+> **Versi:** 2.0 (OVERWRITE V1.0)
+> **Dibuat:** 2026-06-20
+> **Status:** Final
 > **Pemilik:** Bos Agrian
-> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/SRS.md` + `product-docs/DATABASE_SCHEMA.md` (bersitasi per klaim penting)
+> **Sumber kebenaran:** `product-docs/RAG-CONTEXT.md` + `product-docs/SRS.md V2.0` + `product-docs/DATABASE_SCHEMA.md V2.0` + `src/lib/db/schema.ts` (ground truth kode) + `package.json`
 > **Root proyek:** `C:\laragon\www\PromptFlow`
 > **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Catatan:** Dokumen ini menurunkan SRS §3 (Arsitektur High-Level), §4 (Tech Stack), §8 (Constraint), §9 (Keamanan), §10 (Tahapan) menjadi blueprint arsitektur konkret + struktur proyek siap eksekusi agent. Skema data penuh di `DATABASE_SCHEMA.md`, kontrak API penuh di `API_CONTRACT.md`, aturan kode di `CODING_RULES.md`.
+> **Catatan:** OVERWRITE V1.0. V2 = upgrade arsitektur konkret untuk 10 fitur V2 (upload di generate page, Vision LLM classification, story description, real-time logs, dashboard enrichment, navigation optimization, GitHub push). V1 tetap pertahankan 9 tabel + 21 endpoint + modular monolith + server-only boundary. Perubahan = additive saja, tidak breaking.
 
 ---
 
 ## Daftar Isi
 
-1. Pendahuluan & Ringkasan Arsitektur
-2. System Context (C4 Level 1)
-3. Container Diagram (C4 Level 2)
-4. Component Diagram (C4 Level 3)
-5. Folder / Module Structure
-6. Data Flow (Alur Generate Prompt)
-7. External Integrations Detail
-8. Deployment Topology
-9. Security Boundaries
-10. Scalability & Performance
-11. Observability
-12. Cross-cutting Concerns
-13. Asumsi Arsitektur & Referensi
+1. Pendahuluan & Ringkasan Arsitektur V2
+2. System Context (C4 Level 1) — V2 update
+3. Container Diagram (C4 Level 2) — V2 update
+4. Component Diagram (C4 Level 3) — V2 + image-classifier
+5. Folder / Module Structure V2
+6. Data Flow — Upload + Classify (V2 baru)
+7. Data Flow — Generate + Real-time Logs (V2 update)
+8. External Integrations V2 (Vision LLM)
+9. Configuration Management & Environment
+10. Security Boundaries V2
+11. Scalability, Performance, Observability V2
+12. Deployment Topology V2
+13. Keputusan Arsitektur (ADR ringkas)
+14. Asumsi Arsitektur V2 & Referensi
 
 ---
 
-## 1. Pendahuluan & Ringkasan Arsitektur
+## 1. Pendahuluan & Ringkasan Arsitektur V2
 
 ### 1.1 Tujuan Dokumen
 
-Mengubah tech stack & pendekatan teknis SRS menjadi blueprint arsitektur konkret
-+ struktur proyek siap dipakai agent eksekutor membangun kode. Diagram Mermaid
-(C4 style) memetakan komponen, hubungan, alur data, deployment, security
-boundary. Sitasi ke RAG/SRS/DB_SCHEMA per klaim penting.
+Mengubah tech stack & pendekatan teknis SRS V2 + schema V2 menjadi blueprint arsitektur konkret + struktur proyek siap dipakai agent eksekutor membangun kode V2. Diagram Mermaid (C4 style) memetakan komponen, hubungan, alur data, deployment, security boundary V2. Sitasi ke RAG/SRS/DB_SCHEMA per klaim penting.
 
-- Sitasi: `SRS.md 1.1, 3` ; `RAG-CONTEXT.md 2.1`
+- Sitasi: `SRS.md V2.0 §1.1, §4` ; `RAG-CONTEXT.md §2, §9` ; `DATABASE_SCHEMA.md V2.0 §1, §14`
 
-### 1.2 Gaya Arsitektur
+### 1.2 Gaya Arsitektur V2
 
-| Aspek | Nilai | Justifikasi | Bukti |
-|---|---|---|---|
-| Gaya | **Modular Monolith** (Next.js App Router fullstack, satu repo, satu deploy) | Fase awal: kompleksitas microservice tidak sepadan. Next.js App Router = frontend + backend satu deploy. Tidak ada service terpisah. | `SRS.md 3.1` ; `RAG-CONTEXT.md 2.1` |
-| Sub-gaya | **Layered + Feature-oriented** (presentation -> api -> lib -> external) | Pemisahan tanggung jawab jelas, server-only boundary di `lib/*`, tetap type-safe. | `SRS.md 3.2` |
-| Deploy | **Serverless** (Vercel Functions) | Auto-scale, pay-per-use, native Next.js. Constraint: filesystem tidak persisten -> DB remote HTTP wajib. | `RAG-CONTEXT.md 2.1, 2.2, 5.4` |
-| Data | **Turso/libSQL** (SQLite-compatible via HTTP) | Vercel FS tidak persisten. Turso = remote HTTP, serverless-safe, resmi Vercel Marketplace. | `RAG-CONTEXT.md 2.2, 5.4` ; `DATABASE_SCHEMA.md 1` |
-| Orkestrasi AI | **Vercel AI SDK v6** + `@ai-sdk/openai-compatible` `createOpenAICompatible` | Multi-provider OpenAI-compatible, structured output (`generateObject` + Zod), streaming. | `RAG-CONTEXT.md 5.1` ; `SRS.md 4.1` |
-| TIDAK microservice | Single repo, single deploy | Fase awal fokus adoption, bukan skalabilitas horizontal service. | `SRS.md 2.2 OOS` |
+| Aspek | V1 | V2 (baru/ubah) | Justifikasi | Bukti |
+|---|---|---|---|---|
+| Gaya | Modular Monolith | **Tetap Modular Monolith** (tidak migrasi ke microservice) | Fase V2 masih skala adopsi user, kompleksitas microservice tidak sepadan | `SRS.md V2.0 §4.1` |
+| Sub-gaya | Layered + Feature-oriented | **Tetap** + tambah sub-layer `AI/Vision` (image-classifier) | Pemisahan LLM text vs Vision jelas | `SRS.md V2.0 §4.1` |
+| Deploy | Serverless Vercel | **Tetap** | Auto-scale, pay-per-use, native Next.js | `RAG-CONTEXT.md §2.1, §5.4` |
+| Data | Turso/libSQL | **Tetap** + 3 kolom nullable additive | Tidak breaking, migrasi minimal | `DATABASE_SCHEMA.md V2.0 §9.3` |
+| AI Orkestrasi | Vercel AI SDK v4 + `@ai-sdk/openai-compatible` | **Tetap v4** (bukan upgrade ke v6 = OOS V2-3) | AI SDK v4 sudah proven V1; upgrade breaking | `RAG-CONTEXT.md §2` ; `SRS.md V2.0 §5` ; `package.json:25` |
+| **V2 baru** Vision AI | Tidak ada | **Vision LLM call** (GPT-4o / Gemini Vision) via HTTP direct + Zod parse | Pipeline image classification butuh vision capability | `SRS.md V2.0 §6.2 FR-V2-02` |
+| **V2 baru** Dashboard charts | 3 KPI cards langsung query | **Recharts/Tremor** charts + repository pattern refactor | Dashboard load <= 1.5s butuh query teroptimasi | `SRS.md V2.0 §6.6 FR-V2-06` |
+| **V2 baru** Streaming logs SSE | SSE event: stage/progress/done/error | **SSE + event `log`** (level, message, timestamp) | Real-time processing logs | `SRS.md V2.0 §6.5 FR-V2-05` |
+| **V2 baru** Pagination | `?page=1&limit=20` hardcoded | **Server-side pagination** + UI page numbers + prefetch | NFR-V2-P1 page transition <= 200ms | `SRS.md V2.0 §6.9 FR-V2-09` |
 
-### 1.3 Prinsip Arsitektur
+### 1.3 Prinsip Arsitektur V2
 
-1. **Server-only boundary**: semua panggilan LLM, decrypt API key, akses DB
-   lewat `lib/*` yang diawasi `import 'server-only'`. TIDAK ada panggilan LLM
-   atau decrypt dari Client Component. `SRS.md 9.1 SEC-03`.
-2. **Structured output first**: `generateObject` + Zod `PromptPackageSchema`
-   sebagai default. Fallback `streamText` + parse manual bila provider tidak
-   dukung `supportsStructuredOutputs`. `SRS.md 4.2 #2, 8.3, 8.7`.
-3. **Streaming anti-timeout**: generasi panjang via SSE (`streamObject`/`streamText`)
-   supaya token mulai mengalir < 10s (NFR-P3) dan hindari Vercel function timeout.
-   `SRS.md 8.1, ASUMSI SRS-A6`.
-4. **Ownership RBAC dasar**: semua resource scoped per `user_id` (session).
-   User hanya akses resource miliknya. `SRS.md 9.1 SEC-07`.
-5. **Encrypt-at-rest API key**: AES-256-GCM via env `ENCRYPTION_KEY`. TIDAK
-   pernah plaintext di DB atau expose ke client. `SRS.md 9.1 SEC-01/SEC-02`,
-   `DATABASE_SCHEMA.md 11.1`.
+Prinsip V1 dipertahankan + 3 prinsip baru V2:
+
+1. **Server-only boundary** (V1): semua panggilan LLM, decrypt API key, akses DB lewat `lib/*` `import 'server-only'`. TIDAK ada LLM call / decrypt dari Client Component. `SRS.md V2.0 §10.1 SEC-03`.
+2. **Structured output first** (V1): `generateObject` + Zod `PromptPackageSchema`. Fallback `streamText` + parse manual. `SRS.md V2.0 §5`.
+3. **Streaming anti-timeout** (V1): SSE token < 10s. V2 extend dengan `log` event type untuk observability real-time. `SRS.md V2.0 §6.5 FR-V2-05`.
+4. **Ownership RBAC dasar** (V1): semua resource scoped per `user_id`. `SRS.md V2.0 §10.1 SEC-07`.
+5. **Encrypt-at-rest API key** (V1): AES-256-GCM via env `ENCRYPTION_KEY`. `SRS.md V2.0 §10.1 SEC-01`.
+6. **V2 baru — Vision is separate concern**: Vision LLM call (image classification) dipisah di `lib/ai/image-classifier.ts`. BUKAN pakai AI SDK `generateObject` karena provider mungkin beda (GPT-4o Vision vs text-only). Direct HTTP call + Zod parse. Server-only.
+7. **V2 baru — Log buffer in-memory**: real-time logs buffer di memory selama SSE stream. Persist ke `generation_logs.logs_json` saat `done` event. Jangan query DB per log line.
+8. **V2 baru — Pagination as first-class**: list endpoint WAJIB support `?page=&limit=` dengan response `{data[], pagination{page, limit, total, totalPages}}`. Repository pattern panggil `paginate()` helper. `SRS.md V2.0 §6.9`.
 
 ---
 
-## 2. System Context (C4 Level 1)
+## 2. System Context (C4 Level 1) — V2 update
 
-PromptFlow di tengah ekosistem: User (browser), LLM provider, Turso DB, Vercel
-Blob, Vercel hosting.
+V2 tambah **Vision LLM** sebagai sistem eksternal baru + pertahankan V1 actors.
 
 ```mermaid
 flowchart LR
-    User["User<br/>(Browser)"]
-    PF["PromptFlow<br/>(Next.js App Router, Vercel)"]
-    LLM["LLM Providers<br/>(Ollama cloud / OpenRouter / 9router lokal / custom)"]
-    Turso[("Turso DB<br/>libSQL via HTTP")]
-    Blob[("Vercel Blob<br/>gambar referensi")]
-    Vercel["Vercel Hosting<br/>serverless + edge"]
+    User["User (Browser)"]
+    PF["PromptFlow V2 (Next.js App Router, Vercel)"]
+    LLM["LLM Text Providers (Ollama / OpenRouter / 9router / custom)"]
+    Vision["Vision LLM (GPT-4o Vision / Gemini Vision)"]
+    Turso[("Turso DB libSQL via HTTP")]
+    Blob[("Vercel Blob gambar referensi")]
+    GH["GitHub Repo agrianwahab29/promptflow"]
+    Vercel["Vercel Hosting serverless + edge"]
 
     User -->|HTTPS / SSE| PF
-    PF -->|server-side HTTPS<br/>createOpenAICompatible| LLM
+    PF -->|server-side HTTPS createOpenAICompatible| LLM
+    PF -->|server-side HTTPS multipart image upload| Vision
+    Vision -->|JSON role/name/description/confidence| PF
     PF -->|HTTP libSQL| Turso
     PF -->|HTTP put/get| Blob
+    PF -->|git push| GH
     Vercel -.->|hosts| PF
 ```
 
-| Aktor/Sistem Eksternal | Peran | Interaksi | Bukti |
-|---|---|---|---|
-| User (Browser) | Operator: input judul/durasi/style, upload referensi, konfigurasi provider, lihat/export hasil | HTTPS request -> Server Components + Client Components. Streaming SSE untuk generate. | `SRS.md 1.2, 3.2` ; `RAG-CONTEXT.md 7` |
-| LLM Provider (multi) | Generate paket prompt terstruktur dari input | Server-side call via `createOpenAICompatible`. Ollama cloud `https://ollama.com/v1`, OpenRouter `https://openrouter.ai/api/v1`, 9router `http://localhost:20128/v1` (dev lokal only), custom. | `RAG-CONTEXT.md 5.1, 5.2` ; `SRS.md 5 (FR-13)` |
-| Turso DB (libSQL) | Persistensi data: 9 entitas (users, projects, characters, scenes, dll) | HTTP libSQL via Drizzle ORM. Remote (Vercel FS tidak persisten). | `DATABASE_SCHEMA.md 1` ; `SRS.md 8.2` |
-| Vercel Blob | Storage gambar referensi upload (prod) | HTTP `put`/`get` via `@vercel/blob`. URL publik rujuk nama file di prompt. | `SRS.md 8.5` ; ASUMSI SRS-A5 |
-| Vercel Hosting | Hosting serverless + edge + HTTPS | Deploy Next.js App Router native. | `RAG-CONTEXT.md 2.1` |
+| Aktor/Sistem Eksternal | V1 | V2 (baru/ubah) | Interaksi | Bukti |
+|---|---|---|---|---|
+| User (Browser) | Ada | **Tetap** + interaksi baru: upload di generate page, toggle log viewer | HTTPS + SSE extended (event `log`) | `SRS.md V2.0 §6.1 FR-V2-01, §6.5 FR-V2-05` |
+| LLM Text Provider | Ada | **Tetap** | Server-side call via `createOpenAICompatible` | `RAG-CONTEXT.md §5.1` ; `SRS.md V2.0 §5` |
+| **V2 baru** Vision LLM | Tidak ada | **Tambah** untuk image classification (FR-V2-02) | Server-side HTTPS call `lib/ai/image-classifier.ts`. Provider: GPT-4o Vision / Gemini Vision. Direct HTTP (BUKAN AI SDK structured output). | `SRS.md V2.0 §6.2 FR-V2-02` ; `RAG-CONTEXT.md §10 B` |
+| Turso DB | Ada | **Tetap** + 3 kolom nullable baru | HTTP libSQL via Drizzle ORM | `DATABASE_SCHEMA.md V2.0 §3, §9.3` |
+| Vercel Blob | Ada | **Tetap** + asset_references pakai kolom ai_classification | HTTP `put`/`get` via `@vercel/blob` | `SRS.md V2.0 §5` |
+| **V2 baru** GitHub Repo | Tidak ada (V1: belum init git) | **Tambah** — version control + CI/CD future | `git push` ke `https://github.com/agrianwahab29/promptflow.git` | `SRS.md V2.0 §6.10 FR-V2-10` ; `BRD.md §7` |
+| Vercel Hosting | Ada | **Tetap** | Serverless + edge | `RAG-CONTEXT.md §2.1` |
 
 ---
 
-## 3. Container Diagram (C4 Level 2)
+## 3. Container Diagram (C4 Level 2) — V2 update
 
-Container = unit deployable/komponen tingkat tinggi. PromptFlow = 1 container
-Next.js App Router. Di dalamnya ada sub-modul `lib/*` (server-only boundary).
+V2 tambah sub-modul `lib/ai/image-classifier.ts` (Vision LLM), tambah `components/dashboard/Charts/` (Recharts), tambah `components/generate/LogViewer.tsx`.
 
 ```mermaid
 flowchart TB
     subgraph Client["Client Browser"]
-        UI["React Client Components<br/>form, streaming display, i18n toggle"]
+        UI["React Client Components GenerateForm + DropzoneUploader + ClassificationResult + LogViewer + Dashboard Charts"]
     end
 
     subgraph NextApp["Container: Next.js App Router (Vercel serverless)"]
         direction TB
-        RSC["Server Components / Pages<br/>src/app/(dashboard)"]
-        API["Route Handlers + Server Actions<br/>src/app/api"]
-        LibAI["lib/ai<br/>provider-registry, prompt-builder, llm-client, response-parser, consistency-checker"]
-        LibDB["lib/db<br/>Drizzle client + repositories"]
-        LibStorage["lib/storage<br/>Vercel Blob helper"]
-        LibAuth["lib/auth<br/>NextAuth config + middleware"]
-        LibCrypto["lib/crypto<br/>AES-256-GCM"]
-        LibI18n["lib/i18n<br/>next-intl messages"]
-        LibVal["lib/validation<br/>Zod schemas"]
-        LibExport["lib/export<br/>JSON + markdown template"]
+        RSC["Server Components / Pages src/app/[locale]/(dashboard) + loading.tsx + error.tsx"]
+        API["Route Handlers + Server Actions src/app/api/v1/* + /upload/classify (V2 baru) + /dashboard (extended)"]
+        LibAI["lib/ai provider-registry, prompt-builder, llm-client, response-parser, consistency-checker, image-classifier (V2 BARU)"]
+        LibDB["lib/db Drizzle client + repositories + dashboard.repo (V2 BARU)"]
+        LibStorage["lib/storage Vercel Blob helper + local FS"]
+        LibAuth["lib/auth NextAuth config + middleware"]
+        LibCrypto["lib/crypto AES-256-GCM"]
+        LibI18n["lib/i18n next-intl messages"]
+        LibVal["lib/validation Zod schemas + 6-tipe enum (V2)"]
+        LibExport["lib/export JSON + markdown template"]
     end
 
     subgraph Ext["External Services"]
-        LLM["LLM Provider<br/>(Ollama/OpenRouter/9router/custom)"]
+        LLM["LLM Text Provider (Ollama/OpenRouter/9router/custom)"]
+        Vision["Vision LLM (GPT-4o / Gemini Vision)"]
         Turso[("Turso DB")]
         Blob[("Vercel Blob")]
-        NextAuthStore["NextAuth session store<br/>(JWT cookie / Turso adapter)"]
+        NextAuthStore["NextAuth session (JWT cookie)"]
+        GH["GitHub Repo (V2 BARU)"]
     end
 
-    UI -->|fetch /api, Server Actions| RSC
+    UI -->|fetch /api/v1/* Server Actions SSE extended + log event| RSC
     UI -->|SSE stream| API
     RSC --> API
     API --> LibAI
@@ -143,92 +147,107 @@ flowchart TB
     API --> LibExport
     LibAI --> LibCrypto
     LibAI --> LibVal
+    LibDB --> LibVal
     LibAuth --> LibDB
     LibAuth --> NextAuthStore
     LibAI -->|server-side HTTPS| LLM
+    LibAI -->|server-side HTTPS multipart| Vision
     LibDB -->|HTTP libSQL| Turso
     LibStorage -->|HTTP put/get| Blob
+    NextApp -.->|git push| GH
 ```
 
-| Container/Sub-modul | Tanggung jawab | Bukti |
-|---|---|---|
-| Server Components / Pages (`src/app/(dashboard)`) | Render SSR/ISR, data fetch list/detail project, layout, i18n. | `SRS.md 3.2 Layer 1` |
-| Route Handlers + Server Actions (`src/app/api`) | Endpoint REST + mutation. `/api/generate` SSE, `/api/projects` CRUD, `/api/settings/providers`, `/api/upload`, `/api/export`, `/api/auth/*`. | `SRS.md 3.2 Layer 2, 7.1` |
-| `lib/ai` | Orkestrasi LLM: provider registry, prompt builder, llm client, response parser, consistency checker. Server-only. | `SRS.md 3.2 Layer 3, 5 (FR-03..FR-12)` |
-| `lib/db` | Drizzle client + schema + repositories per entitas. Query helper. Server-only. | `SRS.md 3.2 Layer 3, 6` ; `DATABASE_SCHEMA.md 8` |
-| `lib/storage` | Vercel Blob helper (upload, get URL, delete). Dev: FS `public/references/`. | `SRS.md 3.2 Layer 3, 5 (FR-17)` |
-| `lib/auth` | NextAuth config (providers, session, callbacks) + middleware protected routes. | `SRS.md 3.2 Layer 3, 5 (FR-18), 9.1 SEC-11` |
-| `lib/crypto` | AES-256-GCM encrypt/decrypt API key + mask. Server-only. | `SRS.md 3.2 Layer 3, 5 (FR-14), 9.1 SEC-01` |
-| `lib/i18n` | next-intl messages (id/en). | `SRS.md 3.2 (i18n), 5 (FR-19)` ; ASUMSI SRS-A2 |
-| `lib/validation` | Zod schemas (input form + LLM structured output `PromptPackageSchema`). | `SRS.md 3.2 Layer 3, 8.7` |
-| `lib/export` | Template transform JSON -> markdown. | `SRS.md 5 (FR-16)` |
+| Container/Sub-modul | V1 | V2 (baru/ubah) | Tanggung jawab | Bukti |
+|---|---|---|---|---|
+| Server Components / Pages | Ada | **Tetap** + tambah `loading.tsx` + `error.tsx` per page group (FR-V2-07) | SSR/ISR, data fetch list/detail project, layout, i18n. Loading skeleton + error boundary. | `SRS.md V2.0 §6.7 FR-V2-07` |
+| Route Handlers + Server Actions | 21 endpoint V1 | **Tetap 21 + 1 endpoint baru** (`/api/v1/upload/classify`) + extended `/api/v1/dashboard/stats` | Backend endpoints V1 backward-compatible | `SRS.md V2.0 §8.2-§8.3` |
+| `lib/ai` | 5 komponen V1 | **+1 komponen baru**: `image-classifier.ts` (Vision LLM) | Orkestrasi LLM text + Vision. Server-only. | `SRS.md V2.0 §6.2 FR-V2-02` |
+| `lib/db` | 9 repo V1 | **+1 repo baru**: `dashboard.repo.ts` (enrichment queries) + extended `project.repo.ts` (pagination) | Repository pattern enforced | `SRS.md V2.0 §6.6 FR-V2-06, §6.9 FR-V2-09` |
+| `lib/storage` | Ada | **Tetap** | Vercel Blob helper | `SRS.md V2.0 §5` |
+| `lib/auth` | Ada | **Tetap** | NextAuth credentials + middleware | `SRS.md V2.0 §10.1 SEC-11` |
+| `lib/crypto` | Ada | **Tetap** | AES-256-GCM encrypt/decrypt/mask | `SRS.md V2.0 §10.1 SEC-01` |
+| `lib/i18n` | Ada | **Tetap** | next-intl messages id/en | `SRS.md V2.0 §5` |
+| `lib/validation` | 6 schema V1 | **Extended**: `GenerateReferenceSchema.type` enum 6 opsi + `storyDescription` field | Zod schemas input + LLM output | `SRS.md V2.0 §6.3 FR-V2-03, §6.4 FR-V2-04` |
+| `lib/export` | Ada | **Tetap** | JSON + markdown transform | `SRS.md V2.0 §5` |
+| **V2 baru** `components/generate/LogViewer.tsx` | Tidak ada | **Tambah** — Collapsible panel show/hide logs real-time | Toggle panel untuk SSE `log` events | `SRS.md V2.0 §6.5 FR-V2-05` |
+| **V2 baru** `components/generate/ClassificationResult.tsx` | Tidak ada | **Tambah** — thumbnail + role badge + confidence bar + override dropdown | Tampilkan hasil Vision LLM classification | `SRS.md V2.0 §6.2 FR-V2-02` |
+| **V2 baru** `components/dashboard/*` | Tidak ada | **Tambah** — Recharts Line/Bar/Pie chart components | Dashboard enrichment | `SRS.md V2.0 §6.6 FR-V2-06` |
 
 ---
 
-## 4. Component Diagram (C4 Level 3)
+## 4. Component Diagram (C4 Level 3) — V2 update
 
-Detail komponen internal `lib/ai` dan `lib/db` (komponen paling kompleks).
-
-### 4.1 Komponen `lib/ai`
+### 4.1 Komponen `lib/ai` V2
 
 ```mermaid
 flowchart TB
-    subgraph LibAI["lib/ai"]
-        PR["provider-registry.ts<br/>createOpenAICompatible factory"]
-        PB["prompt-builder.ts<br/>assemble system prompt per komponen"]
-        LC["llm-client.ts<br/>generateObject / streamObject + retry"]
-        RP["response-parser.ts<br/>parse + validate Zod fallback"]
-        CC["consistency-checker.ts<br/>post-check FR-12"]
-        Prompts[("prompts/<br/>*.system.ts templates")]
+    subgraph LibAI["lib/ai (V2)"]
+        PR["provider-registry.ts createOpenAICompatible TEXT providers"]
+        IC["image-classifier.ts V2 BARU Vision LLM HTTP call"]
+        PB["prompt-builder.ts assemble system prompt inject storyDescription + 6-tipe refs"]
+        LC["llm-client.ts generateObject/streamObject + log buffer (V2)"]
+        RP["response-parser.ts Zod validate + fallback"]
+        CC["consistency-checker.ts post-check FR-12"]
+        Prompts[("prompts/ *.system.ts templates")]
+        LogBuf[("log-buffer.ts V2 BARU in-memory log array")]
     end
 
-    API["API /api/generate"]
+    API["API endpoints"]
     Crypto["lib/crypto decrypt"]
-    Val["lib/validation PromptPackageSchema"]
+    Val["lib/validation schemas"]
     DB["lib/db repositories"]
-    LLM["LLM Provider"]
+    Vision["Vision LLM GPT-4o / Gemini"]
+    LLM["LLM Text Provider"]
 
     API --> PB
     PB --> Prompts
     API --> PR
     PR --> Crypto
     PR --> LLM
+    API --> IC
+    IC --> Val
+    IC -->|HTTP multipart| Vision
     API --> LC
     LC --> PR
+    LC --> LogBuf
     LC --> LLM
     LC --> RP
     RP --> Val
     LC --> CC
     CC --> Val
     API --> DB
+    LogBuf -.->|persist on done| DB
 ```
 
-| Komponen | Tanggung jawab | Input | Output | Bukti |
+| Komponen | V1 | V2 | Tanggung jawab | Bukti |
 |---|---|---|---|---|
-| `provider-registry.ts` | Init `createOpenAICompatible({name, apiKey, baseURL, headers})`. Decrypt API key server-side. Map provider -> base URL preset. | `provider`, `base_url`, `api_key_encrypted` | instance provider AI SDK | `SRS.md 5 (FR-13), 9.1 SEC-03` ; `RAG-CONTEXT.md 5.1` |
-| `prompt-builder.ts` | Assemble system prompt per komponen (scenes, voiceover, character, image_prompts, moral). Inject `reference_filename`, `style`, `aspect_ratio`, `duration_target`. | input form + asset refs | system prompt string | `SRS.md 5 (FR-03..FR-11), 8.7` |
-| `llm-client.ts` | Panggil `generateObject`/`streamObject` dengan `PromptPackageSchema`. Retry 3x backoff (NFR-R3). SSE stream -> client. | provider, system, messages, schema | partial/full structured JSON | `SRS.md 5 (FR-03), 8.1, ASUMSI SRS-A14` |
-| `response-parser.ts` | Validate Zod. Fallback: bila provider tidak dukung `supportsStructuredOutputs` -> `streamText` + parse JSON manual + validasi Zod. | raw LLM output | parsed `PromptPackage` | `SRS.md 4.2 #2, 8.3` ; `RAG-CONTEXT.md 5.1, 11 #1` |
-| `consistency-checker.ts` | Post-check FR-12: banding `character_profiles` identitas vs `image_prompts.target` reference di `scenes[]`. Mismatch -> warning (tidak block save). | parsed package | warnings[] | `SRS.md 5 (FR-12), 6.2 #1` ; `DATABASE_SCHEMA.md 12.1` |
-| `prompts/*.system.ts` | Template system prompt per komponen (scenes, voiceover, character, image_prompts, moral). | params | string template | `SRS.md 3.2 (lib/ai/prompts)` |
+| `provider-registry.ts` | Ada | **Tetap** (TEXT only) | Init `createOpenAICompatible` + decrypt key server-side | `SRS.md V2.0 §5` |
+| `prompt-builder.ts` | Ada | **Extended** — inject `storyDescription` + 6-tipe refs | Assemble system prompt | `SRS.md V2.0 §6.4 FR-V2-04, §6.3 FR-V2-03` |
+| `llm-client.ts` | Ada | **Extended** — tambah log buffer push per tahap | Panggil LLM + retry 3x backoff + buffer log | `SRS.md V2.0 §6.5 FR-V2-05` |
+| `response-parser.ts` | Ada | **Tetap** | Zod validate + fallback parse | `SRS.md V2.0 §5` |
+| `consistency-checker.ts` | Ada | **Tetap** | Post-check FR-12 | `SRS.md V2.0 §5 FR-12` |
+| `prompts/*.system.ts` | Ada | **Extended** — tambah instruction untuk `storyDescription` | Template system prompt | `SRS.md V2.0 §6.4 FR-V2-04` |
+| **V2 baru** `image-classifier.ts` | Tidak ada | **Tambah** | Vision LLM HTTP call. Input: blob URL atau local path. Output: `{role, name, description, confidence}` JSON. Zod validate. Cache di `asset_references.ai_classification`. Confidence threshold 0.7. Batch max 5. | `SRS.md V2.0 §6.2 FR-V2-02` |
+| **V2 baru** `log-buffer.ts` | Tidak ada | **Tambah** | In-memory array buffer log lines per request. Push per tahap. Drain ke SSE `log` event. Persist JSON ke `generation_logs.logs_json` saat `done`. | `SRS.md V2.0 §6.5 FR-V2-05` |
 
-### 4.2 Komponen `lib/db`
+### 4.2 Komponen `lib/db` V2
 
 ```mermaid
 flowchart TB
-    subgraph LibDB["lib/db"]
-        Client["client.ts<br/>Drizzle + libSQL init"]
-        Schema["schema.ts<br/>9 table Drizzle def"]
+    subgraph LibDB["lib/db (V2)"]
+        Client["client.ts Drizzle + libSQL init"]
+        Schema["schema.ts 9 table + V2 3 kolom nullable"]
         subgraph Repos["repositories/"]
             UserRepo["user.repo.ts"]
             ProviderRepo["provider-config.repo.ts"]
-            ProjectRepo["project.repo.ts"]
-            AssetRepo["asset-reference.repo.ts"]
+            ProjectRepo["project.repo.ts V2: +paginate() +storyDescription"]
+            AssetRepo["asset-reference.repo.ts V2: +updateClassification()"]
             CharacterRepo["character.repo.ts"]
             SceneRepo["scene.repo.ts"]
             ImagePromptRepo["image-prompt.repo.ts"]
-            GenLogRepo["generation-log.repo.ts"]
+            GenLogRepo["generation-log.repo.ts V2: +logsJson"]
             SuppCharRepo["supporting-character.repo.ts"]
+            DashRepo["dashboard.repo.ts V2 BARU enrichment queries"]
         end
     end
 
@@ -241,303 +260,536 @@ flowchart TB
     Client -->|HTTP libSQL| Turso
 ```
 
-| Komponen | Tanggung jawab | Bukti |
-|---|---|---|
-| `client.ts` | Init `createClient` (@libsql/client) + `drizzle` instance. Baca env `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`. | `DATABASE_SCHEMA.md 8.1, 8.3` ; `SRS.md 8.2` |
-| `schema.ts` | Definisi 9 tabel Drizzle (users, provider_configs, projects, asset_references, characters, scenes, image_prompts, generation_logs, supporting_characters). | `DATABASE_SCHEMA.md 8.3` |
-| `repositories/*.repo.ts` | Query helper per entitas: CRUD + ownership filter `user_id` + paginate + komposit index query. | `DATABASE_SCHEMA.md 5` ; `SRS.md 5 (FR-15)` |
+| Komponen | V1 | V2 | Bukti |
+|---|---|---|---|
+| `client.ts` | Ada | **Tetap** | `DATABASE_SCHEMA.md V2.0 §1` |
+| `schema.ts` | 9 tabel | **9 tabel + 3 kolom nullable** (`projects.story_description`, `asset_references.ai_classification`, `generation_logs.logs_json`) | `DATABASE_SCHEMA.md V2.0 §4.3, §4.4, §4.8` ; `schema.ts` |
+| `repositories/*.repo.ts` | 9 repo | **9 repo V1 + extended queries** (pagination, log JSON, classification cache) | `DATABASE_SCHEMA.md V2.0 §5` |
+| **V2 baru** `dashboard.repo.ts` | Tidak ada | **Tambah** — queries: `totalProjects`, `successfulGenerations`, `avgDuration`, `perProviderBreakdown`, `recentProjects(5)`, `weeklyTrend`, `storageUsage` | `SRS.md V2.0 §6.6 FR-V2-06` |
 
 ---
 
-## 5. Folder / Module Structure
+## 5. Folder / Module Structure V2
 
-Struktur folder konkret sesuai framework (Next.js App Router + Drizzle + shadcn/ui).
+Struktur folder V2 = V1 + file/komponen baru. Pertahankan 100% backward-compatible.
 
 ```text
 PromptFlow/
-  product-docs/                      # dokumen (BRD/MRD/PRD/SRS/DB_SCHEMA/ARCH/...)
-  drizzle/                           # output migration SQL (drizzle-kit generate)
-  messages/                          # i18n messages (next-intl)
+  product-docs/                      # 14 dokumen (read-only rujukan)
+  drizzle/                           # output migration SQL
+  messages/
     id.json
     en.json
   public/
-    references/                      # dev-only upload gambar (ASUMSI, tidak persisten Vercel)
+    references/                      # dev-only upload FS
   src/
     app/
       api/
-        auth/
-          [...nextauth]/route.ts     # NextAuth handler
-        projects/
-          route.ts                   # GET list, POST create
-          [id]/route.ts              # GET, PUT, DELETE
-        generate/route.ts            # POST streaming SSE
-        settings/
-          providers/
-            route.ts                 # GET list, POST save
-            [id]/route.ts            # PUT, DELETE
-        upload/route.ts              # POST multipart -> Vercel Blob
-        export/route.ts              # GET JSON / markdown
-      (dashboard)/
+        v1/                          # ASUMSI API-A1, semua endpoint V2 pakai /v1
+          auth/[...nextauth]/route.ts
+          health/route.ts
+          projects/route.ts          # V2: +pagination
+          projects/[id]/route.ts
+          projects/[id]/export/route.ts
+          projects/[id]/characters/route.ts
+          projects/[id]/scenes/route.ts
+          projects/[id]/image-prompts/route.ts
+          projects/[id]/logs/route.ts
+          generate/route.ts          # V2: +log SSE event + storyDescription
+          upload/route.ts            # V2: 6-tipe enum + return ai_classification
+          upload/classify/route.ts   # V2 BARU: trigger AI classification
+          dashboard/route.ts         # V2 BARU/extended: enrichment response
+          settings/providers/route.ts
+          settings/providers/[id]/route.ts
+          settings/providers/[id]/test/route.ts
+      [locale]/
         layout.tsx
-        generate/page.tsx
-        projects/page.tsx
-        projects/[id]/page.tsx
-        settings/page.tsx
-      (auth)/
-        login/page.tsx
-      layout.tsx                     # root layout + i18n provider
-      page.tsx                        # redirect /generate atau /login
-      globals.css                     # Tailwind v4
+        (dashboard)/
+          loading.tsx                # V2 BARU: skeleton
+          error.tsx                  # V2 BARU: boundary
+          generate/
+            loading.tsx              # V2 BARU
+            page.tsx                 # V2: upload di sini, bukan project detail
+          projects/
+            loading.tsx              # V2 BARU
+            page.tsx                 # V2: +pagination
+            [id]/
+              loading.tsx            # V2 BARU
+              page.tsx               # V2: view refs only (read-only, upload DIHAPUS)
+          dashboard/
+            loading.tsx              # V2 BARU
+            page.tsx                 # V2: charts + activity + per-provider
+          settings/
+            loading.tsx              # V2 BARU
+            page.tsx
+        (auth)/
+          login/page.tsx
+          register/page.tsx
+      layout.tsx
+      page.tsx
+      globals.css                    # V2: +design tokens (--primary, font, spacing)
     components/
-      ui/                             # shadcn/ui (copy-paste)
-      generate/                       # form + streaming display
-      projects/                       # list + detail
-      settings/                       # provider form
-      common/                         # header, footer, error boundary
+      ui/                            # shadcn/ui (tetap)
+      generate/
+        generate-form.tsx            # V2: +DropzoneUploader embedded + storyDescription textarea
+        dropzone-uploader.tsx        # V2: 6-tipe enum, support upload tanpa projectId
+        asset-preview-list.tsx       # V2 BARU: list uploaded refs dgn thumbnail + role badge
+        classification-result.tsx    # V2 BARU: thumbnail + role badge + confidence + override
+        log-viewer.tsx               # V2 BARU: Collapsible show/hide logs
+        result-tabs.tsx              # tetap
+        template-picker.tsx          # tetap
+      projects/
+        project-card.tsx             # tetap
+        projects-pagination.tsx      # V2 BARU: page numbers + prev/next
+        delete-project-button.tsx    # tetap
+      dashboard/
+        metric-card.tsx              # V2 BARU: generic metric card
+        weekly-trend-chart.tsx       # V2 BARU: Recharts LineChart
+        success-fail-chart.tsx       # V2 BARU: Recharts BarChart
+        per-provider-table.tsx       # V2 BARU
+        recent-activity-table.tsx    # V2 BARU
+        storage-usage-card.tsx       # V2 BARU
+      settings/
+        provider-config-form.tsx
+        provider-card.tsx
+      common/
+        app-header.tsx
+        language-toggle.tsx
+        copy-button.tsx
+      providers.tsx
     lib/
       ai/
-        provider-registry.ts
-        prompt-builder.ts
-        llm-client.ts
+        provider-registry.ts         # V1: text providers
+        image-classifier.ts          # V2 BARU: Vision LLM
+        prompt-builder.ts            # V2: +storyDescription injection
+        llm-client.ts                # V2: +log buffer integration
         response-parser.ts
         consistency-checker.ts
+        log-buffer.ts                # V2 BARU: in-memory log buffer
         prompts/
-          scenes.system.ts
+          scenes.system.ts           # V2: +storyDescription context
           voiceover.system.ts
           character.system.ts
-          image-prompts.system.ts
+          image-prompts.system.ts    # V2: 6-tipe enum reference format
           moral.system.ts
       db/
         client.ts
-        schema.ts
+        schema.ts                    # V2: +3 kolom nullable
         repositories/
           user.repo.ts
           provider-config.repo.ts
-          project.repo.ts
-          asset-reference.repo.ts
+          project.repo.ts            # V2: +paginate()
+          asset-reference.repo.ts    # V2: +updateClassification()
           character.repo.ts
           scene.repo.ts
           image-prompt.repo.ts
-          generation-log.repo.ts
+          generation-log.repo.ts     # V2: +saveLogsJson()
           supporting-character.repo.ts
-      storage/
-        blob.ts                       # Vercel Blob helper
+          dashboard.repo.ts          # V2 BARU
+      storage/blob.ts                # V1: dual-mode Blob/FS
       auth/
-        config.ts                     # NextAuth providers, session, callbacks
-        middleware.ts                 # protected routes
-      crypto/
-        aes.ts                        # AES-256-GCM encrypt/decrypt/mask
+        config.ts                    # NextAuth credentials + JWT
+        middleware.ts                # protected routes
+      crypto/aes.ts                  # AES-256-GCM
       i18n/
-        config.ts                     # next-intl config
-        request.ts                    # locale resolver
+        config.ts
+        request.ts
       validation/
-        schemas.ts                    # Zod input + PromptPackageSchema
-      export/
-        markdown.template.ts
-    middleware.ts                     # NextAuth + i18n + rate limit middleware
-  drizzle.config.ts                   # Drizzle Kit config
-  next.config.ts                      # Next.js config (i18n, experimental)
-  tailwind.config.ts                  # Tailwind v4 (atau CSS-first v4)
-  components.json                     # shadcn/ui config
-  package.json
+        schemas.ts                   # V2: 6-tipe enum + storyDescription field
+      export/markdown.template.ts
+    middleware.ts                    # NextAuth + i18n + rate limit (10 req/min)
+  drizzle.config.ts                  # Turso dialect
+  next.config.ts                     # next-intl plugin + Vercel Blob images
+  tailwind.config.ts                 # atau CSS-first v4
+  components.json                    # shadcn/ui config
+  package.json                       # V2: +recharts dependency
   tsconfig.json
-  .env.local                          # dev (TIDAK commit)
-  .env.example                        # dokumentasi env tanpa value asli
-  .gitignore
-  README.md
+  .env.local                         # dev (TIDAK commit)
+  .env.example                       # dokumentasi env
+  .gitignore                         # V2 BARU: node_modules, .env.local, .next, public/references
+  README.md                          # V2 updated
 ```
 
-| Folder | Peran | Bukti |
-|---|---|---|
-| `src/app` | Next.js App Router: pages (Server Components) + `api/` Route Handlers. | `SRS.md 3.2, 3.4` |
-| `src/app/api` | Backend endpoints. SSE generate, CRUD, upload, export, auth. | `SRS.md 7.1` |
-| `src/components` | UI: shadcn/ui + custom (generate form, streaming display, project list/detail, settings). | `SRS.md 3.2 Layer 1` |
-| `src/lib/ai` | Orkestrasi LLM server-only. | `SRS.md 3.2 Layer 3` ; §4.1 dokumen ini |
-| `src/lib/db` | Drizzle client + schema + repositories. | `DATABASE_SCHEMA.md 8` ; §4.2 dokumen ini |
-| `src/lib/storage` | Vercel Blob helper. | `SRS.md 3.2 Layer 3` |
-| `src/lib/auth` | NextAuth config + middleware. | `SRS.md 3.2 Layer 3, 9.1 SEC-11` |
-| `src/lib/crypto` | AES-256-GCM. | `SRS.md 9.1 SEC-01` |
-| `src/lib/i18n` | next-intl config + locale resolver. | `SRS.md 5 (FR-19)` ; ASUMSI SRS-A2 |
-| `src/lib/validation` | Zod schemas. | `SRS.md 8.7` |
-| `src/lib/export` | Markdown template transform. | `SRS.md 5 (FR-16)` |
-| `messages/` | i18n message bundles (id/en). | `SRS.md 5 (FR-19)` |
-| `drizzle/` | Output migration SQL. | `DATABASE_SCHEMA.md 8.1` |
-| `public/references/` | Dev-only upload FS (ASUMSI, tidak persisten Vercel prod). | ASUMSI SRS-A17 |
+| Folder | V1 | V2 (baru/ubah) | Bukti |
+|---|---|---|---|
+| `src/app/api/v1/upload/classify/` | Tidak ada | **V2 BARU** — POST endpoint untuk trigger AI classification | `SRS.md V2.0 §8.3` |
+| `src/app/api/v1/dashboard/` | Tidak ada (V1: dashboard via page direct query) | **V2 BARU** — GET endpoint return enrichment data | `SRS.md V2.0 §8.2` |
+| `src/app/[locale]/(dashboard)/loading.tsx` per group | Tidak ada | **V2 BARU** — skeleton per page group (FR-V2-07) | `SRS.md V2.0 §6.7 FR-V2-07` |
+| `src/app/[locale]/(dashboard)/error.tsx` per group | Tidak ada | **V2 BARU** — error boundary (FR-V2-07) | `SRS.md V2.0 §6.7 FR-V2-07` |
+| `src/components/generate/dropzone-uploader.tsx` | Di project detail | **V2**: dipindah ke generate form, support upload tanpa projectId + 6-tipe enum | `SRS.md V2.0 §6.1 FR-V2-01, §6.3 FR-V2-03` |
+| `src/components/generate/asset-preview-list.tsx` | Tidak ada | **V2 BARU** — list refs dengan thumbnail + role badge | `SRS.md V2.0 §6.1 FR-V2-01` |
+| `src/components/generate/classification-result.tsx` | Tidak ada | **V2 BARU** — Vision LLM result UI + override | `SRS.md V2.0 §6.2 FR-V2-02` |
+| `src/components/generate/log-viewer.tsx` | Tidak ada | **V2 BARU** — Collapsible log panel | `SRS.md V2.0 §6.5 FR-V2-05` |
+| `src/components/dashboard/*` | Hanya page | **V2 BARU** — chart + table + card components | `SRS.md V2.0 §6.6 FR-V2-06` |
+| `src/components/projects/projects-pagination.tsx` | Tidak ada | **V2 BARU** — page numbers + prev/next | `SRS.md V2.0 §6.9 FR-V2-09` |
+| `src/lib/ai/image-classifier.ts` | Tidak ada | **V2 BARU** — Vision LLM HTTP call | `SRS.md V2.0 §6.2 FR-V2-02` |
+| `src/lib/ai/log-buffer.ts` | Tidak ada | **V2 BARU** — in-memory log buffer | `SRS.md V2.0 §6.5 FR-V2-05` |
+| `src/lib/db/repositories/dashboard.repo.ts` | Tidak ada | **V2 BARU** — enrichment queries | `SRS.md V2.0 §6.6 FR-V2-06` |
+| `src/lib/db/repositories/project.repo.ts` | V1: listActiveProjects hardcoded | **V2**: +`paginate({userId, page, limit})` | `SRS.md V2.0 §6.9 FR-V2-09` |
+| `.gitignore` | Tidak ada | **V2 BARU** — FR-V2-10 | `SRS.md V2.0 §6.10 FR-V2-10` |
 
 ---
 
-## 6. Data Flow (Alur Generate Prompt)
+## 6. Data Flow — Upload + AI Classification (V2 use case kunci)
 
-Use case kunci: POST `/api/generate` streaming SSE. Alur request -> response.
+Use case V2 kunci #1: User upload gambar referensi di generate page → auto-trigger Vision LLM classification → result visible sebelum submit generate.
 
 ```mermaid
 sequenceDiagram
     participant U as User (Browser)
-    participant API as /api/generate
-    participant Auth as lib/auth middleware
-    participant DB as lib/db
-    participant Crypto as lib/crypto
-    participant PR as provider-registry
-    participant PB as prompt-builder
-    participant LC as llm-client
-    participant LLM as LLM Provider
-    participant RP as response-parser
-    participant CC as consistency-checker
+    participant GU as GenerateForm + DropzoneUploader
+    participant API as POST /api/v1/upload
+    participant Blob as Vercel Blob
+    participant AR as asset_references table
+    participant CL as POST /api/v1/upload/classify
+    participant IC as lib/ai/image-classifier
+    participant Vision as Vision LLM (GPT-4o)
+    participant CR as ClassificationResult component
 
-    U->>Auth: POST /api/generate {title, duration, style, refs}
-    Auth->>Auth: session check (redirect bila unauth)
-    Auth->>API: valid session (user_id)
-    API->>API: validate Zod input (TitleSchema, DurationSchema, style)
-    API->>DB: load ProviderConfig (where user_id, is_active=1)
-    DB-->>API: provider, base_url, api_key_encrypted
-    API->>Crypto: decrypt(api_key_encrypted)
-    Crypto-->>API: plaintext api_key (in-memory only)
-    API->>PR: createOpenAICompatible({name, apiKey, baseURL, headers})
-    PR-->>API: provider instance
-    API->>DB: load asset_references (project_id)
-    DB-->>API: filename[] refs
-    API->>PB: build system prompt (scenes+voiceover+character+image_prompts+moral)
-    PB->>PB: inject reference_filename, style, aspect_ratio, duration_target
-    PB-->>API: system prompt + messages
-    API->>LC: generateObject/streamObject(provider, schema, system, messages)
-    LC->>LLM: POST /v1/chat/completions (stream SSE)
-    LLM-->>LC: token stream (partial JSON)
-    LC-->>API: partial stream (ReadableStream)
-    API-->>U: SSE stream (data: partial ...)
-    LLM-->>LC: done (full output)
-    LC->>RP: parse + validate PromptPackageSchema
-    RP->>RP: fallback streamText + parse JSON bila no structured output
-    RP-->>LC: parsed PromptPackage
-    LC->>CC: consistency check (FR-12)
-    CC-->>LC: warnings[] (mismatch -> warning, tidak block)
-    LC->>DB: persist project + characters + scenes + image_prompts + supporting_chars + gen_log
-    LC-->>API: done {result, warnings}
-    API-->>U: SSE data: done {full structured JSON, warnings}
+    U->>GU: drag-drop gambar (multi-file)
+    GU->>GU: validate mime + size (client-side preview)
+    GU->>API: POST multipart (file, tipe default 'other')
+    API->>API: auth middleware check session
+    API->>Blob: put(filename, file)
+    Blob-->>API: blob_url
+    API->>AR: insert asset_references (project_id=NULL, tipe, blob_url, filename, mime_type, size_bytes)
+    AR-->>API: assetReferenceId
+    API-->>GU: { id, blob_url, filename, tipe: 'other' }
+
+    GU->>CL: auto-trigger POST /api/v1/upload/classify {assetReferenceId}
+    CL->>API: auth check
+    CL->>AR: load asset_references WHERE id=assetReferenceId AND user_id
+    AR-->>CL: asset (blob_url)
+    alt Vision LLM available
+        CL->>IC: classifyImage(blob_url)
+        IC->>Vision: POST /v1/chat/completions (image+prompt)
+        Note over IC,Vision: Prompt: Classify role in animation: character/background/prop/accessory/environment/other. Return JSON {role, name, description, confidence}
+        Vision-->>IC: {role, name, description, confidence}
+        IC->>IC: Zod validate classification schema
+        IC->>AR: UPDATE asset_references SET tipe=role, label=name, ai_classification=JSON
+        AR-->>IC: ok
+        IC-->>CL: {role, name, description, confidence}
+        CL-->>GU: SSE/event {classification result}
+        GU->>CR: render ClassificationResult (thumbnail + role badge + confidence bar)
+    else Vision LLM gagal / timeout
+        CL-->>GU: fallback (manual select tetap tokoh/background/prop/...)
+    end
+
+    U->>CR: review + optional override role
+    CR-->>GU: emit override event -> update form state
+    GU->>GU: list refs dengan classification final (untuk generate submit)
 ```
 
 | Tahap | Aksi | Komponen | Bukti |
 |---|---|---|---|
-| 1. Auth | Middleware cek session. Redirect `/login` bila unauth. | `lib/auth/middleware.ts` | `SRS.md 9.1 SEC-11` |
-| 2. Validate | Zod parse input (title, duration, style, aspect_ratio, refs). 400 bila invalid. | `lib/validation/schemas.ts` | `SRS.md 5 (FR-01, FR-02, FR-10), 8.7` |
-| 3. Load config | Query `provider_configs` where `user_id=session.user.id AND is_active=1`. | `lib/db/repositories/provider-config.repo.ts` | `SRS.md 5 (FR-13), 9.1 SEC-07` |
-| 4. Decrypt key | `decrypt({iv, ciphertext, tag})` server-side. Plaintext hanya in-memory. | `lib/crypto/aes.ts` | `SRS.md 5 (FR-14), 9.1 SEC-01/SEC-03` |
-| 5. Init provider | `createOpenAICompatible({name, apiKey, baseURL, headers})`. Header OpenRouter: `HTTP-Referer`, `X-OpenRouter-Title` opsional. | `lib/ai/provider-registry.ts` | `RAG-CONTEXT.md 5.1, 5.3` |
-| 6. Build prompt | Assemble system prompt dari templates + inject refs/style/duration. | `lib/ai/prompt-builder.ts` | `SRS.md 5 (FR-03..FR-11)` |
-| 7. Call LLM | `generateObject` (structured) atau `streamObject` (SSE partial). Retry 3x backoff. | `lib/ai/llm-client.ts` | `SRS.md 4.2 #2, 8.1, ASUMSI SRS-A14` |
-| 8. Stream | SSE response `text/event-stream` -> client render real-time per komponen. Token < 10s. | `/api/generate` | `SRS.md 7.2, 8.1, NFR-P3` |
-| 9. Parse | Validate `PromptPackageSchema`. Fallback parse JSON manual bila provider tidak dukung structured output. | `lib/ai/response-parser.ts` | `SRS.md 8.3, 8.7` |
-| 10. Consistency | Post-check FR-12: identitas karakter match `character_profiles` vs `scenes[].image_prompts.target`. Mismatch -> warning. | `lib/ai/consistency-checker.ts` | `SRS.md 5 (FR-12), 6.2 #1` |
-| 11. Persist | Save `projects.result_json` (snapshot) + entitas terpisah (characters, scenes, image_prompts, supporting_chars) + `generation_logs`. | `lib/db/repositories/*` | `DATABASE_SCHEMA.md 12.3, 4.1-4.9` |
-| 12. Return | SSE `data: done {result, warnings}`. Client tampilkan paket + tombol export. | `/api/generate` | `SRS.md 7.2, 3.3` |
+| 1. Upload | User drag-drop di generate page. POST multipart `/api/v1/upload`. | `DropzoneUploader` + `/api/v1/upload` | `SRS.md V2.0 §6.1 FR-V2-01` ; `RAG-CONTEXT.md §9 V2-1` |
+| 2. Validasi | MIME image/*, max 10MB, tipe 6 opsi (tokoh/background/prop/accessory/environment/other) | Zod `GenerateReferenceSchema.type` + upload route validation | `SRS.md V2.0 §6.3 FR-V2-03, §9.1` |
+| 3. Storage | `lib/storage/blob.ts` — Vercel Blob (prod) atau local FS `public/references/` (dev) | `@vercel/blob` `put()` | `RAG-CONTEXT.md §5 A` |
+| 4. Insert DB | INSERT `asset_references` dengan `project_id=NULL` (generate page belum punya project), simpan `tipe`, `filename`, `blob_url`, `mime_type`, `size_bytes` | `asset-reference.repo.ts` `create()` | `DATABASE_SCHEMA.md V2.0 §4.4` |
+| 5. Auto-trigger classify | POST `/api/v1/upload/classify {assetReferenceId}` setelah upload success | frontend auto-fire | `SRS.md V2.0 §8.3` |
+| 6. Vision LLM call | `lib/ai/image-classifier.ts` HTTP call ke Vision provider (GPT-4o Vision / Gemini Vision). Prompt structured output JSON. | `image-classifier.ts` | `SRS.md V2.0 §6.2 FR-V2-02` ; `RAG-CONTEXT.md §10 B` |
+| 7. Parse + validate | Zod parse `{role, name, description, confidence}` schema. Confidence threshold 0.7. | `lib/validation/schemas.ts` classification schema | `SRS.md V2.0 §6.2` |
+| 8. Cache result | UPDATE `asset_references` SET `tipe=role`, `label=name`, `ai_classification=JSON` (cache agar tidak reclassify) | `asset-reference.repo.ts` `updateClassification()` | `DATABASE_SCHEMA.md V2.0 §4.4, §13.4` |
+| 9. Render result | `ClassificationResult` component — thumbnail + role badge + confidence bar + override dropdown | `components/generate/classification-result.tsx` | `SRS.md V2.0 §6.2 FR-V2-02` |
+| 10. Manual override | User bisa ubah role via dropdown (confidence rendah atau Vision LLM gagal → fallback ke manual) | `ClassificationResult` onChange | `SRS.md V2.0 §6.2 FR-V2-02` |
+| 11. Include di generate | Saat submit generate, refs dengan classification final di-inject ke `buildUserMessage()` | `prompt-builder.ts` `buildUserMessage()` | `SRS.md V2.0 §6.3 FR-V2-03` |
 
 ---
 
-## 7. External Integrations Detail
+## 7. Data Flow — Generate + Real-time Logs (V2 update use case kunci #2)
 
-### 7.1 LLM Provider (Multi)
+V2 extend V1 flow dengan: `storyDescription` field, SSE `log` event, log persistence.
 
-| Provider | Base URL | Auth | Header khusus | Constraint | Bukti |
-|---|---|---|---|---|---|
-| Ollama cloud | `https://ollama.com/v1` | Bearer API key (ollama.com) | — | Pakai OpenAI-compat `/v1/chat/completions` (bukan native `/api`). Cek `supportsStructuredOutputs`. | `RAG-CONTEXT.md 5.2, 5.3` ; https://ollama.com/blog/openai-compatibility |
-| OpenRouter | `https://openrouter.ai/api/v1` | Bearer API key | `HTTP-Referer` (opsional), `X-OpenRouter-Title` (opsional) | OpenAI-compatible unified. | `RAG-CONTEXT.md 5.2, 5.3` ; https://openrouter.ai/docs/api/reference/authentication |
-| 9router | `http://localhost:20128/v1` | ASUMSI Bearer/none | — | **Lokal dev only**. Tidak reachable dari Vercel prod. Server-side call only. | ASUMSI SRS-A7 `RAG-CONTEXT.md 5.2, 9 G4` |
-| custom | (user input) | (user input) | — | Bebas. Validasi URL di Zod. | `PRD.md 5 (FR-13)` |
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant GF as GenerateForm + LogViewer
+    participant API as POST /api/v1/generate (SSE)
+    participant Auth as lib/auth
+    participant Val as Zod schemas
+    participant LogBuf as log-buffer.ts
+    participant DB as lib/db repositories
+    participant Crypto as lib/crypto decrypt
+    participant PR as provider-registry
+    participant PB as prompt-builder
+    participant LC as llm-client
+    participant LLM as LLM Text Provider
+    participant RP as response-parser
+    participant CC as consistency-checker
+    participant LV as LogViewer component
 
-**Cara konsumsi:** `lib/ai/provider-registry.ts` init via
-`createOpenAICompatible({ name, apiKey, baseURL, headers })`. Panggil via
-`lib/ai/llm-client.ts` (`generateObject`/`streamObject`). Semua server-side
-(`import 'server-only'`).
+    U->>GF: submit form {title, storyDescription, duration, style, refs}
+    GF->>API: POST /api/v1/generate (SSE)
+    API->>Auth: session check
+    Auth-->>API: user_id valid
+    API->>Val: Zod parse GenerateInputSchema (V2: +storyDescription max 500 char)
+    Val-->>API: parsed input OK
+    API->>LogBuf: create log buffer (request-scoped)
+    API->>DB: load ProviderConfig WHERE user_id AND is_active=1
+    DB-->>API: provider + api_key_encrypted
+    API->>Crypto: decrypt api_key
+    Crypto-->>API: plaintext api_key (in-memory)
+    API->>PR: createOpenAICompatible (text provider)
+    PR-->>API: provider instance
 
+    API->>PB: buildUserMessage(input) - V2: inject storyDescription + 6-tipe refs
+    PB-->>API: system prompt + messages
+
+    API-->>U: SSE data: {type:stage, stage:starting}
+    API->>LogBuf: log(info, [generate] Starting...)
+    LogBuf-->>API: drain -> SSE data: {type:log, level:info, message, timestamp}
+
+    loop per stage: character_profiles -> scenes -> image_prompts -> supporting_characters -> moral
+        API->>LC: streamObject stage (provider, schema, prompt)
+        LC->>LLM: POST /v1/chat/completions
+        LLM-->>LC: token stream
+        LC-->>API: partial stream
+        API-->>U: SSE data: {type:stage, stage, message}
+        API-->>U: SSE data: {type:progress, progress}
+        API->>LogBuf: log per LLM call attempt + retry
+        LogBuf-->>API: SSE data: {type:log, level, message, timestamp}
+    end
+
+    LC->>RP: parse + validate PromptPackageSchema
+    RP-->>LC: parsed PromptPackage
+    LC->>CC: consistency check (FR-12)
+    CC-->>LC: warnings[] (mismatch -> warning, tidak block)
+    LC->>DB: persist project (V2: +story_description) + characters + scenes + image_prompts + supporting_chars + gen_log (V2: +logs_json)
+    DB-->>LC: ok
+
+    API->>LogBuf: drain all logs -> JSON.stringify -> saveLogsJson()
+    API-->>U: SSE data: {type:done, result, warnings, logs[]}
+
+    U->>LV: toggle show logs (collapsible panel)
+    LV->>U: render log lines dengan level badge + timestamp
+```
+
+| Tahap | Aksi | Komponen | V2 Change | Bukti |
+|---|---|---|---|---|
+| 1-4. Auth + Validate + Load config + Decrypt | V1 flow | Sama V1 | Tidak berubah | `SRS.md V2.0 §6.4` |
+| 5. Build prompt | `buildUserMessage(input)` | `prompt-builder.ts` | **V2**: inject `storyDescription` (opsional, max 500 char) + 6-tipe refs format | `SRS.md V2.0 §6.4 FR-V2-04` |
+| 6. SSE stage events | `data: {type:stage, stage, message}` | `/api/v1/generate` | **V2 extended**: tambah `log` event type | `SRS.md V2.0 §8.4` |
+| 7. Log buffer init | Create per-request in-memory array | `log-buffer.ts` (V2 BARU) | **V2 BARU** | `SRS.md V2.0 §6.5 FR-V2-05` |
+| 8. Log per tahap | Backend push ke buffer. Buffer drain → SSE `log` event per entry. | `log-buffer.ts` | **V2 BARU** | `SRS.md V2.0 §6.5 FR-V2-05` |
+| 9. Frontend LogViewer | Collapsible panel (default OFF) + toggle switch | `components/generate/log-viewer.tsx` | **V2 BARU** | `SRS.md V2.0 §6.5 FR-V2-05` |
+| 10-11. Parse + Consistency | V1 flow | Sama | Tidak berubah | `SRS.md V2.0 §6 FR-12` |
+| 12. Persist + logs_json | Save project + characters + scenes + image_prompts + supporting_chars + gen_log. V2: tambah `projects.story_description`, `generation_logs.logs_json=JSON.stringify(buffer)`. | `lib/db/repositories/*` | **V2 extended**: 3 kolom nullable diisi | `DATABASE_SCHEMA.md V2.0 §4.3, §4.8, §9.3` |
+| 13. Return done | SSE `data: {type:done, result, warnings, logs[]}` | `/api/v1/generate` | **V2 extended**: tambah `logs[]` di done event | `SRS.md V2.0 §8.4` |
+
+---
+
+## 8. External Integrations V2
+
+### 8.1 Vision LLM (V2 BARU)
+
+| Aspek | Detail | Bukti |
+|---|---|---|
+| Purpose | Image classification (role + name + description + confidence) untuk asset references | `SRS.md V2.0 §6.2 FR-V2-02` |
+| Provider pilihan | GPT-4o Vision (OpenAI) ATAU Gemini Vision (Google) | `RAG-CONTEXT.md §10 B` |
+| Cara panggil | Direct HTTP POST `multipart` ke provider endpoint. BUKAN via AI SDK structured output (vision model beda capability). | `SRS.md V2.0 §6.2 FR-V2-02` |
+| Prompt pattern | "Analyze this image and classify its role in an animation project. Return JSON: {role, name, description, confidence}. Role options: character, background, prop, accessory, environment, other." | `RAG-CONTEXT.md §10 B` |
+| Response schema (Zod) | `{role: enum[6], name: string, description: string, confidence: number(0-1)}` | `SRS.md V2.0 §6.2` |
+| Confidence threshold | 0.7 — di bawah = warning UI + suggest manual override | `SRS.md V2.0 §6.2` |
+| Batch limit | Max 5 gambar per HTTP call (rate limit + cost) | ASUMSI SRS-V2-A12 |
+| Cache | Hasil disimpan di `asset_references.ai_classification` (TEXT nullable, JSON) → tidak reclassify | `DATABASE_SCHEMA.md V2.0 §4.4, §13.4` |
+| Fallback | Vision LLM gagal/timeout → manual select dropdown (6 opsi), classification nullable | `SRS.md V2.0 §6.2 FR-V2-02` |
+| Server-only | `lib/ai/image-classifier.ts` `import 'server-only'`. API key provider Vision via env atau settings. | `SRS.md V2.0 §10.1 SEC-03` |
+| Latency target | <= 5s per gambar (NFR-V2-P3) | `SRS.md V2.0 §3.2` |
+
+**Cara konsumsi (illustrative):**
 ```ts
-// contoh provider-registry.ts
+// src/lib/ai/image-classifier.ts
 import 'server-only';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { decrypt } from '@/lib/crypto/aes';
+import { z } from 'zod';
 
-export function buildProvider(cfg: {
-  provider: string; baseUrl: string; model: string;
-  apiKeyEncrypted: { iv: string; ciphertext: string; tag: string } | null;
-}) {
-  const apiKey = cfg.apiKeyEncrypted ? decrypt(cfg.apiKeyEncrypted) : '';
-  const headers: Record<string,string> = {};
-  if (cfg.provider === 'openrouter') {
-    headers['HTTP-Referer'] = process.env.NEXT_PUBLIC_APP_URL ?? 'https://promptflow.app';
-    headers['X-OpenRouter-Title'] = 'PromptFlow';
-  }
-  const p = createOpenAICompatible({
-    name: cfg.provider, apiKey, baseURL: cfg.baseUrl, headers,
-  });
-  return p(cfg.model);
+const ClassificationResultSchema = z.object({
+  role: z.enum(['tokoh','background','prop','accessory','environment','other']),
+  name: z.string().max(100),
+  description: z.string().max(500),
+  confidence: z.number().min(0).max(1),
+});
+
+export async function classifyImage(blobUrl: string): Promise<ClassificationResult> {
+  // 1. Fetch image bytes dari blobUrl
+  // 2. Build multipart request ke Vision provider (GPT-4o Vision)
+  // 3. POST dengan image + prompt
+  // 4. Parse JSON response
+  // 5. ClassificationResultSchema.parse()
+  // 6. Return validated result
 }
 ```
 
-- Sitasi: `RAG-CONTEXT.md 5.1` ; `SRS.md 5 (FR-13)`
+### 8.2 LLM Text Provider (V1 — tetap)
 
-### 7.2 Turso DB (libSQL)
+| Provider | Base URL | Auth | V2 Change | Bukti |
+|---|---|---|---|---|
+| Ollama cloud | `https://ollama.com/v1` | Bearer API key | Tetap | `RAG-CONTEXT.md §5.2` |
+| OpenRouter | `https://openrouter.ai/api/v1` | Bearer + `HTTP-Referer`, `X-OpenRouter-Title` headers | Tetap | `RAG-CONTEXT.md §5.2` |
+| 9router | `http://localhost:20128/v1` | Bearer/none | Tetap (dev lokal only) | ASUMSI SRS-A7 |
+| custom | (user input) | (user input) | Tetap | `SRS.md V2.0 §5` |
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Engine | Turso (libSQL, SQLite-compatible via HTTP) | `DATABASE_SCHEMA.md 1.1` |
-| Client | `@libsql/client` + `drizzle-orm/libsql` | `DATABASE_SCHEMA.md 8.3` |
-| Env | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | `SRS.md 8.2` ; `DATABASE_SCHEMA.md 11.4` |
-| Cara panggil | `createClient({ url, authToken })` -> `drizzle(client)`. Query via repositories. | `DATABASE_SCHEMA.md 8.3` |
-| Constraint | Akses via HTTP. Hindari fitur PostgreSQL-specific. Tipe SQLite (`integer`, `text`, `real`, `blob`). | `SRS.md 8.2` ; `DATABASE_SCHEMA.md 1.3` |
+### 8.3 Turso DB, Vercel Blob, NextAuth, Vercel Hosting (V1 — tetap)
 
-### 7.3 Vercel Blob (gambar referensi)
+Tidak berubah dari V1. Lihat `PROJECT_ARCHITECTURE.md V1.0 §7.2-§7.5` untuk detail penuh.
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Env | `BLOB_READ_WRITE_TOKEN` | `SRS.md 8.5` ; `DATABASE_SCHEMA.md 11.4` |
-| Cara panggil | `@vercel/blob` `put(pathname, file)` -> `url`. `del(url)`. `head(url)`. | ASUMSI https://vercel.com/docs/vercel-blob |
-| Dev fallback | FS `public/references/` (ASUMSI, flag `USE_VERCEL_BLOB`). Tidak persisten Vercel prod. | ASUMSI SRS-A17 |
-| Output | `blob_url` + `filename` di `asset_references`. `reference_filename` di-inject ke `image_prompts.prompt_text`. | `DATABASE_SCHEMA.md 4.4, 4.7` ; `RAG-CONTEXT.md 6` |
-
-### 7.4 NextAuth.js
+### 8.4 GitHub Repo (V2 BARU)
 
 | Aspek | Detail | Bukti |
 |---|---|---|
-| Versi | v5+ (Auth.js) | `SRS.md 4.1` ; ASUMSI SRS-A1 |
-| Provider | Credentials sederhana fase awal (ASUMSI). Bisa ekstensi OAuth nanti. | ASUMSI SRS-A1 `RAG-CONTEXT.md 9 G2` |
-| Session | JWT cookie (atau Turso adapter bila pakai DB session). | `DATABASE_SCHEMA.md 4.1 catatan NextAuth` |
-| Env | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | `SRS.md 9.1 SEC-12` |
-| Endpoint | `/api/auth/[...nextauth]/route.ts` | `SRS.md 7.1` |
-| Middleware | `lib/auth/middleware.ts` protected: `/projects`, `/settings`, `/generate`, `/api/*` (kecuali `/api/auth`). | `SRS.md 9.1 SEC-11` |
-
-### 7.5 Vercel Hosting
-
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Platform | Vercel (serverless + edge) | `RAG-CONTEXT.md 2.1` |
-| Build | `next build` | `SRS.md 11.1` |
-| Runtime | Node.js versi didukung Vercel stabil terkini | ASUMSI SRS-A20 |
-| HTTPS | Default Vercel | `SRS.md 9.1 SEC-09` |
-| Function timeout | Hobby 10s, Pro 60s/300s (ASUMSI plan-specific). Mitigasi streaming SSE. | `SRS.md 8.1` ; ASUMSI SRS-A19 |
+| URL | `https://github.com/agrianwahab29/promptflow.git` | `BRD.md §1` ; `SRS.md V2.0 §6.10 FR-V2-10` |
+| Visibility | Public (ASUMSI — konfirmasi user) | ASUMSI SRS-V2-A7 |
+| Init | `git init` di root proyek | `SRS.md V2.0 §6.10 FR-V2-10` |
+| `.gitignore` | `node_modules`, `.env.local`, `.next`, `public/references`, `*.tsbuildinfo`, `drizzle/meta`, `.DS_Store` | `SRS.md V2.0 §6.10 FR-V2-10` |
+| Commit convention | Conventional commits: `feat(scope):`, `fix(scope):`, `chore(scope):` | `AGENTS.md §4` |
+| Branch strategy | `main` branch (protected). Feature branches: `feat/v2-upload`, `feat/v2-classification`, `feat/v2-logs`, `feat/v2-dashboard`, `feat/v2-navigation`, `feat/v2-github`. | `AGENTS.md §4 #12` |
+| Push | `git push -u origin main` | `SRS.md V2.0 §6.10 FR-V2-10` |
 
 ---
 
-## 8. Deployment Topology
+## 9. Configuration Management & Environment
+
+### 9.1 Env Keys V2 (`.env.example`)
+
+| Env key | V1 | V2 (baru/ubah) | Wajib | Deskripsi | Bukti |
+|---|---|---|---|---|---|
+| `TURSO_DATABASE_URL` | Ada | Tetap | YA | URL Turso DB | `DATABASE_SCHEMA.md V2.0 §12.3` |
+| `TURSO_AUTH_TOKEN` | Ada | Tetap | YA | Token auth Turso | `DATABASE_SCHEMA.md V2.0 §12.3` |
+| `ENCRYPTION_KEY` | Ada | Tetap | YA | Key AES-256-GCM (32 byte base64) | `DATABASE_SCHEMA.md V2.0 §12.1` |
+| `NEXTAUTH_SECRET` | Ada | Tetap | YA | Secret NextAuth JWT | `SRS.md V2.0 §10.1 SEC-12` |
+| `NEXTAUTH_URL` | Ada | Tetap | YA (prod) | URL deploy | `SRS.md V2.0 §10.1` |
+| `BLOB_READ_WRITE_TOKEN` | Ada | Tetap | YA | Token Vercel Blob | `DATABASE_SCHEMA.md V2.0 §12.3` |
+| `USE_VERCEL_BLOB` | Ada | Tetap | Opsional | Flag dev Blob vs FS | ASUMSI SRS-A17 |
+| `NEXT_PUBLIC_APP_URL` | Ada | Tetap | YA | URL publik client | `CODING_RULES.md §2.1` |
+| **V2 baru** `VISION_LLM_PROVIDER` | Tidak ada | **Tambah** | YA (V2) | `'openai' \| 'google'` — pilih Vision provider | ASUMSI SRS-V2-A1 |
+| **V2 baru** `VISION_LLM_API_KEY` | Tidak ada | **Tambah** | YA (V2) | API key untuk Vision LLM (GPT-4o atau Gemini Vision) | ASUMSI SRS-V2-A1 |
+| **V2 baru** `VISION_LLM_MODEL` | Tidak ada | **Tambah** | YA (V2) | Model ID Vision (mis. `gpt-4o`, `gemini-1.5-flash`) | ASUMSI SRS-V2-A1 |
+| **V2 baru** `VISION_LLM_BASE_URL` | Tidak ada | **Tambah** | Opsional (V2) | Custom base URL Vision (default OpenAI-compat) | ASUMSI |
+| **V2 baru** `LOG_VIEWER_DEFAULT` | Tidak ada | **Tambah** | Opsional | `'on' \| 'off'` default toggle log viewer (default off) | ASUMSI |
+| **V2 baru** `DASHBOARD_DEFAULT_RANGE` | Tidak ada | **Tambah** | Opsional | Default range week untuk weekly trend chart (default 12) | ASUMSI |
+
+> **Catatan Penting:** Vision LLM API key = env (server-side only), BUKAN input per-user via UI di fase V2. Berbeda dengan Text LLM (per-user via UI encrypt di DB). Vision LLM adalah shared service. ASUMSI SRS-V2-A1.
+
+### 9.2 Secrets Management (V1 — tetap)
+
+- Guard wajib di init module: `if (!process.env.ENCRYPTION_KEY) throw new Error('Missing ENCRYPTION_KEY')`. `SRS.md V2.0 §10.1 SEC-08`.
+- `.env.example` tanpa value asli. `.env.local` dev TIDAK commit.
+- Vercel project settings untuk prod/preview.
+- `lib/ai/*` + `lib/crypto/*` `import 'server-only'`. Tidak ada env secret bocor ke client.
+
+### 9.3 Feature Flags V2
+
+| Flag | Default | Lokasi | Fungsi |
+|---|---|---|---|
+| `USE_VERCEL_BLOB` | `true` (prod) / `false` (dev) | `lib/storage/blob.ts` | Toggle Blob vs local FS upload |
+| `LOG_VIEWER_DEFAULT` | `off` | `components/generate/log-viewer.tsx` | Default toggle log panel |
+| `VISION_LLM_ENABLED` (planned) | `true` | `lib/ai/image-classifier.ts` | Enable/disable Vision LLM (fallback ke manual) |
+
+---
+
+## 10. Security Boundaries V2
+
+V1 boundaries (SB-01..SB-13) dipertahankan + tambah 3 boundary baru V2.
+
+| ID | Boundary | V1 | V2 (baru/ubah) | Implementasi | Bukti |
+|---|---|---|---|---|---|
+| SB-01 | Server-only provider call | Ada | **Tetap** | `lib/ai/*` + V2 `image-classifier.ts` `import 'server-only'` | `SRS.md V2.0 §10.1 SEC-03` |
+| SB-02 | Server-only crypto | Ada | **Tetap** | `lib/crypto/aes.ts` `import 'server-only'` | `SRS.md V2.0 §10.1 SEC-01` |
+| SB-03 | API key encryption at rest | Ada | **Tetap** | AES-256-GCM | `DATABASE_SCHEMA.md V2.0 §12.1` |
+| SB-04 | API key tidak expose ke client | Ada | **Tetap** | Mask `****` + 4 char terakhir | `SRS.md V2.0 §10.1 SEC-02` |
+| SB-05 | RBAC ownership dasar | Ada | **Tetap** | Filter `user_id = session.user.id` di semua repo | `SRS.md V2.0 §10.1 SEC-07` |
+| SB-06 | Protected routes | Ada | **Tetap** | Middleware: `/projects`, `/settings`, `/generate`, `/api/v1/*` | `SRS.md V2.0 §10.1 SEC-11` |
+| SB-07 | CSRF protection | Ada | **Tetap** | Next.js built-in CSRF + NextAuth | `SRS.md V2.0 §10.1 SEC-05` |
+| SB-08 | Input sanitization (XSS) | Ada | **Tetap** + extend ke `storyDescription` | Zod validate + escape HTML | `SRS.md V2.0 §10.1 SEC-06` |
+| SB-09 | Env secret management | Ada | **Tetap** + tambah 4 env V2 | Vercel env, guard di init | `SRS.md V2.0 §10.1 SEC-08` |
+| SB-10 | HTTPS only | Ada | **Tetap** | Vercel default | `SRS.md V2.0 §10.1 SEC-09` |
+| SB-11 | 9router localhost only | Ada | **Tetap** | Dev only, server-side call | ASUMSI SRS-A7 |
+| SB-12 | Rate limit generate | Ada (10 req/min) | **Tetap** | Middleware `X-RateLimit-*` header | `SRS.md V2.0 §10.1 SEC-10` |
+| SB-13 | NextAuth secret | Ada | **Tetap** | `NEXTAUTH_SECRET` wajib | `SRS.md V2.0 §10.1 SEC-12` |
+| **V2 baru SB-14** | Vision LLM key env-only | Tidak ada | **Tambah** | `VISION_LLM_API_KEY` di env server-only. BUKAN input per-user UI di fase V2. Shared service. | ASUMSI SRS-V2-A1 |
+| **V2 baru SB-15** | Story description length limit | Tidak ada | **Tambah** | `storyDescription: z.string().max(500)` Zod validate sebelum prompt injection + DB save. Cegah prompt injection via input panjang. | `SRS.md V2.0 §6.4 FR-V2-04` |
+| **V2 baru SB-16** | Log buffer sanitization | Tidak ada | **Tambah** | Log lines di-escape HTML sebelum render di LogViewer. Cegah XSS via LLM error message. | `SRS.md V2.0 §6.5 FR-V2-05` |
+
+---
+
+## 11. Scalability, Performance, Observability V2
+
+### 11.1 Scalability V2
+
+| Aspek | V1 | V2 | Bukti |
+|---|---|---|---|
+| Auto-scale | Vercel serverless | **Tetap** | `RAG-CONTEXT.md §2.1` |
+| Streaming SSE anti-timeout | V1 ada | **Tetap + extended log events** | `SRS.md V2.0 §6.5 FR-V2-05` |
+| **V2 baru** Pagination | `?page=1&limit=20` hardcoded | **Server-side pagination** + repository `paginate()` + UI page numbers | `SRS.md V2.0 §6.9 FR-V2-09` |
+| **V2 baru** Suspense boundaries | Tidak ada | **Tambah** Suspense per page group | `SRS.md V2.0 §6.9 FR-V2-09` |
+| **V2 baru** loading.tsx + error.tsx | Tidak ada | **Tambah** per page group | `SRS.md V2.0 §6.7 FR-V2-07` |
+| **V2 baru** Image optimization | Tidak ada (V1 pakai `<img>` biasa) | **Pakai** `<Image>` Next.js component | `SRS.md V2.0 §6.9 FR-V2-09` |
+| **V2 baru** Prefetch | Tidak ada | **Pakai** `next/link prefetch=true` | `SRS.md V2.0 §6.9 FR-V2-09` |
+| DB read replica | V1 opsional | **Tetap opsional** | `DATABASE_SCHEMA.md V2.0 §1` |
+| Connection pooling | Drizzle handle internal | **Tetap** | `DATABASE_SCHEMA.md V2.0 §1.3` |
+| Query optimization | V1 indexes | **Tetap 17 indexes** | `DATABASE_SCHEMA.md V2.0 §6` |
+| Caching | V1 tidak ada cache layer | **Tetap** (fase awal) | ASUMSI |
+
+### 11.2 Performance Targets V2
+
+| ID | Metrik | Target | V1/V2 | Bukti |
+|---|---|---|---|---|
+| NFR-P1 | Latency Shorts | <= 60s end-to-end | V1 | `SRS.md V2.0 §11` |
+| NFR-P2 | Latency Tutorial | <= 180s end-to-end | V1 | `SRS.md V2.0 §11` |
+| NFR-P3 | Streaming partial SSE | Token < 10s | V1 | `SRS.md V2.0 §11` |
+| NFR-P4 | UI response time | < 2s page load | V1 | `SRS.md V2.0 §11` |
+| NFR-P5 | DB query | < 500ms | V1 | `SRS.md V2.0 §11` |
+| **V2 baru NFR-V2-P1** | Page transition | <= 200ms | V2 | `SRS.md V2.0 §3.2, §6.9 FR-V2-09` |
+| **V2 baru NFR-V2-P2** | Dashboard load | <= 1.5s | V2 | `SRS.md V2.0 §3.2, §6.6 FR-V2-06` |
+| **V2 baru NFR-V2-P3** | AI classification latency | <= 5s per gambar | V2 | `SRS.md V2.0 §3.2, §6.2 FR-V2-02` |
+| **V2 baru NFR-V2-P4** | Real-time log latency | <= 100ms server ke UI | V2 | `SRS.md V2.0 §3.2, §6.5 FR-V2-05` |
+
+### 11.3 Observability V2
+
+| Aspek | V1 | V2 (baru/ubah) | Bukti |
+|---|---|---|---|
+| Platform logs | Vercel logs | **Tetap** | `RAG-CONTEXT.md §2.1` |
+| Structured log DB | `generation_logs` (provider, model, duration, status, error_message) | **Tetap + extended** `logs_json` (JSON array log lines) | `DATABASE_SCHEMA.md V2.0 §4.8` |
+| **V2 baru** Real-time logs UI | Tidak ada | **Tambah** — LogViewer Collapsible panel | `SRS.md V2.0 §6.5 FR-V2-05` |
+| Telemetri KPI | V1: `generation_logs` row per generate | **V2 extended**: per-provider, per-duration, success rate, weekly trend, storage usage | `SRS.md V2.0 §6.6 FR-V2-06` |
+| **V2 baru** Dashboard analytics | 3 KPI cards hardcoded query | **V2**: dashboard.repo.ts + Recharts + 6-8 metric cards | `SRS.md V2.0 §6.6 FR-V2-06` |
+| Error tracking | Vercel logs + `error_message` DB | **Tetap** | ASUMSI |
+| Monitoring | Vercel Analytics | **Tetap** | ASUMSI |
+| Audit trail | `created_at`/`updated_at`/`deleted_at` | **Tetap** | `DATABASE_SCHEMA.md V2.0 §4` |
+
+---
+
+## 12. Deployment Topology V2
 
 ```mermaid
 flowchart TB
     subgraph Vercel["Vercel Cloud"]
-        Edge["Edge Network<br/>CDN + HTTPS + middleware"]
-        Func["Serverless Functions<br/>Next.js App Router<br/>src/app/api + RSC"]
-        Cron["Vercel Cron (opsional)<br/>cleanup job"]
+        Edge["Edge Network CDN + HTTPS + middleware (rate limit 10 req/min)"]
+        Func["Serverless Functions Next.js App Router src/app/api/v1/* + RSC + /upload/classify (V2) + /dashboard (V2) maxDuration 600s"]
+        Cron["Vercel Cron (opsional) cleanup job"]
     end
 
     subgraph TursoCloud["Turso Cloud"]
-        Primary[("Primary DB<br/>libSQL")]
-        Replica[("Read Replica<br/>(opsional)")]
+        Primary[("Primary DB libSQL + 3 kolom nullable V2")]
+        Replica[("Read Replica (opsional)")]
     end
 
     subgraph BlobStore["Vercel Blob"]
-        Blob[("Blob Store<br/>gambar referensi")]
+        Blob[("Blob Store gambar referensi")]
     end
 
     subgraph LLMExt["LLM Provider (eksternal)"]
-        Ollama["Ollama cloud<br/>https://ollama.com/v1"]
-        OR["OpenRouter<br/>https://openrouter.ai/api/v1"]
-        NineR["9router lokal<br/>(dev only, tidak di prod)"]
+        Ollama["Ollama cloud https://ollama.com/v1"]
+        OR["OpenRouter https://openrouter.ai/api/v1"]
+        NineR["9router lokal (dev only)"]
+    end
+
+    subgraph VisionExt["Vision LLM (eksternal)"]
+        GPT4V["GPT-4o Vision OpenAI API"]
+        GeminiV["Gemini Vision Google API"]
+    end
+
+    subgraph VCS["Version Control (V2 BARU)"]
+        GH["GitHub Repo agrianwahab29/promptflow"]
     end
 
     User["User Browser"]
@@ -549,143 +801,166 @@ flowchart TB
     Func -->|HTTP put/get| Blob
     Func -->|server-side HTTPS| Ollama
     Func -->|server-side HTTPS| OR
+    Func -->|server-side HTTPS multipart| GPT4V
+    Func -->|server-side HTTPS multipart| GeminiV
     Cron -->|HTTP| Primary
+    Developer["Developer"] -->|git push| GH
+    GH -.->|webhook trigger| Vercel
 ```
 
-| Aspek | Detail | Bukti |
-|---|---|---|
-| Hosting | Vercel serverless (Next.js App Router native). Auto-scale per request. | `RAG-CONTEXT.md 2.1` |
-| Region | Default Vercel region (ASUMSI: `iad1` / global edge). Bisa override per function. | ASUMSI |
-| DB | Turso Cloud (remote HTTP). Primary + opsional read replica untuk read scaling. | `DATABASE_SCHEMA.md 1` ; `RAG-CONTEXT.md 2.2` |
-| Storage | Vercel Blob (gambar referensi prod). | ASUMSI SRS-A5 |
-| Build command | `next build` (Next.js) + `drizzle-kit generate` (migration, lokal/dev). | `SRS.md 11.1` ; `DATABASE_SCHEMA.md 8.4` |
-| Env vars (Vercel) | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ENCRYPTION_KEY` (32 byte base64), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_APP_URL`. | `DATABASE_SCHEMA.md 11.4` ; `SRS.md 8.2, 8.4, 8.5, 9.1` |
-| Migration apply | Dev: `drizzle-kit push`. Prod: SQL migration manual via `turso db shell`. | `DATABASE_SCHEMA.md 8.4` |
-| Cron (opsional) | Cleanup `projects.deleted_at < now-30d` + `generation_logs < now-90d`. Butuh plan Pro+. | ASUMSI `DATABASE_SCHEMA.md 10.3` |
-| 9router | **TIDAK di prod** (localhost only). Prod: user pakai Ollama cloud/OpenRouter/custom. | ASUMSI SRS-A7 `RAG-CONTEXT.md 5.2` |
-
----
-
-## 9. Security Boundaries
-
-| ID | Boundary | Implementasi | Bukti |
+| Aspek | V1 | V2 (baru/ubah) | Bukti |
 |---|---|---|---|
-| SB-01 | Server-only provider call | `lib/ai/provider-registry.ts`, `llm-client.ts`, `prompt-builder.ts`, `response-parser.ts`, `consistency-checker.ts` wajib `import 'server-only'`. TIDAK ada panggilan LLM dari Client Component. | `SRS.md 9.1 SEC-03` |
-| SB-02 | Server-only crypto | `lib/crypto/aes.ts` `import 'server-only'`. Decrypt hanya di `provider-registry.ts`. | `SRS.md 9.1 SEC-01/SEC-03` |
-| SB-03 | API key encryption at rest | AES-256-GCM. `provider_configs.api_key_encrypted` = JSON `{iv, ciphertext, tag}`. TIDAK ada kolom plaintext. | `DATABASE_SCHEMA.md 4.2, 11.1` ; `SRS.md 9.1 SEC-01` |
-| SB-04 | API key tidak expose ke client | Response API mask `****` + 4 char terakhir. Helper `mask()` di `lib/crypto/aes.ts`. | `SRS.md 5 (FR-14), 9.1 SEC-02` ; `DATABASE_SCHEMA.md 11.2` |
-| SB-05 | RBAC ownership dasar | Semua query project/provider filter `user_id = session.user.id`. Server check di repo + API. | `SRS.md 9.1 SEC-07` ; `DATABASE_SCHEMA.md 11.3` |
-| SB-06 | Protected routes | `lib/auth/middleware.ts`. `/projects`, `/settings`, `/generate`, `/api/*` (kecuali `/api/auth`) wajib session. | `SRS.md 9.1 SEC-11` |
-| SB-07 | CSRF protection | Next.js built-in CSRF Server Actions + Route Handlers. NextAuth CSRF token. | `SRS.md 9.1 SEC-05` |
-| SB-08 | Input sanitization (XSS) | Zod validate + escape HTML (`<>"'&`) pada `title` & field teks sebelum render/prompt. | `SRS.md 9.1 SEC-06` |
-| SB-09 | Env secret management | `ENCRYPTION_KEY`, `TURSO_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`, `NEXTAUTH_SECRET` di Vercel env. `.env.example` tanpa value asli. | `SRS.md 9.1 SEC-08` ; `DATABASE_SCHEMA.md 11.4` |
-| SB-10 | HTTPS only | Vercel default HTTPS. | `SRS.md 9.1 SEC-09` |
-| SB-11 | 9router localhost only | `http://localhost:20128/v1` tidak reachable dari Vercel prod. Validasi: hanya user dev lokal pakai. Server-side call only. | ASUMSI SRS-A7 `RAG-CONTEXT.md 5.2, 9 G4` |
-| SB-12 | Rate limit generate | ASUMSI 10 req/min/user. Middleware rate limit. | ASUMSI SRS-A15 `SRS.md 9.1 SEC-10` |
-| SB-13 | NextAuth secret | `NEXTAUTH_SECRET` env wajib. | `SRS.md 9.1 SEC-12` |
+| Hosting | Vercel serverless | **Tetap** | `RAG-CONTEXT.md §2.1` |
+| DB | Turso (9 tabel) | **Tetap + 3 kolom nullable** | `DATABASE_SCHEMA.md V2.0 §9.3` |
+| Storage | Vercel Blob | **Tetap** | `SRS.md V2.0 §5` |
+| **V2 baru** Vision LLM | Tidak deploy | **Server-side HTTPS call** ke GPT-4o / Gemini Vision | `SRS.md V2.0 §6.2 FR-V2-02` |
+| **V2 baru** VCS | Tidak ada (V1: belum init git) | **GitHub Repo** + auto-deploy Vercel webhook (planned) | `SRS.md V2.0 §6.10 FR-V2-10` |
+| Env vars (Vercel) | 7 keys V1 | **7 + 5 V2** = 12 keys total (lihat §9.1) | `DATABASE_SCHEMA.md V2.0 §12.3` ; `SRS.md V2.0 §6.10` |
+| Migration apply V2 | Dev: `drizzle-kit push`. Prod: manual SQL. | **Tetap** + tambah 3 ALTER TABLE untuk kolom nullable | `DATABASE_SCHEMA.md V2.0 §9.3-§9.4` |
+| Cron | Cleanup 30 hari project, 90 hari log | **Tetap** | `DATABASE_SCHEMA.md V2.0 §10.3` |
+| 9router | Dev only | **Tetap dev only** | ASUMSI SRS-A7 |
 
 ---
 
-## 10. Scalability & Performance
+## 13. Keputusan Arsitektur (ADR Ringkas)
 
-| Aspek | Strategi | Bukti |
-|---|---|---|
-| Auto-scale | Vercel serverless auto-scale per request. Tidak ada capacity planning manual. | `RAG-CONTEXT.md 2.1` |
-| Streaming SSE anti-timeout | `streamObject`/`streamText` -> SSE. Token mulai mengalir < 10s (NFR-P3). Hindari Vercel function timeout (Hobby 10s, Pro 60s/300s). Pecah generate per komponen bila perlu. | `SRS.md 7.2, 8.1` ; ASUMSI SRS-A6, SRS-A19 |
-| DB read replica | Turso mendukung read replica. Read scaling: query read ke replica (ASUMSI, fase awal cukup primary). | `RAG-CONTEXT.md 2.2` (turso.tech/blog/serverless) |
-| Connection pooling | Drizzle + `@libsql/client` handle pool internal. Tidak perlu manual pool di app. | `DATABASE_SCHEMA.md 8.3` |
-| Query optimization | Index komposit di tabel kunci (`idx_projects_user_created`, `idx_scenes_project_order`, `idx_characters_project_nama`, `idx_image_prompts_project_scene`). | `DATABASE_SCHEMA.md 5` |
-| Caching (opsional) | Fase awal: tidak ada cache layer (ASUMSI). Bila perlu: `unstable_cache` Next.js untuk list project. LLM response TIDAK di-cache (dynamic). | ASUMSI |
-| Latency target | Shorts <= 60s end-to-end (NFR-P1), Tutorial <= 180s (NFR-P2), token < 10s (NFR-P3), query < 500ms (NFR-P5). | `SRS.md ASUMSI SRS-A12, NFR` |
-| Retry LLM | 3x backoff (NFR-R3). | ASUMSI SRS-A14 |
-| Rate limit | 10 req/min/user endpoint generate (ASUMSI). | ASUMSI SRS-A15 |
-| Export cepat | `projects.result_json` snapshot -> export tanpa re-query 9 tabel. | `DATABASE_SCHEMA.md 12.3` |
-| Result snapshot + entitas | KEDUA disimpan. `result_json` = export cepat. Entitas = query/filter. Trade-off storage vs query speed. | `DATABASE_SCHEMA.md 7.2, 12.3` |
+### ADR-001 — Pertahankan Modular Monolith (bukan microservice)
+- **Konteks:** V2 tambah 10 fitur baru (Vision LLM, real-time logs, dashboard charts). Pertimbangkan migrasi ke microservice?
+- **Keputusan:** Tetap Modular Monolith (Next.js App Router single deploy).
+- **Alasan:** (1) V2 masih skala adopsi user, tim kecil. (2) Next.js App Router cukup handle SSE streaming + Vision HTTP call dalam 1 container. (3) Overhead microservice (deployment, service discovery, distributed tracing) tidak sepadan. (4) Bisa migrasi fase akhir bila scale membesar.
+- **Bukti:** `SRS.md V2.0 §4.1` ; `AGENTS.md §5`
+
+### ADR-002 — AI SDK tetap v4 (bukan upgrade v6)
+- **Konteks:** Docs V1 sebut AI SDK v6, tapi `package.json` catatan `ai: ^4.0.0`. Upgrade v6 = breaking changes?
+- **Keputusan:** Tetap AI SDK v4 (ground truth = kode).
+- **Alasan:** (1) V1 sudah jalan stabil dengan v4. (2) Upgrade v6 = breaking changes besar (API redesign). (3) Out of scope V2 (`SRS.md V2.0 §3.3 OOS-V2-3`). (4) Kode = ground truth, docs V1 outdated.
+- **Bukti:** `RAG-CONTEXT.md §2` ; `SRS.md V2.0 §5` ; `package.json:25`
+
+### ADR-003 — Vision LLM = direct HTTP call (bukan AI SDK)
+- **Konteks:** Vision LLM (GPT-4o / Gemini Vision) punya capability berbeda dari text generation. Pakai AI SDK `generateObject` atau direct HTTP?
+- **Keputusan:** Direct HTTP POST ke Vision provider endpoint.
+- **Alasan:** (1) AI SDK `generateObject` + `PromptPackageSchema` cocok untuk text, belum tentu support vision prompt format. (2) Vision provider response format mungkin beda. (3) Direct HTTP + Zod parse memberi kontrol penuh. (4) Server-only = tetap aman.
+- **Bukti:** `SRS.md V2.0 §6.2 FR-V2-02` ; `RAG-CONTEXT.md §10 B`
+
+### ADR-004 — Upload di generate page (bukan project detail)
+- **Konteks:** V1 upload ada di project detail page, generate page hanya textarea manual nama file. V2 flow: upload → classify → include di generate.
+- **Keputusan:** Pindahkan DropzoneUploader dari project detail ke generate page. Upload tanpa `projectId` (project dibuat saat generate submit).
+- **Alasan:** (1) Lebih intuitif: user upload SEBELUM generate, lihat klasifikasi, baru submit. (2) Hindari bolak-balik project detail ↔ generate page. (3) Vision LLM auto-classify butuh konteks generate. (4) Backward compat: project detail tetap view refs read-only.
+- **Bukti:** `SRS.md V2.0 §6.1 FR-V2-01` ; `RAG-CONTEXT.md §9 V2-1`
+
+### ADR-005 — Schema V2 = additive nullable only (no breaking)
+- **Konteks:** V2 butuh 3 kolom baru (story_description, ai_classification, logs_json). Migrasi besar atau additive?
+- **Keputusan:** Additive nullable columns only. 3 ALTER TABLE.
+- **Alasan:** (1) Backward-compatible 100% — existing V1 data intact. (2) Tidak ada tabel baru. (3) Tidak ada kolom dihapus. (4) SQLite `ALTER TABLE ADD COLUMN` support nullable tanpa default. (5) Rollback = DROP COLUMN.
+- **Bukti:** `DATABASE_SCHEMA.md V2.0 §9.3` ; `SRS.md V2.0 §7.2`
+
+### ADR-006 — Dashboard queries via repository pattern (bukan direct Drizzle)
+- **Konteks:** V1 dashboard page pakai direct Drizzle queries (deviasi dari CODING_RULES repository pattern). V2 tambah enrichment (6-8 cards + charts + breakdown).
+- **Keputusan:** Refactor ke `dashboard.repo.ts` + repository pattern. Hapus direct Drizzle dari page.
+- **Alasan:** (1) Konsisten dengan CODING_RULES repository pattern. (2) Dashboard load <= 1.5s butuh query teroptimasi + cache-able. (3) Pagination + sort logic dipusatkan di repo. (4) Testable — mock repo di unit test.
+- **Bukti:** `SRS.md V2.0 §6.6 FR-V2-06` ; `CODING_RULES.md §1.3`
+
+### ADR-007 — Real-time logs = in-memory buffer + SSE (bukan WebSocket)
+- **Konteks:** Real-time processing logs butuh push dari server ke client. SSE atau WebSocket?
+- **Keputusan:** Extend SSE dengan event type `log`. Buffer in-memory per request.
+- **Alasan:** (1) Architecture V1 sudah SSE-based untuk generate — konsisten. (2) WebSocket lebih kompleks (bidirectional, persistent connection). (3) SSE cukup untuk one-way log push. (4) Buffer in-memory drain ke SSE per log line. (5) Persist ke `generation_logs.logs_json` saat `done` event.
+- **Bukti:** `SRS.md V2.0 §6.5 FR-V2-05` ; `RAG-CONTEXT.md §10 C`
+
+### ADR-008 — GitHub repo public (bukan private)
+- **Konteks:** V2 init git + push ke GitHub. Public atau private?
+- **Keputusan:** Public repo (ASUMSI — konfirmasi user).
+- **Alasan:** (1) Showcase project open-source. (2) Vercel deploy public preview gratis. (3) Tidak ada data sensitif di kode (API key di env, user data di Turso). (4) `.gitignore` cover `.env.local`.
+- **Bukti:** `SRS.md V2.0 §6.10 FR-V2-10` ; ASUMSI SRS-V2-A7
 
 ---
 
-## 11. Observability
+## 14. Asumsi Arsitektur V2 & Referensi
 
-| Aspek | Strategi | Bukti |
-|---|---|---|
-| Platform logs | Vercel logs (runtime + build). Default. | `RAG-CONTEXT.md 2.1` |
-| Structured log DB | `generation_logs` tabel: `provider`, `model`, `duration_ms`, `status` (success/fail/partial), `error_message`, `created_at`. Query history per project. | `DATABASE_SCHEMA.md 4.8` ; KPI K5 `BRD.md 3.2` |
-| Telemetri KPI | Log setiap generate untuk KPI K1-K7 (BRD). Dashboard sederhana fase akhir (ASUMSI). | `SRS.md 10 F3-05` ; `BRD.md 3.2` |
-| Error tracking | `generation_logs.error_message` + Vercel logs. ASUMSI integrasi Sentry/Datadog opsional fase akhir. | ASUMSI |
-| Monitoring (opsional) | Vercel Analytics (built-in) untuk web vitals. ASUMSI. | ASUMSI |
-| Audit trail | `created_at`/`updated_at` di semua tabel. `generation_logs` = audit generate. Soft delete `projects.deleted_at`. | `DATABASE_SCHEMA.md 4, 10` |
-| Tracing (opsional) | ASUMSI OpenTelemetry via Vercel bila perlu fase akhir. TIDAK ADA BUKTI preferensi. | ASUMSI |
-
----
-
-## 12. Cross-cutting Concerns
-
-| Concern | Implementasi | Bukti |
-|---|---|---|
-| i18n (dwibahasa ID+EN) | `next-intl` (ASUMSI). `messages/id.json`, `messages/en.json`. `src/lib/i18n/config.ts` + `request.ts`. Toggle di header, persist cookie. Scope: UI label, error, placeholder. Konten LLM bahasa ikut judul (ASUMSI NFR-I2). | `SRS.md 5 (FR-19)` ; ASUMSI SRS-A2 ; `RAG-CONTEXT.md 9 G5` |
-| Error handling envelope | ASUMSI format `{ error: { code, message, details } }`. HTTP status 400/401/404/429/500/502/504. Code: `VALIDATION_ERROR`/`PROVIDER_ERROR`/`AUTH_ERROR`/`TIMEOUT`/`INTERNAL`. Bahasa aktif (FR-19). | `SRS.md 7.3` |
-| Validation (Zod) | `lib/validation/schemas.ts`: input form (`TitleSchema`, `DurationSchema`, `StyleSchema`, `AspectRatioSchema`, `ProviderConfigSchema`) + LLM structured output (`PromptPackageSchema` per SRS §8.7). | `SRS.md 8.7` |
-| Logging | `console.*` -> Vercel logs. `generation_logs` DB untuk telemetri generate. ASUMSI structured JSON log format. | `DATABASE_SCHEMA.md 4.8` |
-| Config env | Env var via Vercel. `.env.example` dokumentasi. `lib/config` (opsional) atau baca `process.env` langsung di `client.ts`/`config.ts`. | `SRS.md 9.1 SEC-08` ; `DATABASE_SCHEMA.md 11.4` |
-| Consistency check (FR-12) | `lib/ai/consistency-checker.ts` post-generate. Cross-cutting: dipanggil di pipeline generate, result warnings ke client. | `SRS.md 5 (FR-12)` |
-| Soft delete | `projects.deleted_at`. Semua query project WAJIB filter `WHERE deleted_at IS NULL` (Drizzle scope helper). | `DATABASE_SCHEMA.md 10.1` |
-| Batas tokoh 10 | App-layer Zod + count check sebelum insert `characters`. BUKAN DB CHECK (SQLite terbatas). | ASUMSI SRS-A10 `DATABASE_SCHEMA.md 6.2, 12.6` |
-| Export format | `lib/export/markdown.template.ts` transform JSON -> markdown. `/api/export?format=json|markdown`. | `SRS.md 5 (FR-16)` |
-| Rate limit | Middleware rate limit endpoint generate (ASUMSI 10/min/user). | ASUMSI SRS-A15 |
-
----
-
-## 13. Asumsi Arsitektur & Referensi
-
-### 13.1 Asumsi Arsitektur
+### 14.1 Asumsi Arsitektur V2
 
 | ID | Asumsi | Status Bukti | Dampak | Sitasi |
 |---|---|---|---|---|
-| ARCH-A1 | Gaya = Modular Monolith (Next.js App Router, single repo+deploy) | DIKONFIRMASI SRS | Fase awal cukup, tidak microservice | `SRS.md 3.1` |
-| ARCH-A2 | ORM = Drizzle (bukan Prisma/raw libsql) | TIDAK ADA BUKTI preferensi user | RAG menyebut raw/Prisma alternatif | `RAG-CONTEXT.md 9 G7` ; ASUMSI SRS-A3 |
-| ARCH-A3 | Enkripsi API key = AES-256-GCM via env `ENCRYPTION_KEY` | TIDAK ADA BUKTI mekanisme spesifik | Bisa defer ke secret manager | `RAG-CONTEXT.md 11 #4` ; ASUMSI SRS-A4 |
-| ARCH-A4 | Storage gambar prod = Vercel Blob | ASUMSI rekomendasi | Bisa S3/R2 | `RAG-CONTEXT.md 9 G3` ; ASUMSI SRS-A5 |
-| ARCH-A5 | Auth = NextAuth credentials provider | TIDAK ADA BUKTI preferensi | Bisa OAuth nanti | `RAG-CONTEXT.md 9 G2` ; ASUMSI SRS-A1 |
-| ARCH-A6 | i18n = next-intl | TIDAK ADA BUKTI preferensi lib | Bisa native App Router i18n | `RAG-CONTEXT.md 9 G5` ; ASUMSI SRS-A2 |
-| ARCH-A7 | Streaming SSE untuk generasi panjang | ASUMSI | Hindari Vercel timeout | `RAG-CONTEXT.md 5.4, 9 G6` ; ASUMSI SRS-A6 |
-| ARCH-A8 | 9router localhost only, Bearer/none auth | TIDAK ADA BUKTI eksternal | Hanya dev lokal | `RAG-CONTEXT.md 5.2, 9 G4` ; ASUMSI SRS-A7 |
-| ARCH-A9 | Vercel region default (`iad1`/global edge) | ASUMSI | Bisa override per function | ASUMSI |
-| ARCH-A10 | No cache layer fase awal | ASUMSI | Bila perlu `unstable_cache` Next.js | ASUMSI |
-| ARCH-A11 | Rate limit 10 req/min/user | ASUMSI | Middleware | ASUMSI SRS-A15 |
-| ARCH-A12 | Cron cleanup butuh Vercel Pro+ | ASUMSI | Fase awal manual cleanup | ASUMSI `DATABASE_SCHEMA.md 10.3` |
-| ARCH-A13 | NextAuth session = JWT cookie (bukan DB adapter) | ASUMSI | Bisa pakai Turso adapter | `DATABASE_SCHEMA.md 4.1 catatan` |
+| ARCH-V2-A1 | Vision LLM provider = GPT-4o Vision (OpenAI) ATAU Gemini Vision (Google), env-configurable | ASUMSI SRS-V2-A1 — perlu konfirmasi user | Pipeline V2-3 tidak jalan bila env kosong | `SRS.md V2.0 §14` |
+| ARCH-V2-A2 | Vision LLM API key = env shared (`VISION_LLM_API_KEY`), BUKAN per-user UI input di fase V2 | ASUMSI | Tidak ada UI settings Vision LLM di fase V2 | `SRS.md V2.0 §14` |
+| ARCH-V2-A3 | Deskripsi cerita = optional textarea max 500 char | ASUMSI SRS-V2-A2 | Schema + form beda bila required | `SRS.md V2.0 §6.4 FR-V2-04` |
+| ARCH-V2-A4 | Real-time logs = Collapsible panel, default OFF, switch toggle | ASUMSI SRS-V2-A3 | Frontend design beda | `SRS.md V2.0 §6.5 FR-V2-05` |
+| ARCH-V2-A5 | Dashboard = simple cards + tables + charts (Recharts), 6-8 metric cards | ASUMSI SRS-V2-A4 | Dependencies + dev time beda | `SRS.md V2.0 §6.6 FR-V2-06` |
+| ARCH-V2-A6 | Upload di generate page = pre-submit (upload → classify → baru generate) | ASUMSI SRS-V2-A5 | UX flow beda | `SRS.md V2.0 §6.1 FR-V2-01` |
+| ARCH-V2-A7 | Role classification 6 opsi: tokoh/background/prop/accessory/environment/other | ASUMSI SRS-V2-A6 | Schema + UI beda | `SRS.md V2.0 §6.3 FR-V2-03` |
+| ARCH-V2-A8 | GitHub repo public | ASUMSI SRS-V2-A7 — perlu konfirmasi user | `.gitignore` beda bila private | `SRS.md V2.0 §14` |
+| ARCH-V2-A9 | Deploy target Vercel (Laragon tetap untuk dev lokal) | ASUMSI SRS-V2-A8 | Env vars beda | `SRS.md V2.0 §14` |
+| ARCH-V2-A10 | AI SDK tetap v4, tidak upgrade ke v6 | ASUMSI: OOS V2-3 | Bila upgrade, breaking changes | `SRS.md V2.0 §3.3 OOS-V2-3` |
+| ARCH-V2-A11 | Schema V2 = additive nullable columns only, no breaking | ASUMSI confirmed by SRS | Bila migrasi besar, tambah task | `SRS.md V2.0 §7.2` |
+| ARCH-V2-A12 | Classification auto-trigger saat upload (seamless UX) | ASUMSI SRS-V2-A11 | Bila manual trigger, flow beda | `SRS.md V2.0 §14` |
+| ARCH-V2-A13 | Batch classify max 5 gambar per Vision call | ASUMSI SRS-V2-A12 | API cost beda | `SRS.md V2.0 §14` |
+| ARCH-V2-A14 | Confidence threshold 0.7 untuk auto-classify warning | ASUMSI SRS-V2-A13 | UI behavior beda | `SRS.md V2.0 §14` |
+| ARCH-V2-A15 | Recharts dipilih untuk dashboard charts (bukan Tremor) | ASUMSI SRS-V2-A14 | Dependencies beda | `SRS.md V2.0 §14` |
+| ARCH-V2-A16 | Retry LLM text = 2 attempts (existing V1) | Dari kode existing `llm-client.ts:14` | Sama V1 | `RAG-CONTEXT.md §5 B` |
+| ARCH-V2-A17 | Pagination default `limit=20` page=1 | ASUMSI | UI default beda | `SRS.md V2.0 §6.9` |
+| ARCH-V2-A18 | i18n dwibahasa ID+EN, scope UI label saja (LLM output ikut judul) | ASUMSI NFR-I2 | Bila extend scope, schema beda | `SRS.md V2.0 §5 FR-19` |
 
-### 13.2 Referensi Internal
+### 14.2 Referensi Internal
 
 | Dokumen | Path |
 |---|---|
 | RAG-CONTEXT (sumber kebenaran) | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
-| SRS | `C:\laragon\www\PromptFlow\product-docs\SRS.md` |
-| DATABASE_SCHEMA | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` |
-| GitHub repo | https://github.com/agrianwahab29/promptflow.git |
+| SRS V2.0 | `C:\laragon\www\PromptFlow\product-docs\SRS.md` |
+| DATABASE_SCHEMA V2.0 | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` |
+| BRD V2.0 | `C:\laragon\www\PromptFlow\product-docs\BRD.md` |
+| MRD V2.0 | `C:\laragon\www\PromptFlow\product-docs\MRD.md` |
+| PRD V2.0 | `C:\laragon\www\PromptFlow\product-docs\PRD.md` |
+| AGENTS.md | `C:\laragon\www\PromptFlow\product-docs\AGENTS.md` |
+| GitHub repo (V2 target) | https://github.com/agrianwahab29/promptflow.git |
+| Kode ground truth | `src/lib/db/schema.ts`, `src/app/api/v1/generate/route.ts`, `src/lib/ai/llm-client.ts`, `src/components/generate/dropzone-uploader.tsx`, `src/middleware.ts` |
 
-### 13.3 Sitasi Eksternal Kunci
+### 14.3 Sitasi Eksternal Kunci
 
 | Sitasi | Klaim didukung | Bagian |
 |---|---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | `createOpenAICompatible`, structured output, streaming, tool calling | 1.2, 4.1, 7.1 |
-| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL, Bearer, header opsional | 7.1 |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat `https://ollama.com/v1` | 7.1 |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js setup, `@libsql/client` | 7.2 |
-| https://turso.tech/blog/serverless | Vercel FS tidak persisten -> Turso | 1.2, 8, 10 |
-| https://vercel.com/marketplace/tursocloud | Turso resmi Vercel Marketplace | 1.2 |
-| https://vercel.com/docs/vercel-blob | Vercel Blob storage | 7.3 |
+| https://ai-sdk.dev/providers/openai-compatible-providers | `createOpenAICompatible`, multi-provider | 4.1, 8.2 |
+| https://openrouter.ai/docs/api/reference/authentication | OpenRouter base URL, Bearer, headers | 8.2 |
+| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat `https://ollama.com/v1` | 8.2 |
+| https://platform.openai.com/docs/guides/vision | GPT-4o Vision API | 8.1 |
+| https://ai.google.dev/gemini-api/docs/vision | Gemini Vision API | 8.1 |
+| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js setup | 12 |
+| https://turso.tech/blog/serverless | Vercel FS tidak persisten -> Turso | 1.2, 12 |
+| https://vercel.com/marketplace/tursocloud | Turso Vercel Marketplace | 12 |
+| https://vercel.com/docs/vercel-blob | Vercel Blob storage | 12 |
+| https://recharts.org/ | Dashboard charts library | 3, 4.2 |
 | https://ui.shadcn.com/docs/installation/next | shadcn/ui Next.js | 5 |
-| https://ui.shadcn.com/docs/tailwind-v4 | shadcn/ui Tailwind v4 | 5 |
+| https://nextjs.org/docs/app/building-your-application/routing/loading | loading.tsx + Suspense | 5 |
+| https://nextjs.org/docs/app/building-your-application/routing/error-handling | error.tsx boundary | 5 |
+
+### 14.4 Ringkasan Perubahan V1 -> V2
+
+| Aspek | V1 | V2 | Dampak |
+|---|---|---|---|
+| Gaya arsitektur | Modular Monolith | Tetap | Tidak berubah |
+| Container | 1 Next.js | Tetap + Vision LLM external | Tambah 1 external system |
+| Sub-modul `lib/ai` | 5 komponen | 6 komponen (+image-classifier) | +1 file |
+| Sub-modul `lib/db` | 9 repo | 10 repo (+dashboard.repo) | +1 file |
+| Schema DB | 9 tabel, 17 indexes | 9 tabel, 17 indexes, +3 kolom nullable | Additive only |
+| Endpoint API | 21 | 22 (+/upload/classify, +/dashboard) | +2 (satu dedicated, satu extended) |
+| SSE events | 4 type (stage/progress/done/error) | 5 type (+log) | +1 event type |
+| Folder `src/app/[locale]/(dashboard)/` | Page only | Page + loading.tsx + error.tsx per group | +5-7 file |
+| Folder `src/components/dashboard/` | Tidak ada | 6 file (charts + tables + cards) | +1 folder |
+| Folder `src/components/generate/` | 4 file | 7 file (+asset-preview-list, +classification-result, +log-viewer) | +3 file |
+| Env vars | 7 keys | 12 keys (+5 V2) | +5 keys |
+| Security boundary | SB-01..SB-13 | SB-01..SB-16 (+SB-14 Vision key, +SB-15 story desc limit, +SB-16 log sanitization) | +3 boundary |
+| VCS | Tidak ada | GitHub repo + conventional commits | +1 system |
+| Vision LLM integration | Tidak ada | Direct HTTP + Zod parse + cache | +1 pipeline |
+| Pagination | Hardcoded page=1 limit=20 | Server-side + UI page numbers + prefetch | +1 feature |
+| Charts library | Tidak ada | Recharts | +1 dependency |
+| `package.json` dependencies | V1 stable | V1 stable + recharts | +1 dep |
 
 ---
 
-**Dokumen ini fokus pada BLUEPRINT ARSITEKTUR konkret siap eksekusi. Tujuan
-bisnis di BRD, pasar di MRD, produk di PRD, spesifikasi teknis di SRS, skema
-data penuh di DATABASE_SCHEMA, kontrak API penuh di API_CONTRACT, aturan kode
-di CODING_RULES. PROJECT_ARCHITECTURE tidak membangun deliverable akhir /
-menulis kode — hanya blueprint.**
+**Dokumen ini fokus pada BLUEPRINT ARSITEKTUR konkret V2 siap eksekusi. Tujuan
+bisnis di BRD V2, pasar di MRD V2, produk di PRD V2, spesifikasi teknis di SRS V2,
+skema data penuh di DATABASE_SCHEMA V2, kontrak API penuh di API_CONTRACT V2,
+aturan kode di CODING_RULES. PROJECT_ARCHITECTURE V2 tidak membangun deliverable
+akhir / menulis kode — hanya blueprint.**
 
 > **Dibuat oleh:** docgen-architecture subagent
-> **Tanggal:** 2026-06-19
-> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Versi:** 2.0 (OVERWRITE V1.0)

@@ -11,14 +11,24 @@ export interface AssetRef {
   id: number;
   filename: string;
   url: string;
-  tipe: 'tokoh' | 'background';
+  tipe: string;
   label: string | null;
 }
 
-export function DropzoneUploader({ projectId, onUploaded }: { projectId: number; onUploaded: (refs: AssetRef[]) => void }) {
+// V2: 6-tipe role classification
+const ROLE_OPTIONS = [
+  { value: 'tokoh', label: 'Tokoh' },
+  { value: 'background', label: 'Background' },
+  { value: 'prop', label: 'Prop' },
+  { value: 'accessory', label: 'Accessory' },
+  { value: 'environment', label: 'Environment' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export function DropzoneUploader({ projectId, onUploaded }: { projectId: number; onUploaded?: (refs: AssetRef[]) => void }) {
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
-  const [tipe, setTipe] = useState<'tokoh' | 'background'>('tokoh');
+  const [tipe, setTipe] = useState('tokoh');
   const [label, setLabel] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -47,7 +57,7 @@ export function DropzoneUploader({ projectId, onUploaded }: { projectId: number;
     setUploading(false);
     if (uploaded.length > 0) {
       toast.success(`${uploaded.length} file terupload`);
-      onUploaded(uploaded);
+      onUploaded?.(uploaded);
       router.refresh();
     }
   }
@@ -76,9 +86,10 @@ export function DropzoneUploader({ projectId, onUploaded }: { projectId: number;
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label htmlFor="tipe">Tipe Default</Label>
-          <Select id="tipe" value={tipe} onChange={(e) => setTipe(e.target.value as 'tokoh' | 'background')}>
-            <option value="tokoh">Tokoh</option>
-            <option value="background">Background</option>
+          <Select id="tipe" value={tipe} onChange={(e) => setTipe(e.target.value)}>
+            {ROLE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </Select>
         </div>
         <div className="space-y-2">
