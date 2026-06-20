@@ -16,7 +16,7 @@ import { checkConsistency } from '@/lib/ai/consistency-checker';
 import { createLogBuffer, type LogBuffer } from '@/lib/ai/log-buffer';
 
 export const runtime = 'nodejs';
-export const maxDuration = 600;
+export const maxDuration = 300; // Vercel Hobby plan max
 export const dynamic = 'force-dynamic';
 
 interface SseEvent {
