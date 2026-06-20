@@ -1,946 +1,707 @@
-# Software Requirement Specification (SRS) V2.0
-## PromptFlow -- Upgrade V2: Workflow Engine Otomasi Prompt Animasi AI
+# SRS — Software Requirement Specification
+## PromptFlow Landing Page Redesign
 
-> **Versi:** 2.0
-> **Dibuat:** 2026-06-20
-> **Status:** Final
-> **Pemilik:** Bos Agrian
-> **Sumber kebenaran:** product-docs/RAG-CONTEXT.md + PRD V2.0 + BRD V2.0 + MRD V2.0
-> **GitHub:** https://github.com/agrianwahab29/promptflow.git
-> **Root proyek:** C:\laragon\www\PromptFlow
-> **Catatan:** V1 sudah built & berjalan. SRS V2 ini OVERWRITE SRS V1. Fokus pada upgrade teknis V2.
+> **Versi:** 1.0
+> **Tanggal:** 2026-06-20
+> **Status:** Draft
+> **Deliverable:** Landing page src/app/[locale]/page.tsx — redesign total
+> **Selaras:** BRD.md (why), MRD.md (who), PRD.md (what)
+> **Rujukan:** RAG-CONTEXT.md (fakta), AGENTS.md (build V2), UIUX_SPEC.md (design system)
 
 ---
 
 ## Daftar Isi
 
-1. Pendahuluan
-2. Gambaran Umum Produk
-3. Kebutuhan Spesifik
-4. Arsitektur Sistem
-5. Tech Stack & Versi (LOCKED)
-6. Spesifikasi Fungsional Detail V2
-7. Data Model & Perubahan Schema
-8. Interface / API / Integrasi
+1. Tech Stack & Justifikasi
+2. Arsitektur Sistem
+3. Spesifikasi Fungsional Detail
+4. Data Model
+5. Interface / API / Integrasi
+6. File Format & Path
+7. Tahapan Implementasi
+8. Verifikasi & Pengujian
 9. Constraint Teknis
-10. Keamanan
-11. Performa
-12. Tahapan Implementasi V2
-13. Verifikasi & Pengujian
-14. Asumsi
 
 ---
 
-## 1. Pendahuluan
+## 1. Tech Stack & Justifikasi
 
-### 1.1 Tujuan Dokumen
+### 1.1 Stack Utama (Landing Page)
 
-SRS V2 ini menjabarkan spesifikasi teknis eksekutabel untuk **upgrade V2** PromptFlow. V1 sudah terbangun: 9 tabel DB, auth NextAuth, upload Vercel Blob, generate SSE streaming, export JSON/markdown, i18n dwibahasa, 21 endpoint API. Kode berjalan di Laragon localhost.
-
-V2 menambah 10 fitur:
-1. Image reference dipindah ke generate page (multi-file + role classification)
-2. AI image classification via Vision LLM
-3. Field deskripsi singkat cerita
-4. Real-time processing logs (SSE + show/hide toggle)
-5. Dashboard enrichment (stats, charts, activity)
-6. Konsistensi UI (loading.tsx, error.tsx, design tokens)
-7. SQA testing menyeluruh (>=80% coverage)
-8. Navigation optimization (pagination, Suspense, prefetch)
-9. Push ke GitHub
-10. Extended role classification (6 opsi)
-
-Situs: PRD V2.0 S1.1, BRD V2.0 S1, RAG-CONTEXT.md S9
-
-### 1.2 Lingkup Dokumen
-
-| Aspek | V1 (pertahankan) | V2 (baru) |
-|---|---|---|
-| Upload gambar | Di project detail page | Di generate page (multi-file + AI classify) |
-| Deskripsi cerita | TIDAK ADA | Textarea opsional di generate form |
-| Role classification | 2 opsi (tokoh/background) | 6 opsi (tokoh/background/prop/accessory/environment/other) |
-| AI image analysis | TIDAK ADA | Vision LLM auto-classify |
-| Real-time logs | TIDAK ADA | SSE log events + Collapsible panel |
-| Dashboard | 3 kartu KPI | 6-8 kartu + charts + breakdown |
-| Loading states | TIDAK ADA | loading.tsx + error.tsx + Suspense |
-| Pagination | TIDAK ADA | Projects list pagination |
-| Test coverage | Partial | >=80% unit, 100% critical E2E |
-| Version control | TIDAK ADA | GitHub repo |
-
-### 1.3 Definisi & Akronim
-
-| Istilah | Definisi |
-|---|---|
-| PromptPackage | Output JSON terstruktur hasil generate |
-| SSE | Server-Sent Events |
-| Vision LLM | Model LLM yang memproses gambar (GPT-4o, Gemini Vision) |
-| AI Classification | Vision LLM menganalisis gambar dan mengklasifikasi role |
-| Asset Reference | Metadata upload gambar referensi |
-| Character Master | Deskripsi karakter konsisten lintas adegan |
-| Drizzle ORM | TypeScript ORM untuk Turso/libSQL |
-| Turso | Database libSQL (SQLite-compatible) via HTTP |
-
----
-
-## 2. Gambaran Umum Produk
-
-### 2.1 Perspektif Produk
-
-PromptFlow = web app fullstack Next.js App Router. Frontend + backend satu repo. Deploy Vercel serverless + Turso DB + Vercel Blob. Multi-provider LLM via @ai-sdk/openai-compatible.
-
-Situs: PRD V2.0 S1.2, RAG-CONTEXT.md S2.1
-
-### 2.2 Karakteristik Pengguna
-
-| Karakteristik | Nilai |
-|---|---|
-| Tipe user | Kreator solo, indie studio, edukator |
-| Level teknis | Rendah-sedang |
-| Device | Desktop + mobile (responsive) |
-| Bahasa | Indonesia + English |
-| Auth | NextAuth credentials |
-| Role | User (default) -- tidak ada admin/RBAC |
-
-Situs: MRD V2.0 S3.1, RAG-CONTEXT.md S6
-
-### 2.3 Ketergantungan Eksternal
-
-| ID | Dependency | Pemilik | Status |
-|---|---|---|---|
-| TD-1 | Vision LLM API (GPT-4o / Gemini Vision) | User | Perlu API key |
-| TD-2 | Akun GitHub + repo access | Bos Agrian | Perlu push access |
-| TD-3 | Vercel project setup | Bos Agrian | Perlu connect repo |
-| TD-4 | Turso DB production | Bos Agrian | Sudah ada V1 |
-| TD-5 | API key Ollama/OpenRouter | User | User sediakan via UI |
-| TD-6 | Chart library (Recharts / Tremor) | Developer | Install via pnpm |
-
----
-
-## 3. Kebutuhan Spesifik
-
-### 3.1 Kebutuhan Fungsional (V2 BARU)
-
-| ID | Requirement | MoSCoW | Mapping PRD |
-|---|---|---|---|
-| FR-V2-01 | Image reference di generate page (multi-file + role classification) | MUST | F-V2-01, US-V2-01, US-V2-02 |
-| FR-V2-02 | AI image classification via Vision LLM | MUST | F-V2-02, US-V2-03, US-V2-04 |
-| FR-V2-03 | Extended role classification (6 opsi) | MUST | F-V2-03, US-V2-03 |
-| FR-V2-04 | Field deskripsi singkat cerita | MUST | F-V2-04, US-V2-05 |
-| FR-V2-05 | Real-time processing logs (SSE + Collapsible) | SHOULD | F-V2-05, US-V2-06, US-V2-07 |
-| FR-V2-06 | Dashboard enrichment (charts, breakdown, activity) | SHOULD | F-V2-06, US-V2-08, US-V2-09 |
-| FR-V2-07 | Konsistensi UI (loading.tsx, error.tsx, tokens) | SHOULD | F-V2-07, US-V2-10 |
-| FR-V2-08 | SQA testing menyeluruh (>=80% coverage) | SHOULD | F-V2-08, US-V2-12 |
-| FR-V2-09 | Navigation optimization (pagination, Suspense) | SHOULD | F-V2-09, US-V2-11 |
-| FR-V2-10 | Push ke GitHub | SHOULD | F-V2-10, US-V2-12 |
-
-### 3.2 Kebutuhan Non-Fungsional (V2 tambahan)
-
-| ID | Requirement | Target | MoSCoW |
-|---|---|---|---|
-| NFR-V2-P1 | Page transition | <= 200ms | SHOULD |
-| NFR-V2-P2 | Dashboard load | <= 1.5s | SHOULD |
-| NFR-V2-P3 | AI classification latency | <= 5s per gambar | MUST |
-| NFR-V2-P4 | Real-time log latency | <= 100ms server ke UI | SHOULD |
-| NFR-V2-U1 | loading.tsx per page group | Skeleton/spinner | SHOULD |
-| NFR-V2-U2 | error.tsx boundary per page group | Error + retry + home link | SHOULD |
-| NFR-V2-U3 | Disabled state saat loading | Semua form field disabled | SHOULD |
-| NFR-V2-U4 | Pagination di projects list | Page numbers + prev/next | SHOULD |
-| NFR-V2-T1 | Unit test coverage | >= 80% | SHOULD |
-| NFR-V2-T2 | E2E critical path | 100% pass | SHOULD |
-
-### 3.3 Out of Scope V2
-
-| # | Item | Alasan |
-|---|---|---|
-| OOS-V2-1 | Dark mode toggle | Bisa V3 |
-| OOS-V2-2 | Multi-language output prompt | Ikut judul input |
-| OOS-V2-3 | AI SDK upgrade v4 ke v6 | Breaking changes |
-| OOS-V2-4 | Schema migration besar-besaran | Additive columns only |
-| OOS-V2-5 | Auto-fallback provider otomatis | Manual switch fase awal |
-| OOS-V2-6 | Marketplace template prompt | Fase akhir |
-| OOS-V2-7 | Kolaborasi real-time multi-user | Fase awal solo per project |
-
----
-
-## 4. Arsitektur Sistem
-
-### 4.1 Pendekatan Arsitektur
-
-V2 mempertahankan arsitektur V1 (monolith Next.js App Router) dan menambah layer baru:
-
-`
-+------------------------------------------------------------------+
-|  Layer 1: Presentation (App Router pages + components)           |
-|  - Generate page: DropzoneUploader + AI classify + LogViewer     |
-|  - Dashboard: Charts + metric cards + activity table             |
-|  - Projects: Pagination + Suspense boundaries                    |
-|  - loading.tsx + error.tsx per page group                        |
-+------------------------------------------------------------------+
-         |  Server Actions + fetch /api/v1/*
-         v
-+------------------------------------------------------------------+
-|  Layer 2: API / Route Handlers (backend)                         |
-|  - POST /api/v1/generate (SSE + log events)                      |
-|  - POST /api/v1/upload (multi-file + auto-classify)              |
-|  - POST /api/v1/upload/classify (trigger AI classify)            |
-|  - GET /api/v1/projects (pagination)                             |
-|  - GET /api/v1/dashboard/stats (enrichment data)               |
-|  - 21 endpoint V1 tetap backward-compatible                      |
-+------------------------------------------------------------------+
-         |  panggil lib/*
-         v
-+------------------------------------------------------------------+
-|  Layer 3: lib/ (core logic, server-only)                          |
-|  - lib/ai/provider-registry.ts  createOpenAICompatible           |
-|  - lib/ai/prompt-builder.ts     system + user message            |
-|  - lib/ai/llm-client.ts         generatePromptPackage + retry    |
-|  - lib/ai/image-classifier.ts   NEW: Vision LLM classify         |
-|  - lib/ai/consistency-checker.ts                                |
-|  - lib/db/repositories/*.ts     9 repos + V2 queries             |
-|  - lib/storage/blob.ts          Vercel Blob + local FS           |
-|  - lib/auth/config.ts           NextAuth credentials + JWT       |
-|  - lib/crypto/aes.ts            AES-256-GCM                     |
-|  - lib/validation/schemas.ts    Zod + PromptPackageSchema        |
-|  - lib/export/markdown.template.ts                              |
-+------------------------------------------------------------------+
-         |  external call
-         v
-+------------------------------------------------------------------+
-|  Layer 4: External Services                                       |
-|  - LLM provider (Ollama / OpenRouter / 9router / custom)         |
-|  - Vision LLM (GPT-4o / Gemini Vision) untuk classification      |
-|  - Turso DB (libSQL via HTTP)                                     |
-|  - Vercel Blob (gambar referensi)                                 |
-+------------------------------------------------------------------+
-`
-
-### 4.2 Flow V2: Upload + AI Classification
-
-`
-[User drag-drop gambar di generate page]
-    |
-    v
-[POST /api/v1/upload -- multipart]
-    |-- validasi: mime image/*, max 10MB
-    |-- upload ke Vercel Blob / local FS
-    |-- simpan AssetReference (tanpa projectId dulu)
-    |
-    v
-[Auto-trigger POST /api/v1/upload/classify]
-    |-- kirim gambar ke Vision LLM (GPT-4o / Gemini)
-    |-- prompt: Classify role: character/background/prop/accessory/environment/other
-    |-- parse response -> update AssetReference
-    |
-    v
-[Frontend: tampilkan hasil klasifikasi]
-    |-- thumbnail + role badge + nama + confidence
-    |-- manual override: user bisa ubah role
-    |-- fallback ke manual select jika Vision LLM gagal
-`
-
-Situs: RAG-CONTEXT.md S9 V2-3, PRD V2.0 S5 (FR-V2-02)
-
-### 4.3 Flow V2: Generate dengan Story Description + Logs
-
-`
-[User submit generate form]
-    |-- title + storyDescription (opsional) + duration + style + refs
-    |
-    v
-[POST /api/v1/generate -- SSE]
-    |-- validasi Zod (termasuk storyDescription field baru)
-    |-- resolve provider + decrypt API key
-    |-- buildUserMessage() -> inject storyDescription
-    |
-    |-- SSE events:
-    |   data: {"type":"stage","stage":"starting","message":"..."}
-    |   data: {"type":"log","level":"info","message":"[generate] Resolving provider..."}
-    |   data: {"type":"stage","stage":"character_profiles","message":"..."}
-    |   ...
-    |   data: {"type":"done","result":<full JSON>,"logs":[...]}
-    |
-    v
-[Frontend: stage tracker + LogViewer Collapsible]
-    |-- toggle show/hide logs
-    |-- log per stage + timestamp + level badge
-`
-
-### 4.4 Flow V2: Dashboard Enrichment
-
-`
-[GET /api/v1/dashboard/stats]
-    |-- query: total projects, successful generations, avg duration
-    |-- query: per-provider breakdown (avg duration, success rate)
-    |-- query: recent 5 projects
-    |-- query: weekly trend (projects per minggu)
-    |-- query: storage usage (total files, total size)
-    |
-    v
-[Frontend: 6-8 metric cards + charts + tables]
-    |-- Line chart: projects per minggu (Recharts)
-    |-- Bar chart: success vs fail ratio
-    |-- Table: per-provider breakdown
-    |-- Table: recent 5 projects + status
-    |-- Card: storage usage
-`
-
----
-
-## 5. Tech Stack & Versi (LOCKED)
-
-> **Penting:** Semua versi di bawah dari package.json (ground truth). AI SDK = v4, BUKAN v6.
-
-| Lapisan | Teknologi | Versi (package.json) | Justifikasi |
-|---|---|---|---|
-| Framework | Next.js | ^15.1.0 | App Router, RSC, Server Actions, Vercel native |
-| UI Library | React + ReactDOM | ^19.0.0 | Latest stable |
-| AI SDK | ai (Vercel AI SDK) | ^4.0.0 | Multi-provider, structured output. CATATAN: docs sebut v6, kode = v4 |
-| AI Provider | @ai-sdk/openai-compatible | ^1.0.0 | Multi-provider OpenAI-compat |
-| Validasi | Zod | ^3.24.0 | Schema input + LLM structured output |
-| Auth | next-auth | 5.0.0-beta.25 | Credentials provider, JWT session |
-| Auth Core | @auth/core | ^0.37.0 | NextAuth core |
-| Password Hash | bcryptjs | ^2.4.3 | User password hashing |
-| DB Client | @libsql/client | ^0.14.0 | Turso/libSQL driver |
-| ORM | drizzle-orm | ^0.38.0 | Type-safe, lightweight, Turso support |
-| ORM Kit | drizzle-kit | ^0.30.0 | Migration generate + push |
-| Storage | @vercel/blob | ^0.27.0 | Vercel Blob upload |
-| i18n | next-intl | ^3.26.0 | Dwibahasa ID + EN |
-| Icons | lucide-react | ^0.468.0 | Icon library |
-| Form | react-hook-form | ^7.54.0 | Form management |
-| Form Resolvers | @hookform/resolvers | ^3.10.0 | Zod integration |
-| Toast | sonner | ^1.7.0 | Toast notification |
-| UI Primitives | Radix UI (14 paket) | ^1.1.0--^1.2.0 | shadcn/ui foundation |
-| UI Helpers | clsx + tailwind-merge + cva | ^2.1.1 / ^2.5.0 / ^0.7.1 | Class utilities |
-| TypeScript | typescript | ^5.7.0 | Type safety |
-| Tailwind CSS | tailwindcss | ^4.0.0 | CSS-first styling |
-| PostCSS | @tailwindcss/postcss + postcss + autoprefixer | ^4.0.0 / ^8.4.0 / ^10.4.0 | Build pipeline |
-| Test Unit | vitest | ^2.1.0 | Unit + integration test |
-| Test Coverage | @vitest/coverage-v8 | ^2.1.0 | Coverage reporting |
-| Test E2E | @playwright/test | ^1.49.0 | E2E browser test |
-| Lint | eslint + eslint-config-next | ^9.17.0 / ^15.1.0 | Code quality |
-| TS ESLint | @typescript-eslint/eslint-plugin + @typescript-eslint/parser | ^8.18.0 | TS lint rules |
-| Format | prettier + prettier-plugin-tailwindcss | ^3.4.0 / ^0.6.0 | Code formatting |
-| Package Manager | pnpm | 11.7.0 | Fast, disk-efficient |
-| Runtime | Node.js (server-only) | N/A | Server-side only |
-| DB Engine | Turso (libSQL via HTTP) | latest | Vercel serverless DB |
-| V2 Baru | Recharts atau Tremor | latest stabil | Dashboard charts |
-
-**KETIDAKSESUAIAN VERSI:** Product docs V1 menyebut AI SDK v6 tapi package.json mencatat ai: ^4.0.0. **Kode = ground truth.** SRS V2 pakai v4. Tidak upgrade ke v6 = out of scope.
-
-Situs: RAG-CONTEXT.md S2 (Tech Stack Tabel), package.json:22-81
-
----
-
-## 6. Spesifikasi Fungsional Detail V2
-
-### 6.1 FR-V2-01: Image Reference di Generate Page
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Lokasi | Generate page (/generate) -- bukan project detail |
-| Komponen | DropzoneUploader dipindah dari projects/[id]/page.tsx:78 ke generate-form.tsx |
-| Upload flow | 1) User drag-drop multi-file di generate form. 2) Upload ke storage. 3) Metadata simpan di asset_references (tanpa projectId). 4) List refs muncul di form sebelum submit. |
-| Multi-file | Sudah didukung dropzone-uploader.tsx:72 (multiple attribute). Max 10MB per file, mime image/(png|jpe?g|gif|webp|svg+xml) |
-| Backward compat | Project detail page tetap view refs (read-only). Upload di project detail DIHAPUS dari UI. |
-| Submit flow | Generate submit -> buat project (draft) -> attach refs ke project -> generate prompt |
-| Dampak schema | TIDAK perlu migration |
-| Komponen baru | AssetPreviewList -- menampilkan daftar gambar yang sudah di-upload dengan thumbnail + role badge + nama |
-
-Situs: RAG-CONTEXT.md S9 V2-1, PRD V2.0 S5 (FR-V2-01), dropzone-uploader.tsx:1-97
-
-### 6.2 FR-V2-02: AI Image Classification via Vision LLM
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | POST /api/v1/upload/classify (baru) atau auto-trigger saat upload |
-| Input | assetReferenceId (atau auto-trigger setelah upload) |
-| Vision LLM | GPT-4o Vision ATAU Gemini Vision (tergantung provider aktif) |
-| Prompt | Analyze this image and classify its role in an animation project. Return JSON: {role, name, description, confidence} |
-| Output | {role, name, description, confidence} |
-| Update DB | asset_references.tipe = role, asset_references.label = name, asset_references.ai_classification = JSON string |
-| Confidence threshold | 0.7 -- di bawah threshold = warning, suggest manual override |
-| Manual override | User bisa ubah role via dropdown di UI sebelum submit |
-| Fallback | Vision LLM gagal -> manual select (V1 behavior: tokoh/background) |
-| Cache | Simpan hasil di asset_references.ai_classification agar tidak reclassify |
-| Rate limit | Batch classify max 5 gambar per call |
-| Dampak schema | Tambah kolom ai_classification (TEXT nullable) di asset_references |
-| Komponen baru | ClassificationResult -- thumbnail + role badge + nama + deskripsi + confidence bar + override dropdown |
-
-Situs: RAG-CONTEXT.md S9 V2-3, PRD V2.0 S5 (FR-V2-02), RAG-CONTEXT.md S10 B
-
-### 6.3 FR-V2-03: Extended Role Classification (6 Opsi)
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Opsi tipe | tokoh, background, prop, accessory, environment, other |
-| Zod update | GenerateReferenceSchema.type: z.enum(['tokoh','background','prop','accessory','environment','other']) |
-| Upload validation | upload/route.ts:32-33 -- extend dari 2 opsi ke 6 opsi |
-| DropzoneUploader | Select options: 6 opsi (dari hanya tokoh/background) |
-| Prompt builder | Inject tipe ke LLM context: Referensi: wahab.jpg (tokoh), meja.jpg (prop) |
-| ImagePrompt tipe | schema.ts:104 -- tetap text tanpa CHECK constraint |
-| Dampak schema | TIDAK perlu migration |
-
-Situs: RAG-CONTEXT.md S9 V2-2, PRD V2.0 S5 (FR-V2-03), schemas.ts:106-109
-
-### 6.4 FR-V2-04: Field Deskripsi Singkat Cerita
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| UI | Textarea opsional di generate form, di bawah field judul |
-| Validasi | Optional. Max 500 char. Trim whitespace. |
-| Zod | GenerateInputSchema: tambah storyDescription: z.string().max(500).optional() |
-| Prompt injection | buildUserMessage(): tambah Deskripsi cerita:  bila terisi |
-| DB opsional | Tambah kolom story_description (TEXT nullable) di projects table |
-| Save flow | Simpan di projects.story_description saat create project |
-| Dampak schema | Tambah kolom story_description (TEXT nullable) di projects |
-
-Situs: RAG-CONTEXT.md S9 V2-4, PRD V2.0 S5 (FR-V2-04), generate-form.tsx:178-238
-
-### 6.5 FR-V2-05: Real-time Processing Logs
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| SSE events | Extend protocol: tambah event type log |
-| Log event format | data: {"type":"log","level":"info","message":"[generate] Starting...","timestamp":"..."} |
-| Level | info, warn, error |
-| Backend | Collect console.log ke buffer array. Kirim via SSE setiap ada log baru. |
-| Frontend | LogViewer component -- Collapsible panel di bawah stage tracker |
-| Toggle | Switch show/hide. Default OFF. Toggle ON = terima log events. |
-| UI | Log per stage + timestamp + level badge (info=blue, warn=yellow, error=red) |
-| Persistence | Opsional: tambah kolom logs_json (TEXT nullable) di generation_logs |
-| Dampak schema | Opsional: tambah logs_json (TEXT nullable) di generation_logs |
-
-Situs: RAG-CONTEXT.md S9 V2-5, PRD V2.0 S5 (FR-V2-05), generate/route.ts:20-27
-
-### 6.6 FR-V2-06: Dashboard Enrichment
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Endpoint | Extend GET /api/v1/dashboard/stats response |
-| Metrics baru | Total projects, successful generations, avg duration, total uploads, success rate, active providers |
-| Charts | Line chart: projects per minggu. Bar chart: success vs fail ratio. Library: Recharts atau Tremor. |
-| Per-provider | Table: provider name, avg duration, success rate, total calls |
-| Recent activity | Table: 5 project terbaru + status + tanggal |
-| Storage usage | Card: total files, total size |
-| Refactor | Dashboard queries pindah dari direct Drizzle ke repository pattern |
-| Dampak schema | TIDAK perlu |
-| Performance | Dashboard load <= 1.5s |
-
-Situs: RAG-CONTEXT.md S9 V2-6, PRD V2.0 S5 (FR-V2-06), dashboard/page.tsx:1-72
-
-### 6.7 FR-V2-07: Konsistensi UI
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| loading.tsx | Tambah loading.tsx di: /generate, /projects, /projects/[id], /dashboard, /settings |
-| error.tsx | Tambah error.tsx boundary per page group: error message + retry button + link home |
-| Disabled state | Semua form field disabled saat generating/loading |
-| Empty state | Ilustrasi + pesan + CTA untuk empty projects, empty results |
-| Design tokens | Primary violet #7c3aed, font Inter, spacing 4px base, radius 6px |
-| Badge variants | Pastikan: success, secondary, destructive, info tersedia |
-| Loading skeleton | Skeleton cards di projects list via Suspense |
-
-Situs: RAG-CONTEXT.md S9 V2-7, PRD V2.0 S5 (FR-V2-07)
-
-### 6.8 FR-V2-08: SQA Testing Menyeluruh
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Unit test | Vitest -- target >= 80% coverage unit/integration |
-| E2E test | Playwright -- critical path: login -> set provider -> upload + classify -> generate -> save -> export |
-| Lint | ESLint (next lint) -- 0 error, 0 warning |
-| Type check | tsc --noEmit -- 0 error |
-| Build | next build -- sukses tanpa error |
-| Manual test | Semua V2 features |
-| Performance test | Latency: Shorts <= 60s, Tutorial <= 180s, Dashboard <= 1.5s, Page transition <= 200ms |
-| CI gate | PR tidak merge bila lint/typecheck/test/e2e/build fail |
-
-Situs: RAG-CONTEXT.md S9 V2-8, PRD V2.0 S5 (FR-V2-08)
-
-### 6.9 FR-V2-09: Navigation Optimization
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Pagination | Projects list: ?page=1&limit=20. UI: page numbers + prev/next. Server-side. |
-| Suspense | Tambah Suspense boundaries di projects list, dashboard, generate page |
-| loading.tsx | Streaming SSR via Next.js App Router loading states |
-| Client-side nav | Next.js Link component untuk soft navigation |
-| Image optimization | Next.js Image component untuk thumbnails |
-| Prefetch | Next.js Link prefetch=true untuk navigasi umum |
-
-Situs: RAG-CONTEXT.md S9 V2-9, PRD V2.0 S5 (FR-V2-09)
-
-### 6.10 FR-V2-10: Push ke GitHub
-
-| Aspek | Realisasi Teknis |
-|---|---|
-| Repo | https://github.com/agrianwahab29/promptflow.git |
-| Init | git init di root proyek |
-| .gitignore | node_modules, .env.local, .next, public/references, *.tsbuildinfo, drizzle/meta |
-| Commit | Conventional commits: feat(scope): ..., fix(scope): ... |
-| Branch | main branch. Feature branches: feat/v2-upload, feat/v2-classification |
-| Remote | git remote add origin https://github.com/agrianwahab29/promptflow.git |
-| Push | git push -u origin main |
-
-Situs: RAG-CONTEXT.md S9 V2-10, PRD V2.0 S5 (FR-V2-10), BRD V2.0 S5.1 S9
-
----
-
-## 7. Data Model & Perubahan Schema
-
-### 7.1 Schema Existing V1 (9 tabel -- pertahankan)
-
-| # | Tabel | Status V2 |
-|---|---|---|
-| 1 | users | Tetap |
-| 2 | provider_configs | Tetap |
-| 3 | projects | Tambah kolom opsional |
-| 4 | asset_references | Tambah kolom opsional |
-| 5 | characters | Tetap |
-| 6 | scenes | Tetap |
-| 7 | image_prompts | Tetap |
-| 8 | generation_logs | Tambah kolom opsional |
-| 9 | supporting_characters | Tetap |
-
-Situs: RAG-CONTEXT.md S4, schema.ts:1-163
-
-### 7.2 Perubahan Schema V2 (ADDITIVE -- tidak breaking)
-
-| Tabel | Kolom Baru | Tipe | Nullable | Alasan |
+| Lapisan | Teknologi | Versi | Justifikasi | Sitasi |
 |---|---|---|---|---|
-| projects | story_description | TEXT | YA | Simpan deskripsi cerita dari generate form |
-| asset_references | ai_classification | TEXT | YA | Simpan hasil analisis Vision LLM (JSON string) |
-| generation_logs | logs_json | TEXT | YA | Simpan real-time logs (JSON array) |
+| Framework | Next.js (App Router) | ^15.1.0 | Sudah ada di V1, RSC default | package.json:48 |
+| UI Library | React + ReactDOM | ^19.0.0 | Sudah ada, RSC support | package.json:51-52 |
+| Styling | Tailwind CSS v4 | ^4.0.0 | Utility-first, design token existing | package.json:79 |
+| UI Components | shadcn/ui (Radix primitives) | ^1.1.0 | 14 Radix packages sudah ada | package.json:26-39 |
+| i18n | next-intl | ^3.26.0 | Dwibahasa ID+EN, sudah wired | package.json:50 |
+| Animation | **framer-motion** | **^11.x** | **BARU — install.** Standard React animation | RAG-CONTEXT S7.1 |
+| Icons | lucide-react | ^0.468.0 | Sudah ada, icon lengkap | package.json:47 |
+| Analytics | **@vercel/analytics** | **latest** | **BARU — install.** Event tracking, no PII | BRD SCOPE-15 |
+| TypeScript | typescript | ^5.7.0 | Strict mode, type-safe | package.json:80 |
+| Package Manager | pnpm | 11.7.0 | Sudah ada | package.json:83 |
 
-Catatan:
-- Semua kolom baru = nullable -> tidak breaking existing data
-- Kolom tipe di asset_references tetap TEXT tanpa CHECK constraint -> extended enum di app layer (Zod)
-- Migration: drizzle-kit generate -> review SQL -> drizzle-kit push
+### 1.2 Dependencies BARU (Perlu Install)
 
-Situs: PRD V2.0 S8.2, RAG-CONTEXT.md S9 V2-3, V2-4, V2-5
-
-### 7.3 Validasi Enum V2 (App Layer -- Zod)
-
-| Schema | V1 | V2 (baru) |
-|---|---|---|
-| GenerateReferenceSchema.type | z.enum(['tokoh', 'background']) | z.enum(['tokoh', 'background', 'prop', 'accessory', 'environment', 'other']) |
-| GenerateInputSchema | title, durationType, durationTargetSeconds, styleType, aspectRatio, references | + storyDescription: z.string().max(500).optional() |
-
-### 7.4 Relasi (tetap dari V1)
-
-- users 1:N -> provider_configs, projects
-- projects 1:N -> asset_references, characters, scenes, image_prompts, generation_logs, supporting_characters
-- scenes 1:N -> image_prompts (scene_id nullable), supporting_characters (scene_id nullable)
-
-### 7.5 PromptPackageSchema (Source of Truth LLM Output -- tetap)
-
-`	s
-const PromptPackageSchema = z.object({
-  title: z.string(),
-  duration_target: z.object({ type: z.enum(['shorts','tutorial']), seconds: z.number() }),
-  style: z.object({ type: z.enum(['3D','2D']), aspect_ratio: z.string() }),
-  character_profiles: z.array(CharacterProfileSchema),
-  scenes: z.array(SceneSchema),
-  image_prompts: z.object({
-    characters: z.array(ImagePromptItemSchema),
-    backgrounds: z.array(ImagePromptItemSchema),
-  }),
-  supporting_characters: z.array(SupportingCharacterSchema),
-  moral_message: z.string(),
-});
+`ash
+pnpm add framer-motion @vercel/analytics
 `
 
-Situs: AGENTS.md S9, PRD V2.0 S8.2
+| Package | Size (gzipped) | Alasan Install | Sitasi |
+|---|---|---|---|
+| framer-motion | ~30KB | Fade-in scroll, stagger, hover scale, spring | RAG-CONTEXT S7.1, BRD SCOPE-03 |
+| @vercel/analytics | ~5KB | Event tracking CTA/FAQ/scroll, KPI measurable | BRD SCOPE-15 |
+
+**Total bundle tambahan:** ~35KB gzipped. Acceptable (NFR-P05 <= 50KB).
+
+### 1.3 Dependencies YANG TIDAK BOLEH DITAMBAH
+
+| Package | Alasan | Sitasi |
+|---|---|---|
+| AI SDK v6 | Kode V1 pakai v4. Upgrade = OOS | AGENTS.md CRIT-002 |
+| GSAP | Overkill untuk landing page | RAG-CONTEXT S7.1 |
+| next-themes | Dark mode pakai CSS class manual | RAG-CONTEXT S6.3 |
+| Custom font berbayar | Inter via system-ui sudah ada | BRD OOS-10 |
 
 ---
 
-## 8. Interface / API / Integrasi
+## 2. Arsitektur Sistem
 
-### 8.1 Endpoint Existing V1 (21 endpoint -- tetap)
+### 2.1 Component Tree
 
-Semua 21 endpoint V1 tetap backward-compatible.
+`
+src/app/[locale]/page.tsx (Server Component — root orchestrator)
+  ├── Navbar (Client Component — sticky + scroll detection)
+  ├── Hero (Client Component — Framer Motion entrance)
+  ├── SocialProofBar (Client Component — counter animation)
+  ├── ProblemSolution (Client Component — stagger fade-in)
+  ├── HowItWorks (Client Component — 3 step connector)
+  ├── FeaturesBento (Client Component — bento grid + hover)
+  ├── ProductDemo (Client Component — browser mockup animated)
+  ├── Testimonials (Client Component — 3 card grid)
+  ├── FAQ (Client Component — accordion)
+  ├── FinalCTA (Client Component — gradient section)
+  └── Footer (Server Component — static)
+`
 
-Situs: RAG-CONTEXT.md S3, API_CONTRACT.md S5
+### 2.2 Reusable Components
 
-### 8.2 Perubahan Endpoint V2 (additive)
-
-| Endpoint | Perubahan |
-|---|---|
-| POST /api/v1/generate | Extend SSE events: tambah log event type. Tambah field storyDescription di request. |
-| POST /api/v1/upload | tipe field extended ke 6 opsi. Response tambah ai_classification. |
-| POST /api/v1/projects | Tambah field opsional story_description di request body. |
-| GET /api/v1/projects | Pagination via ?page=&limit=. Response: {data[], pagination{page, limit, total, totalPages}}. |
-| GET /api/v1/dashboard/stats | Extend response: {totalProjects, successfulGenerations, avgDuration, perProviderBreakdown[], recentProjects[], storageUsage, weeklyTrend[]}. |
-
-### 8.3 Endpoint Baru V2
-
-| Method | Path | Auth | Deskripsi |
+| Component | Path | Tipe | Fungsi |
 |---|---|---|---|
-| POST | /api/v1/upload/classify | wajib | Trigger AI classification. Input: {assetReferenceId}. Output: {role, name, description, confidence}. |
+| SectionWrapper | src/components/landing/section-wrapper.tsx | Client | whileInView + stagger wrapper reusable |
+| AnimatedCounter | src/components/landing/animated-counter.tsx | Client | Counter angka Framer Motion |
+| BrowserMockup | src/components/landing/browser-mockup.tsx | Client | Browser chrome frame reusable |
+| FeatureCard | src/components/landing/feature-card.tsx | Client | 1 feature card hover scale |
+| TestimonialCard | src/components/landing/testimonial-card.tsx | Client | 1 testimonial card |
+| FaqItem | src/components/landing/faq-item.tsx | Client | 1 accordion item |
+| LogoPlaceholder | src/components/landing/logo-placeholder.tsx | Server | SVG/text logo placeholder |
 
-### 8.4 SSE Event Protocol V2
+### 2.3 Data Flow
 
 `
-POST /api/v1/generate
-Content-Type: application/json
-Body: {
-  title: string,
-  storyDescription?: string,
-  durationType: 'shorts' | 'tutorial',
-  durationTargetSeconds?: number,
-  styleType: '3D' | '2D',
-  aspectRatio: string,
-  references?: Array<{name: string, type: string, filename: string}>
-}
-
-Response: text/event-stream (SSE)
-  data: {"type":"stage","stage":"starting","message":"Memulai generate..."}
-  data: {"type":"log","level":"info","message":"[generate] Resolving provider..."}
-  data: {"type":"progress","stage":"character_profiles","progress":20}
-  data: {"type":"log","level":"info","message":"[llm] Calling GPT-4o..."}
-  data: {"type":"stage","stage":"character_profiles","message":"Profile karakter selesai"}
-  ... (stages: starting -> character_profiles -> scenes -> image_prompts -> supporting_characters -> moral_message)
-  data: {"type":"done","result":<full structured JSON>,"warnings":[...],"logs":[...]}
-  data: {"type":"error","message":"Provider timeout","provider":"openrouter"}
+page.tsx (Server Component)
+  |
+  +-- getTranslations('landing') -> semua teks via next-intl
+  |
+  +-- SectionWrapper -> props: children, className
+  |     +-- Framer Motion: whileInView, variants, viewport once:true
+  |
+  +-- Hero -> props: t('heroTitle'), t('heroSubtitle'), ctaPrimary, ctaSecondary
+  |     +-- ProductDemo (browser mockup animated)
+  |
+  +-- SocialProofBar -> props: userCount (placeholder), logos[]
+  |     +-- AnimatedCounter -> useMotionValue + animate
+  |
+  +-- FeaturesBento -> props: features[] (icon, title, desc)
+  |     +-- FeatureCard[] -> whileHover scale 1.02
+  |
+  +-- FAQ -> props: faqs[] (question, answer)
+  |     +-- FaqItem[] -> accordion expand/collapse
+  |
+  +-- Analytics -> @vercel/analytics track events
+        +-- cta_hero_click
+        +-- cta_final_click
+        +-- faq_expand
+        +-- scroll_75
+        +-- language_toggle
 `
 
-### 8.5 Error Envelope
+### 2.4 State Management
 
-`json
-{
-  "error": {
-    "code": "VALIDATION_ERROR | PROVIDER_ERROR | AUTH_ERROR | TIMEOUT | INTERNAL | CLASSIFICATION_ERROR",
-    "message": "string (bahasa aktif)",
-    "details": {}
-  }
-}
+| State | Tipe | Lokasi | Keterangan |
+|---|---|---|---|
+| Scroll position | useScroll | Navbar | Transparent ke solid bg |
+| FAQ expand | Local state | FaqItem | Default collapsed, multi-open |
+| Counter value | useMotionValue | AnimatedCounter | 0 ke target value |
+| Locale | next-intl context | Global | ID/EN toggle |
+| Reduced motion | useReducedMotion | Framer Motion | Respect OS setting |
+
+Tidak ada global state store — landing page = static content + animation state saja.
+
+---
+
+## 3. Spesifikasi Fungsional Detail
+
+### 3.1 F-01 Navbar (FR-LP-01)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Position | Sticky top-0 z-50 |
+| Bg | Transparent -> solid (bg-background/80 backdrop-blur) setelah scroll 50px |
+| Layout | Logo kiri + Nav tengah (Fitur, Cara Kerja, FAQ) + Language Toggle + CTA kanan |
+| Logo | Text PromptFlow styling violet. Link ke #top |
+| Nav links | Smooth scroll ke #features, #how-it-works, #faq |
+| Language toggle | next-intl switchLocale. Preserve scroll position |
+| CTA | Mulai Gratis -> /register. Filled violet button |
+| Mobile | Hamburger menu (slide-in). Logo + CTA visible |
+| i18n keys | landing.nav.features, landing.nav.howItWorks, landing.nav.faq, landing.nav.cta |
+| a11y | Focus ring visible, aria-label hamburger, keyboard nav |
+
+### 3.2 F-02 Hero (FR-LP-02)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Layout | 2 kolom desktop (60% text, 40% mockup). Stack center mobile |
+| Headline | text-5xl md:text-6xl weight-800. Satu judul ke paket prompt animasi siap pakai |
+| Subheadline | text-lg md:text-xl muted-foreground. 3 value props |
+| CTA Primary | Mulai Gratis -> /register. Filled violet size-lg |
+| CTA Secondary | Lihat Demo atau Masuk -> /login. Outline variant |
+| Product visual | BrowserMockup component (text-based generate flow mockup) |
+| Bg | Gradient violet subtle + animated gradient shift |
+| Animation | Fade-in + slide-up stagger (Framer Motion) |
+| i18n keys | landing.heroTitle, landing.heroSubtitle, landing.heroCtaPrimary, landing.heroCtaSecondary |
+
+### 3.3 F-03 Social Proof Bar (FR-LP-03)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Position | Langsung setelah hero. Max-height 200px |
+| Content | Dipercaya 100+ kreator AI + 5-6 logo placeholder + rating stars |
+| Logo | SVG/text, grayscale 60%, hover full color + scale 1.02 |
+| Counter | AnimatedCounter: 0 ke 100+ (Framer Motion) |
+| i18n keys | landing.socialProof.headline, landing.socialProof.subheadline |
+
+### 3.4 F-04 Problem / Solution (FR-LP-04)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Layout | 2 kolom desktop, stack mobile |
+| Pain points (kiri) | 3 item: icon + judul + deskripsi. Bg red/amber subtle |
+| Solutions (kanan) | 3 item: icon + judul + deskripsi. Bg violet subtle |
+| Mapping | Pain 1 -> Solution 1, Pain 2 -> Solution 2, Pain 3 -> Solution 3 |
+| Animation | Stagger fade-in |
+| i18n keys | landing.problemSolution.problem1Title/Desc, solution1Title/Desc (3 pasang) |
+
+### 3.5 F-05 How It Works (FR-LP-05)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Layout | 3 kolom horizontal + connector arrows desktop. Vertical timeline mobile |
+| Step 1 | Icon + Input + Masukkan judul, durasi, dan gaya |
+| Step 2 | Icon + Generate + AI susun paket prompt lengkap |
+| Step 3 | Icon + Export + Download JSON atau Markdown |
+| Step number | Besar 1/2/3, violet bg |
+| i18n keys | landing.howItWorks.step1Title/Desc, step2, step3 |
+
+### 3.6 F-06 Features Bento Grid (FR-LP-06)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Layout | Bento asymmetric grid. Character Master col-span-2 |
+| 6 Features | (a) Input Minimal (b) Character Master (c) Multi-Provider LLM (d) Export JSON+MD (e) Real-time Logs (f) Upload Referensi |
+| Tiap card | Icon (lucide-react) + judul + 1-2 kalimat |
+| Hover | Scale 1.02 + violet border glow |
+| Animation | Stagger fade-in on viewport |
+| i18n keys | landing.features.title, f1Title/Desc sampai f6Title/Desc |
+
+### 3.7 F-07 Product Demo (FR-LP-07)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Visual | BrowserMockup: chrome wrapper (3 dot traffic light) |
+| Content kiri | Form mockup: judul Petualangan Kiko di Pasar Malam / 60s / 3D |
+| Animation | Typing effect input -> loading bar violet -> result JSON snippet kanan |
+| Loop | 8-10 detik, pause on hover (opsional) |
+| i18n keys | landing.demo.title, landing.demo.inputLabel, landing.demo.outputLabel |
+
+### 3.8 F-08 Testimonials (FR-LP-08)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Layout | 3 kolom desktop, 1 kolom carousel mobile |
+| Tiap card | Avatar placeholder (initials violet circle) + nama + role + quote |
+| Quote | Max 25 kata. Pain ke outcome |
+| Label | Cerita dari beta tester (transparansi placeholder) |
+| Placeholder data | (a) Hemat 3 jam per video. Kreator Solo. (b) Karakter konsisten. Studio Animasi. (c) Murid paham 5 menit. Edukator |
+| i18n keys | landing.testimonials.title, t1Quote/Name/Role (3x) |
+
+### 3.9 F-09 FAQ (FR-LP-09)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Component | shadcn/ui Accordion (Radix) |
+| Items | 5-6 Q&A |
+| Default | Collapsed. Multi-open allowed |
+| Animation | Smooth expand (height auto + opacity). Chevron rotate 90 deg |
+| FAQ items | (a) Provider didukung? (b) Gratis? (c) Konsistensi karakter? (d) Data aman? (e) Mobile? (f) Bahasa? |
+| i18n keys | landing.faq.title, q1-q6 (object question + answer) |
+
+### 3.10 F-10 Final CTA (FR-LP-10)
+
+| Field | Detail |
+|---|---|
+| Tipe | Client Component |
+| Bg | Full-width violet gradient |
+| Content | Headline besar + subheadline + CTA white-on-violet + disclaimer |
+| Copy | Mulai buat paket prompt pertama dalam 60 detik + Tanpa kartu kredit. Tanpa komitmen. |
+| Animation | Fade-in |
+| i18n keys | landing.finalCta.title, subtitle, button, disclaimer |
+
+### 3.11 F-11 Footer (FR-LP-11)
+
+| Field | Detail |
+|---|---|
+| Tipe | Server Component |
+| Layout | 4 kolom desktop, 2 kolom tablet, 1 kolom mobile |
+| Content | Brand + Product links + Legal links + Social icons (GitHub, Twitter/X) |
+| Bg | Dark muted. Border-top subtle |
+| Copyright | 2026 PromptFlow |
+| i18n keys | landing.footer.tagline, copyright, productLinks, legalLinks, social.github, social.twitter |
+
+### 3.12 F-12 Animations (Cross-cutting)
+
+| Pattern | Implementasi | Sitasi |
+|---|---|---|
+| Fade-in scroll | whileInView opacity 1 y 0 + initial opacity 0 y 20 + viewport once true | RAG-CONTEXT S7.2 |
+| Stagger children | Parent variants + transition staggerChildren 0.1 | RAG-CONTEXT S7.2 |
+| Hover scale | whileHover scale 1.02 + whileTap scale 0.98 | RAG-CONTEXT S7.2 |
+| Gradient shift | CSS keyframes gradient + background-size 200% + animation 8s ease infinite | RAG-CONTEXT S7.2 |
+| Counter | useMotionValue + useTransform + animate 0 ke target | RAG-CONTEXT S7.2 |
+| Typing effect | Framer Motion word-by-word atau CSS steps keyframes | RAG-CONTEXT S7.2 |
+| Smooth scroll | scroll-behavior smooth CSS + scrollIntoView smooth | PRD S7.6 |
+
+**Performance rules:**
+- GPU-accelerated only: transform, opacity. No width, height, top.
+- Respect prefers-reduced-motion (sudah ada globals.css:74-80).
+- No layout shift (CLS <= 0.1).
+
+### 3.13 F-13 Dark Mode Default (Cross-cutting)
+
+| Token | Nilai | Sitasi |
+|---|---|---|
+| --background | #0a0a0a | globals.css:50 |
+| --foreground | #fafafa | globals.css:51 |
+| --primary | #a78bfa | globals.css:56 |
+| --accent | #3b0764 | globals.css:62 |
+
+Force dark via class="dark" di html root. Light mode = OOS V2 (COULD F-17).
+
+### 3.14 F-14 SEO Meta Tags (Cross-cutting)
+
+| Field | Value | Sitasi |
+|---|---|---|
+| Title | PromptFlow — Workflow Otomasi Prompt Animasi AI (<= 60 char) | PRD S7.3 |
+| Description | <= 160 char + CTA | PRD S7.3 |
+| OG Image | public/og/og-image.jpg 1200x630 | BRD SCOPE-14 |
+| Canonical | Per locale | Best practice |
+| Hreflang | Alternate id + en | Best practice |
+
+### 3.15 F-15 Analytics (Cross-cutting)
+
+| Event | Trigger | Sitasi |
+|---|---|---|
+| cta_hero_click | Klik CTA di hero | PRD AC-14 |
+| cta_final_click | Klik CTA di final section | PRD AC-14 |
+| faq_expand | Expand FAQ item | PRD AC-14 |
+| scroll_75 | Scroll >= 75% halaman | PRD AC-14 |
+| language_toggle | Toggle bahasa ID/EN | PRD AC-14 |
+
+Tidak ada PII dikumpulkan (NFR-S04).
+
+---
+
+## 4. Data Model
+
+### 4.1 Form Schema
+
+Landing page = tidak ada form submission. CTA mengarah ke /register (sudah ada). Tidak ada data model untuk form.
+
+### 4.2 Analytics Event Schema
+
+`	ypescript
+// src/lib/analytics/events.ts
+type LandingEvent =
+  | { name: 'cta_hero_click'; properties: { locale: string } }
+  | { name: 'cta_final_click'; properties: { locale: string } }
+  | { name: 'faq_expand'; properties: { locale: string; faqIndex: number } }
+  | { name: 'scroll_75'; properties: { locale: string } }
+  | { name: 'language_toggle'; properties: { from: string; to: string } };
 `
 
-HTTP status: 200/201 (ok), 204 (delete), 400 (validation), 401 (auth), 403 (ownership), 404 (not found), 429 (rate limit), 500 (internal), 502/504 (provider timeout).
+### 4.3 Section Config (Static)
+
+`	ypescript
+// src/lib/landing/sections.ts
+export const SECTIONS = [
+  { id: 'features', labelKey: 'landing.nav.features' },
+  { id: 'how-it-works', labelKey: 'landing.nav.howItWorks' },
+  { id: 'faq', labelKey: 'landing.nav.faq' },
+] as const;
+`
+
+### 4.4 Feature Card Data (Static)
+
+`	ypescript
+// src/lib/landing/features.ts
+export const FEATURES = [
+  { key: 'f1', icon: 'Sparkles', colSpan: 1 },
+  { key: 'f2', icon: 'Brain', colSpan: 2 },  // Character Master — prominent
+  { key: 'f3', icon: 'Layers', colSpan: 1 },
+  { key: 'f4', icon: 'Download', colSpan: 1 },
+  { key: 'f5', icon: 'Activity', colSpan: 1 },
+  { key: 'f6', icon: 'Upload', colSpan: 1 },
+] as const;
+`
+
+---
+
+## 5. Interface / API / Integrasi
+
+### 5.1 Form Submission
+
+Tidak ada form submission di landing page. CTA Mulai Gratis navigasi ke /register (route sudah ada). Tidak perlu endpoint baru.
+
+### 5.2 Analytics Integration
+
+| Service | Package | Setup | Sitasi |
+|---|---|---|---|
+| Vercel Analytics | @vercel/analytics | Install + tambah Analytics di src/app/layout.tsx | BRD SCOPE-15 |
+
+`	sx
+// src/app/layout.tsx — tambah
+import { Analytics } from '@vercel/analytics/react';
+// di dalam body:
+<Analytics />
+`
+
+### 5.3 i18n Integration
+
+| Service | Package | Setup | Sitasi |
+|---|---|---|---|
+| next-intl | next-intl ^3.26.0 | Sudah wired. Expand namespace landing.* | package.json:50 |
+
+### 5.4 External Links
+
+| Link | Target | Keterangan |
+|---|---|---|
+| CTA Primary | /register | Sign-up page (sudah ada) |
+| CTA Secondary | /login | Login page (sudah ada) |
+| GitHub | https://github.com/agrianwahab29/promptflow.git | Footer social link |
+| Twitter/X | Placeholder URL | Footer social link |
+
+### 5.5 Backend Endpoints
+
+Tidak ada backend endpoint baru. Landing page = frontend only. Semua data statis dari i18n + hardcoded config.
+
+---
+
+## 6. File Format & Path
+
+### 6.1 File yang HARUS Dibuat Baru
+
+| # | Path | Tipe | Deskripsi |
+|---|---|---|---|
+| 1 | src/components/landing/navbar.tsx | Client | Navbar sticky + scroll |
+| 2 | src/components/landing/hero.tsx | Client | Hero + FM entrance |
+| 3 | src/components/landing/social-proof-bar.tsx | Client | Logo row + counter |
+| 4 | src/components/landing/problem-solution.tsx | Client | 2 kolom pain/solution |
+| 5 | src/components/landing/how-it-works.tsx | Client | 3 step connector |
+| 6 | src/components/landing/features-bento.tsx | Client | Bento grid 6 card |
+| 7 | src/components/landing/product-demo.tsx | Client | Browser mockup animated |
+| 8 | src/components/landing/testimonials.tsx | Client | 3 card grid |
+| 9 | src/components/landing/faq.tsx | Client | Accordion |
+| 10 | src/components/landing/final-cta.tsx | Client | Gradient section |
+| 11 | src/components/landing/footer.tsx | Server | Footer minimal |
+| 12 | src/components/landing/section-wrapper.tsx | Client | Reusable FM wrapper |
+| 13 | src/components/landing/animated-counter.tsx | Client | Counter FM |
+| 14 | src/components/landing/browser-mockup.tsx | Client | Browser chrome frame |
+| 15 | src/components/landing/feature-card.tsx | Client | 1 feature card |
+| 16 | src/components/landing/testimonial-card.tsx | Client | 1 testimonial card |
+| 17 | src/components/landing/faq-item.tsx | Client | 1 accordion item |
+| 18 | src/components/landing/logo-placeholder.tsx | Server | SVG/text logo |
+| 19 | src/lib/landing/sections.ts | Module | Section IDs |
+| 20 | src/lib/landing/features.ts | Module | Feature config |
+| 21 | src/lib/analytics/events.ts | Module | Event types |
+| 22 | public/og/og-image.jpg | Aset | OG image 1200x630 |
+
+### 6.2 File yang HARUS DI-OVERWRITE
+
+| # | Path | Tipe | Deskripsi |
+|---|---|---|---|
+| 1 | src/app/[locale]/page.tsx | Server | Root landing — OVERWRITE existing 41 baris |
+
+### 6.3 File yang HARUS DI-EXPAND
+
+| # | Path | Tipe | Deskripsi |
+|---|---|---|---|
+| 1 | messages/id.json | JSON | Namespace landing.* di-expand (target 60+ keys) |
+| 2 | messages/en.json | JSON | Namespace landing.* di-expand paralel |
+
+### 6.4 File yang HARUS DI-MODIFY (minimal)
+
+| # | Path | Tipe | Deskripsi |
+|---|---|---|---|
+| 1 | src/app/layout.tsx | Server | Tambah Analytics + Metadata OG |
+
+### 6.5 Aset yang TIDAK ADA (Placeholder)
+
+| Aset | Status | Solusi | Sitasi |
+|---|---|---|---|
+| Logo PromptFlow | TIDAK ADA | Text-based PromptFlow violet styling | BRD OOS-01 |
+| Social proof logos | TIDAK ADA | SVG text brand fiktif | RAG-CONTEXT GAP-03 |
+| Avatar testimonial | TIDAK ADA | Initials dalam lingkaran violet | PRD S7.4 |
+| Product screenshot | TIDAK ADA | Text-based browser mockup | RAG-CONTEXT GAP-05 |
+| OG image | TIDAK ADA | Buat: violet gradient + PromptFlow + tagline 1200x630 | BRD SCOPE-14 |
+
+---
+
+## 7. Tahapan Implementasi
+
+### Fase 1: Setup (Hari 1)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| 1.1 | Install dependencies | pnpm add framer-motion @vercel/analytics | package.json updated |
+| 1.2 | Buat folder structure | src/components/landing/, src/lib/landing/, src/lib/analytics/, public/og/ | Folder exists |
+| 1.3 | Buat reusable components | section-wrapper, animated-counter, browser-mockup, feature-card, testimonial-card, faq-item, logo-placeholder | Component files exist |
+| 1.4 | Buat config files | sections.ts, features.ts, events.ts | Module exports correct |
+| 1.5 | Expand i18n keys | messages/id.json + messages/en.json namespace landing.* (60+ keys) | Keys lengkap ID+EN sinkron |
+
+### Fase 2: Core Sections (Hari 2-3)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| 2.1 | Navbar | Sticky, scroll bg, nav links, language toggle, CTA | Visual + keyboard nav |
+| 2.2 | Hero | Headline + sub + 2 CTA + gradient bg + FM entrance | 10-second rule |
+| 2.3 | Social Proof Bar | Logo row + counter animation | Visible < 200px |
+| 2.4 | Problem / Solution | 2 kolom pain/solution + stagger | 3 pain + 3 solution |
+| 2.5 | How It Works | 3 step + connector + mobile timeline | 3 step visible |
+| 2.6 | Features Bento | Bento grid 6 card + hover | 6 card, bento layout |
+| 2.7 | Product Demo | Browser mockup + typing animation | Loop 8-10s |
+| 2.8 | Testimonials | 3 card + placeholder data | 3 card visible |
+| 2.9 | FAQ | Accordion 5-6 item | Expand/collapse jalan |
+| 2.10 | Final CTA | Gradient violet + CTA | Visible tanpa scroll |
+| 2.11 | Footer | 4 kolom + social + copyright | Responsive |
+| 2.12 | Overwrite page.tsx | Import semua section, urut sesuai PRD S7.2 | Page render lengkap |
+
+### Fase 3: Polish and Quality (Hari 3-4)
+
+| # | Task | Detail | Verifikasi |
+|---|---|---|---|
+| 3.1 | Dark mode | Force dark, token konsisten | Visual dark mode |
+| 3.2 | SEO meta | Title, description, OG, canonical, hreflang | Metadata valid |
+| 3.3 | Analytics | @vercel/analytics + event tracking | Events fire |
+| 3.4 | OG image | Buat 1200x630 violet gradient | File exists, valid |
+| 3.5 | Mobile responsive | Test 375/768/1024/1440px | No horizontal scroll |
+| 3.6 | Reduced motion | Respect prefers-reduced-motion | Animasi disabled |
+| 3.7 | a11y | Focus ring, keyboard nav, ARIA, contrast | WCAG 2.1 AA |
+| 3.8 | Lint + typecheck | pnpm lint + pnpm typecheck | 0 error |
+| 3.9 | Build | pnpm build | Pass |
+| 3.10 | Lighthouse | Performance mobile >= 85 | Score valid |
+
+---
+
+## 8. Verifikasi & Pengujian
+
+### 8.1 Acceptance Criteria per Section
+
+| Section | AC ID | Kriteria | Status |
+|---|---|---|---|
+| Navbar | AC-01 | Logo kiri, nav tengah, toggle, CTA kanan, sticky, bg transition | WAJIB |
+| Hero | AC-02 | Headline < 3 detik, 2 CTA, mockup, gradient bg, FM entrance | WAJIB |
+| Social Proof | AC-03 | Max 200px, logo grayscale, counter animation | WAJIB |
+| Problem/Solution | AC-04 | 3 pain + 3 solution, icon, stagger | WAJIB |
+| How It Works | AC-05 | 3 step, connector, mobile timeline | WAJIB |
+| Features Bento | AC-06 | 6 card, bento asymmetric, hover scale | WAJIB |
+| Product Demo | AC-07 | Browser chrome, typing, loading, JSON preview | WAJIB |
+| Testimonials | AC-08 | 3 card, placeholder, label transparansi | WAJIB |
+| FAQ | AC-09 | 5-6 Q&A, accordion, multi-open, smooth | WAJIB |
+| Final CTA | AC-10 | Gradient, headline, CTA, disclaimer | WAJIB |
+| Footer | AC-11 | 4 kolom, responsive, social, copyright | WAJIB |
+| Animations | AC-12 | FM installed, fade-in, stagger, hover, gradient, counter, reduced-motion | WAJIB |
+| SEO | AC-13 | Title, description, OG, canonical, hreflang | WAJIB |
+| Analytics | AC-14 | Events tracked, no PII | WAJIB |
+| Quality | AC-15 | Lint 0, typecheck 0, build pass, Lighthouse >= 85 | WAJIB |
+
+### 8.2 Lighthouse Targets
+
+| Metric | Target | Sitasi |
+|---|---|---|
+| Performance (mobile) | >= 85 | BRD KPI-08 |
+| LCP | <= 2.5s | BRD KPI-09 |
+| CLS | <= 0.1 | BRD KPI-10 |
+| TBT | <= 200ms | PRD NFR-P04 |
+| FCP | <= 1.8s | PRD NFR-P07 |
+| Bundle tambahan | <= 50KB gzipped | PRD NFR-P05 |
+
+### 8.3 Accessibility (a11y)
+
+| Kriteria | Target | Sitasi |
+|---|---|---|
+| WCAG compliance | 2.1 AA | AGENTS.md |
+| Kontras teks | >= 4.5:1 body, >= 3:1 large | UIUX_SPEC S9 |
+| Keyboard nav | Semua interactive reachable + focus ring | UIUX_SPEC S9 |
+| Screen reader | Landmark + ARIA labels accordion | UIUX_SPEC S9 |
+| Alt text | Semua image punya alt atau aria-hidden | UIUX_SPEC S9 |
+| Reduced motion | Respect prefers-reduced-motion | RAG-CONTEXT S7.3 |
+| axe-core | 0 critical violation | PRD AC-15 |
+
+### 8.4 Responsive Testing
+
+| Viewport | Width | Target |
+|---|---|---|
+| Mobile | 375px | No horizontal scroll, CTA thumb-zone, text legible |
+| Tablet | 768px | 2 kolom where applicable |
+| Desktop | 1024px | Full layout |
+| Large | 1440px | Max-width constrained |
+
+### 8.5 Quality Gates (PR Merge)
+
+- [ ] pnpm lint 0 error
+- [ ] pnpm typecheck 0 error
+- [ ] pnpm build pass
+- [ ] Lighthouse Performance mobile >= 85
+- [ ] axe-core: 0 critical a11y violation
+- [ ] Tested di 375/768/1024/1440px
+- [ ] Conventional commit feat(landing): ...
+- [ ] PR reviewed + merged (no direct push main)
 
 ---
 
 ## 9. Constraint Teknis
 
-### 9.1 Upload Constraint
+### 9.1 Stack Constraints
 
-| Constraint | Nilai |
-|---|---|
-| Max file size | 10 MB per file |
-| Allowed MIME | image/(png|jpe?g|gif|webp|svg+xml) |
-| Tipe validation | tokoh, background, prop, accessory, environment, other (6 opsi V2) |
-| Storage | Vercel Blob (prod) / local FS public/references/ (dev) |
-| Filename | Sanitized + random UUID suffix, max 60 char base |
-| Max files per upload | ASUMSI 10 files |
-
-### 9.2 Generate Constraint
-
-| Constraint | Nilai |
-|---|---|
-| Runtime | nodejs, maxDuration 600s, force-dynamic |
-| Rate limit | 10 req/min per user |
-| LLM timeout | AbortSignal 240,000ms (4 menit) per call |
-| Max retries | 2 (default) + exponential backoff max 8000ms |
-| LLM max_tokens | 32768 |
-| LLM temperature | 0.7 |
-| Stream mode | Non-streaming di LLM call, SSE streaming dari route ke client |
-
-### 9.3 Auth Constraint
-
-| Constraint | Nilai |
-|---|---|
-| Provider | NextAuth credentials only (email + password) |
-| Session | JWT session strategy |
-| Password | bcryptjs comparison |
-| Protected routes | Semua page + API v1 kecuali auth/health/register |
-| Public paths | login, register, api/auth, api/v1/auth, api/v1/health, _next, favicon, robots |
-
-### 9.4 Validation Constraint
-
-| Schema | Rule |
-|---|---|
-| TitleSchema | min 3, max 200, trim |
-| Duration | shorts max 180s; tutorial 420-900s |
-| Style | enum '3D' \| '2D' |
-| ProviderEnum | 'ollama' \| 'openrouter' \| '9router' \| 'custom' |
-| V2: GenerateReferenceSchema.type | 'tokoh'\|'background'\|'prop'\|'accessory'\|'environment'\|'other' |
-| V2: GenerateInputSchema.storyDescription | z.string().max(500).optional() |
-
-### 9.5 DB Constraint
-
-| Constraint | Nilai |
-|---|---|
-| Dialect | Turso (libSQL via HTTP) |
-| Env | TURSO_DATABASE_URL, TURSO_AUTH_TOKEN (wajib) |
-| Timestamp | Integer unix epoch |
-| PK | Auto-increment id |
-
-### 9.6 Output Format Constraint
-
-| Constraint | Spesifikasi |
-|---|---|
-| Output utama | JSON structured (PromptPackageSchema) |
-| Export markdown | .md download via /api/v1/projects/[id]/export?format=markdown |
-| TIDAK generate media | Output = teks prompt saja |
-| TIDAK TTS | Voiceover = naskah teks |
-
-### 9.7 Vercel Serverless Constraint
-
-| Constraint | Dampak | Mitigasi |
+| ID | Constraint | Sumber |
 |---|---|---|
-| Filesystem tidak persisten | SQLite file lokal hilang | WAJIB Turso remote HTTP |
-| Function timeout | Generate panjang berisiko timeout | Streaming SSE (token < 10s) |
-| Upload gambar di FS lokal | Hilang saat recycle | Vercel Blob untuk prod |
+| TC-01 | Next.js 15 + React 19 + Tailwind v4 + shadcn/ui + next-intl — tidak boleh ubah | AGENTS.md S3, BRD LIM-01 |
+| TC-02 | AI SDK tetap v4 — tidak boleh upgrade v6 | AGENTS.md CRIT-002, BRD LIM-02 |
+| TC-03 | Framer Motion latest stable ^11.x — kompatibel React 19 | PRD A16 |
+| TC-04 | Bundle tambahan <= 50KB gzipped (framer-motion ~30KB + analytics ~5KB) | PRD NFR-P05 |
 
----
+### 9.2 Code Constraints
 
-## 10. Keamanan
-
-### 10.1 Tabel Keamanan
-
-| ID | Requirement | Implementasi |
+| ID | Constraint | Sumber |
 |---|---|---|
-| SEC-01 | API key user dienkripsi saat simpan | AES-256-GCM lib/crypto/aes.ts, env ENCRYPTION_KEY 32 byte base64 |
-| SEC-02 | API key TIDAK expose ke client | Response mask **** + 4 char terakhir |
-| SEC-03 | Provider call server-side only | lib/ai/* + lib/crypto/* wajib import server-only |
-| SEC-04 | 9router localhost hanya server-side | http://localhost:20128/v1 tidak reachable dari client |
-| SEC-05 | CSRF protection | Next.js built-in CSRF + NextAuth CSRF token |
-| SEC-06 | Input sanitization (XSS) | Zod validasi + escape HTML <>"'& |
-| SEC-07 | Ownership check | project.user_id === session.user.id semua operasi |
-| SEC-08 | Env secret management | .env.example tanpa value. Guard if (!env) throw di init |
-| SEC-09 | HTTPS only | Vercel default HTTPS |
-| SEC-10 | Rate limit | 10 req/min/user. Header X-RateLimit-*. 429 bila exceed. |
-| SEC-11 | Auth protected routes | Middleware: /projects, /settings, /generate, /api/v1/* (kecuali auth/health) |
-| SEC-12 | No secret client-side | NEXT_PUBLIC_* hanya non-sensitif. API key = server-only |
-| SEC-13 | No LLM call / decrypt client | lib/ai/* + lib/crypto/* server-only |
-| SEC-14 | Password hash | bcryptjs untuk users.password_hash |
+| TC-05 | TypeScript strict, no any (L06) | AGENTS.md S4 |
+| TC-06 | No hardcoded text — semua via useTranslations('landing') (L09) | AGENTS.md S4 |
+| TC-07 | No secret client-side (L07) | AGENTS.md S4 |
+| TC-08 | No LLM call client-side (L24) | AGENTS.md S4 |
+| TC-09 | Server Component default, Client Component hanya bila butuh interaksi | AGENTS.md S4 |
+| TC-10 | Conventional commit feat(landing): ... atomic | AGENTS.md S4 |
+| TC-11 | No direct push main — via PR + review (L20) | AGENTS.md S4 |
 
-### 10.2 30 Larangan (CODING_RULES S13)
+### 9.3 Design Constraints
 
-L01-L30 wajib dipatuhi. Kunci: L06 (no any), L07 (no hardcoded secret), L12 (no query tanpa user_id), L14 (no string concat SQL), L15 (no dangerouslySetInnerHTML), L16 (no eval), L17 (no process.env.X! tanpa guard), L24 (no LLM call client), L25 (no decrypt client).
-
----
-
-## 11. Performa
-
-| ID | Metrik | Target | V1/V2 |
-|---|---|---|---|
-| NFR-P1 | Latency Shorts | <= 60s end-to-end | V1 |
-| NFR-P2 | Latency Tutorial | <= 180s end-to-end | V1 |
-| NFR-P3 | Streaming partial SSE | Token < 10s | V1 |
-| NFR-P4 | UI response time | < 2s page load | V1 |
-| NFR-P5 | DB query | < 500ms | V1 |
-| NFR-V2-P1 | Page transition | <= 200ms | V2 |
-| NFR-V2-P2 | Dashboard load | <= 1.5s | V2 |
-| NFR-V2-P3 | AI classification latency | <= 5s per gambar | V2 |
-| NFR-V2-P4 | Real-time log latency | <= 100ms server ke UI | V2 |
-
----
-
-## 12. Tahapan Implementasi V2
-
-### Fase A: Core V2 (MUST -- 2-3 hari)
-
-| # | Task | Detail | Verifikasi |
-|---|---|---|---|
-| VA-01 | Git init + .gitignore | git init, .gitignore lengkap, README updated | Repo ter-push ke GitHub |
-| VA-02 | Schema migration V2 | Tambah 3 kolom nullable: projects.story_description, asset_references.ai_classification, generation_logs.logs_json. drizzle-kit generate + push. | Migration sukses, existing data intact |
-| VA-03 | Upload di generate page | Pindahkan DropzoneUploader dari project detail ke generate form. Upload tanpa projectId. Backward compat: project detail view refs. | E2E upload di generate page jalan |
-| VA-04 | Extended role classification | Update GenerateReferenceSchema.type ke 6 opsi. Update DropzoneUploader select. Update upload route validation. | 6 opsi tipe muncul di UI + validasi jalan |
-| VA-05 | Field deskripsi cerita | Tambah storyDescription di GenerateInputSchema. Tambah Textarea di form. Inject ke buildUserMessage(). Simpan di projects.story_description. | E2E: isi deskripsi -> prompt lebih kontekstual |
-| VA-06 | Push ke GitHub | Commit + push ke https://github.com/agrianwahab29/promptflow.git | Repo accessible |
-
-### Fase B: Intelligence (SHOULD -- 3-4 hari)
-
-| # | Task | Detail | Verifikasi |
-|---|---|---|---|
-| VB-01 | AI image classifier | lib/ai/image-classifier.ts. Vision LLM call. Prompt untuk classify role. Parse response. Update asset_references. | Unit test classify round-trip |
-| VB-02 | Classification endpoint | POST /api/v1/upload/classify atau auto-trigger saat upload. | E2E: upload -> auto-classify -> result visible |
-| VB-03 | Classification UI | ClassificationResult component. Thumbnail + role badge + nama + confidence + override dropdown. Fallback ke manual select. | E2E: classify result visible, override jalan |
-| VB-04 | Real-time logs | Extend SSE events: tambah log event type. Backend: buffer logs, kirim via SSE. | E2E: log events muncul di SSE stream |
-| VB-05 | LogViewer component | Collapsible panel + show/hide toggle. Log per stage + timestamp + level badge. Default OFF. | E2E: toggle show/hide jalan |
-
-### Fase C: Dashboard & Polish (SHOULD -- 2-3 hari)
-
-| # | Task | Detail | Verifikasi |
-|---|---|---|---|
-| VC-01 | Dashboard queries | Extend queries: per-provider breakdown, recent 5 projects, weekly trend, storage usage. Refactor ke repository pattern. | Dashboard data lengkap |
-| VC-02 | Dashboard charts | Install Recharts/Tremor. Line chart projects/minggu. Bar chart success vs fail. | Charts render correctly |
-| VC-03 | Dashboard UI | 6-8 metric cards + tables + charts. Load <= 1.5s. | E2E: dashboard load cepat + data benar |
-| VC-04 | loading.tsx | Tambah loading.tsx di: /generate, /projects, /projects/[id], /dashboard, /settings | Skeleton muncul saat loading |
-| VC-05 | error.tsx | Tambah error.tsx per page group: error message + retry + home link | Error boundary jalan |
-| VC-06 | Design tokens | Primary violet #7c3aed, font Inter, spacing 4px, radius 6px. Disabled states. Empty states. | Visual konsisten |
-
-### Fase D: Quality & Deploy (SHOULD -- 2-3 hari)
-
-| # | Task | Detail | Verifikasi |
-|---|---|---|---|
-| VD-01 | Pagination | Projects list: ?page=1&limit=20. UI: page numbers + prev/next. | E2E: pagination jalan |
-| VD-02 | Suspense boundaries | Tambah Suspense di projects list, dashboard, generate page | Streaming SSR jalan |
-| VD-03 | SQA unit test | Jalankan semua test. Coverage >= 80%. Fix failing tests. | pnpm test --coverage >= 80% |
-| VD-04 | SQA E2E test | Critical path: login -> set provider -> upload + classify -> generate -> save -> export | pnpm test:e2e green |
-| VD-05 | Lint + typecheck | pnpm lint 0 error. pnpm typecheck 0 error. | CI gate pass |
-| VD-06 | Performance test | Latency: Shorts <= 60s, Dashboard <= 1.5s, Page transition <= 200ms | Metrics sesuai target |
-| VD-07 | Deploy Vercel | Deploy preview. Set env vars. E2E test di preview URL. | Preview URL jalan |
-
-### Fase Dependency Graph
-
-`
-Fase A (Core) -> Fase B (Intelligence) -> Fase D (Quality)
-                     |
-                     +-> Fase C (Dashboard) -> Fase D (Quality)
-`
-
-Fase A harus selesai dulu (upload flow = foundation untuk classification). Fase B dan C bisa paralel. Fase D = final validation.
-
----
-
-## 13. Verifikasi & Pengujian
-
-### 13.1 Test Strategy
-
-| Level | Tool | Scope | Target |
-|---|---|---|---|
-| Unit | Vitest (co-located) | lib/ai/*, lib/db/repositories/*, lib/crypto/*, lib/validation/*, lib/storage/*, lib/export/* | >= 80% coverage |
-| Integration | Vitest + Turso test DB | API route handlers + repository queries | >= 70% coverage |
-| E2E | Playwright | Critical path: login -> set provider -> upload + classify -> generate -> save -> export | 100% pass |
-| Lint | ESLint (next lint) | src/** | 0 error, 0 warning |
-| Type check | tsc --noEmit | Type safety | 0 error |
-| Build | next build | Production build | Sukses |
-
-### 13.2 Test Case V2 (mapping AC PRD V2)
-
-| AC PRD V2 | Test case | Level |
+| ID | Constraint | Sumber |
 |---|---|---|
-| AC-V2-01 | DropzoneUploader di generate page. Multi-file upload. Backward compat project detail. | E2E |
-| AC-V2-02 | Upload -> Vision LLM classify -> result visible. Manual override. Fallback ke manual. Cache result. | E2E + Unit |
-| AC-V2-03 | 6 opsi tipe: tokoh/background/prop/accessory/environment/other. Zod enum valid. | Unit (Zod) + E2E |
-| AC-V2-04 | Textarea deskripsi cerita. Max 500 char. Inject ke prompt. | Unit + E2E |
-| AC-V2-05 | SSE log events. Collapsible panel. Toggle show/hide. Default OFF. | E2E |
-| AC-V2-06 | Dashboard 6-8 cards + charts + recent + per-provider. Load <= 1.5s. | E2E + Performance |
-| AC-V2-07 | loading.tsx + error.tsx per page group. Disabled states. Design tokens. | Manual + Visual |
-| AC-V2-08 | Coverage >= 80%. E2E green. Lint 0. Typecheck 0. Build pass. | CI |
-| AC-V2-09 | Pagination projects list. Page transition <= 200ms. Suspense. | E2E + Performance |
-| AC-V2-10 | Repo ter-push. .gitignore lengkap. README updated. | Manual |
+| TC-12 | Design tokens dari globals.css — tidak hardcode warna/font | RAG-CONTEXT S4.1 |
+| TC-13 | Primary violet #7c3aed (light) / #a78bfa (dark) konsisten | globals.css:10,56 |
+| TC-14 | Dark mode default (#0a0a0a bg) | globals.css:50 |
+| TC-15 | Font Inter via system-ui — tidak custom font | globals.css:27 |
+| TC-16 | Radius 6px default | globals.css:26 |
+| TC-17 | Spacing base 4px | UIUX_SPEC S2.5 |
+| TC-18 | Respect prefers-reduced-motion | globals.css:74-80 |
 
-### 13.3 Command Verifikasi
+### 9.4 Performance Constraints
 
-`ash
-# Setup
-pnpm install
-
-# Dev
-pnpm dev
-
-# Quality gates
-pnpm lint                          # ESLint -- 0 error
-pnpm typecheck                     # tsc --noEmit -- 0 error
-pnpm test --coverage               # Vitest -- >= 80%
-pnpm test:e2e                      # Playwright -- 100% critical
-pnpm build                         # Next.js build -- sukses
-
-# DB
-pnpm db:generate                   # Generate migration SQL
-pnpm db:push                       # Apply ke Turso
-
-# Deploy
-pnpm deploy                        # Vercel deploy
-`
-
-### 13.4 Definition of Done Teknis
-
-**Fase A DoD:**
-- [ ] Git repo ter-push ke GitHub
-- [ ] Schema migration V2 sukses (3 kolom nullable tambah)
-- [ ] Upload di generate page jalan (multi-file)
-- [ ] 6 opsi role classification jalan
-- [ ] Field deskripsi cerita jalan
-- [ ] pnpm build pass
-- [ ] pnpm lint 0 error
-- [ ] pnpm typecheck 0 error
-
-**Fase B DoD:**
-- [ ] AI image classification jalan (Vision LLM)
-- [ ] Classification UI visible + manual override
-- [ ] Real-time log events di SSE
-- [ ] LogViewer Collapsible jalan
-
-**Fase C DoD:**
-- [ ] Dashboard enrichment: 6-8 cards + charts + tables
-- [ ] Dashboard load <= 1.5s
-- [ ] loading.tsx + error.tsx per page group
-- [ ] Design tokens konsisten
-
-**Fase D DoD:**
-- [ ] Pagination projects list jalan
-- [ ] Coverage >= 80% unit/integration
-- [ ] E2E critical path green
-- [ ] Performance targets terpenuhi
-- [ ] Deploy Vercel preview sukses
-
-**Cross-fase DoD:**
-- [ ] Semua 30 larangan CODING_RULES S13 dipatuhi
-- [ ] Tidak ada any tanpa // eslint-disable + alasan
-- [ ] Tidak ada secret di client-side
-- [ ] Tidak ada LLM call / decrypt di Client Component
-- [ ] Server Component default, Client Component minimal
-- [ ] Conventional commit + PR review
-
----
-
-## 14. Asumsi
-
-| ID | Asumsi | Status | Dampak bila Salah |
+| ID | Constraint | Target | Sumber |
 |---|---|---|---|
-| SRS-V2-A1 | Vision LLM tersedia untuk classification (GPT-4o / Gemini Vision) | Perlu konfirmasi provider | Pipeline V2-3 tidak jalan |
-| SRS-V2-A2 | Deskripsi cerita = optional textarea, max 500 char | Perlu konfirmasi | Schema + form beda |
-| SRS-V2-A3 | Real-time logs = Collapsible panel, default OFF | Perlu konfirmasi UI pattern | Frontend design beda |
-| SRS-V2-A4 | Dashboard = simple cards + tables + charts (Recharts/Tremor) | Perlu konfirmasi complexity | Dependencies + dev time beda |
-| SRS-V2-A5 | Upload di generate page = pre-submit (upload dulu, baru generate) | Perlu konfirmasi flow | UX flow beda |
-| SRS-V2-A6 | Role: tokoh/background/prop/accessory/environment/other (6 opsi) | Perlu konfirmasi opsi | Schema + UI beda |
-| SRS-V2-A7 | Push GitHub = public repo | Perlu konfirmasi visibility | .gitignore beda |
-| SRS-V2-A8 | Deploy target Vercel (masih bisa Laragon untuk dev) | Perlu konfirmasi | Env vars beda |
-| SRS-V2-A9 | AI SDK tetap v4 (tidak upgrade ke v6) | ASUMSI: upgrade = OOS V2 | Bila upgrade, breaking changes |
-| SRS-V2-A10 | Tidak ada schema migration besar (kolom additive only) | ASUMSI | Bila perlu migration, tambah task |
-| SRS-V2-A11 | Classification auto-trigger saat upload (seamless UX) | Perlu konfirmasi | Bila manual trigger, flow beda |
-| SRS-V2-A12 | Batch classify max 5 gambar per call | ASUMSI | Bila beda, API cost beda |
-| SRS-V2-A13 | Confidence threshold 0.7 untuk auto-classify | ASUMSI | Bila beda, UI behavior beda |
-| SRS-V2-A14 | Recharts atau Tremor untuk dashboard charts | Perlu konfirmasi library | Dependencies beda |
-| SRS-V2-A15 | Retry policy LLM = 2 attempts + backoff (existing V1) | Dari kode existing | Bila 3x backoff, update llm-client.ts |
+| TC-19 | Lighthouse Performance mobile | >= 85 | BRD KPI-08 |
+| TC-20 | LCP | <= 2.5s | BRD KPI-09 |
+| TC-21 | CLS | <= 0.1 | BRD KPI-10 |
+| TC-22 | TBT | <= 200ms | PRD NFR-P04 |
+| TC-23 | GPU-accelerated animation only | transform, opacity | RAG-CONTEXT S7.3 |
+| TC-24 | Lazy load below-fold animations | on intersection | RAG-CONTEXT S7.3 |
+
+### 9.5 i18n Constraints
+
+| ID | Constraint | Sumber |
+|---|---|---|
+| TC-25 | Dwibahasa ID (default) + EN paralel | AGENTS.md |
+| TC-26 | Locale routing /{locale}/... | next-intl config |
+| TC-27 | Language toggle preserve scroll position | RAG-CONTEXT S4.5 |
+| TC-28 | CTA kontekstual per bahasa, bukan translate literal | MRD S4.4 |
+
+### 9.6 Asumsi Teknis
+
+| ID | Asumsi | Dampak bila Salah | Sitasi |
+|---|---|---|---|
+| TC-A01 | Produk = animation prompt automation (BUKAN document generation) | Landing page salah describe | RAG-CONTEXT GAP-01 |
+| TC-A02 | Produk gratis (tidak ada pricing) | Butuh pricing section | RAG-CONTEXT GAP-04 |
+| TC-A03 | Social proof = placeholder | Page terasa kosong | RAG-CONTEXT GAP-03 |
+| TC-A04 | Product demo = text-based mockup | Kurang convincing | RAG-CONTEXT GAP-05 |
+| TC-A05 | Primary CTA ke /register | Conversion path valid | BRD RISK-05 |
+| TC-A06 | Logo = text-based PromptFlow violet | Branding cukup | BRD OOS-01 |
+| TC-A07 | Mobile-first responsive | 50%+ traffic mobile | RAG-CONTEXT S5.3 |
+| TC-A08 | Bahasa default ID, toggle EN | Traffic non-ID konversi turun | BRD ASM-B05 |
+| TC-A09 | Dark mode default | Techno-futurist aesthetic | RAG-CONTEXT S6.3 |
+| TC-A10 | Animasi = scroll-triggered fade-in + hover | User mau lebih complex | RAG-CONTEXT S7.2 |
 
 ---
 
-## 15. Referensi
+## Lampiran A — Mapping PRD Feature ke Realisasi Teknis
 
-### 15.1 Dokumen Internal
-
-| Dokumen | Path |
-|---|---|
-| RAG-CONTEXT (sumber kebenaran) | C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md |
-| BRD V2.0 | C:\laragon\www\PromptFlow\product-docs\BRD.md |
-| MRD V2.0 | C:\laragon\www\PromptFlow\product-docs\MRD.md |
-| PRD V2.0 | C:\laragon\www\PromptFlow\product-docs\PRD.md |
-| AGENTS.md | C:\laragon\www\PromptFlow\product-docs\AGENTS.md |
-| GitHub | https://github.com/agrianwahab29/promptflow.git |
-
-### 15.2 Sitasi Eksternal
-
-| Sitasi | Klaim |
-|---|---|
-| https://ai-sdk.dev/providers/openai-compatible-providers | Multi-provider via @ai-sdk/openai-compatible |
-| https://openrouter.ai/docs/api/reference/authentication | Base URL OpenRouter |
-| https://ollama.com/blog/openai-compatibility | Ollama OpenAI-compat |
-| https://docs.turso.tech/sdk/ts/guides/nextjs | Turso + Next.js |
-| https://turso.tech/blog/serverless | Vercel FS tidak persisten -> Turso |
-| https://kling.ai/blog/ai-character-consistency-guide | Konsistensi karakter |
-| https://glibatree.com/proven-consistent-character-method | Metode konsistensi karakter |
+| PRD ID | Section | Komponen | File | Animasi |
+|---|---|---|---|---|
+| F-01 | Navbar | Navbar | navbar.tsx | Scroll bg transition |
+| F-02 | Hero | Hero + BrowserMockup | hero.tsx, browser-mockup.tsx | Fade-in + slide-up stagger |
+| F-03 | Social Proof | SocialProofBar + AnimatedCounter | social-proof-bar.tsx, animated-counter.tsx | Counter animation |
+| F-04 | Problem/Solution | ProblemSolution | problem-solution.tsx | Stagger fade-in |
+| F-05 | How It Works | HowItWorks | how-it-works.tsx | Stagger fade-in |
+| F-06 | Features Bento | FeaturesBento + FeatureCard | features-bento.tsx, feature-card.tsx | Stagger + hover scale |
+| F-07 | Product Demo | ProductDemo + BrowserMockup | product-demo.tsx, browser-mockup.tsx | Typing + loading |
+| F-08 | Testimonials | Testimonials + TestimonialCard | testimonials.tsx, testimonial-card.tsx | Stagger fade-in |
+| F-09 | FAQ | FAQ + FaqItem | faq.tsx, faq-item.tsx | Accordion expand |
+| F-10 | Final CTA | FinalCTA | final-cta.tsx | Fade-in |
+| F-11 | Footer | Footer | footer.tsx | Static |
+| F-12 | Animations | SectionWrapper | section-wrapper.tsx | Cross-cutting |
+| F-13 | Dark Mode | CSS class | globals.css | Token-based |
+| F-14 | SEO | Metadata | layout.tsx | Static |
+| F-15 | Analytics | @vercel/analytics | layout.tsx, events.ts | Event tracking |
 
 ---
 
-> **Dokumen ini = spesifikasi teknis eksekutabel untuk upgrade V2 PromptFlow.**
-> **Tiap fitur PRD V2 punya realisasi teknis di sini. Detail penuh di**
-> **DATABASE_SCHEMA.md, API_CONTRACT.md, PROJECT_ARCHITECTURE.md, CODING_RULES.md.**
-> **SRS tidak membangun deliverable akhir -- hanya spesifikasi.**
+## Lampiran B — i18n Keys Target (60+ keys)
 
-> **Dibuat oleh:** docgen-srs subagent
-> **Tanggal:** 2026-06-20
-> **Versi:** 2.0
+Berikut struktur namespace landing.* yang harus ada di messages/id.json dan messages/en.json:
+
+- nav: features, howItWorks, faq, cta
+- heroTitle, heroSubtitle, heroCtaPrimary, heroCtaSecondary
+- socialProof: headline, subheadline
+- problemSolution: problem1-3Title/Desc, solution1-3Title/Desc (12 keys)
+- howItWorks: step1-3Title/Desc (6 keys)
+- features: title, f1-6Title/Desc (13 keys)
+- demo: title, inputLabel, outputLabel
+- testimonials: title, t1-3Quote/Name/Role (10 keys)
+- faq: title, q1-6 object question+answer (13 keys)
+- finalCta: title, subtitle, button, disclaimer
+- footer: tagline, copyright, productLinks, legalLinks, social
+- seo: title, description, ogAlt
+
+---
+
+> **Dokumen ini = kontrak teknis untuk landing page redesign PromptFlow. Eksekutor baca SRS ini + PRD.md + AGENTS.md + UIUX_SPEC.md sebelum coding. Semua constraint langsung executable. Klaim tanpa bukti = ASUMSI (ditandai di TC-A01..A10).**
+
+**Dibuat oleh:** docgen-srs subagent
+**Tanggal:** 2026-06-20
+**Versi:** 1.0

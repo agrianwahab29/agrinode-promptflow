@@ -9,16 +9,128 @@
     "logout": "Keluar"
   },
   "landing": {
-    "heroTitle": "Satu judul → paket prompt animasi siap pakai",
+    "nav": {
+      "features": "Fitur",
+      "howItWorks": "Cara Kerja",
+      "faq": "FAQ",
+      "cta": "Mulai Gratis",
+      "languageToggle": "EN",
+      "menuOpen": "Buka menu",
+      "menuClose": "Tutup menu",
+      "languageSwitchTo": "English"
+    },
+    "heroTitle": "Satu judul ke paket prompt animasi siap pakai",
     "heroSubtitle": "Karakter konsisten lintas adegan. Multi-provider LLM. Export JSON / Markdown.",
-    "cta": "Mulai Gratis",
-    "loginCta": "Masuk",
-    "feature1Title": "Input Judul",
-    "feature1Desc": "Masukkan judul + durasi + style. Sistem generate paket lengkap.",
-    "feature2Title": "Konsistensi Karakter",
-    "feature2Desc": "Character master terstruktur dirujuk lintas adegan — identitas tetap, adegan bervariasi.",
-    "feature3Title": "Export Siap Pakai",
-    "feature3Desc": "JSON terstruktur + Markdown. Copy ke tool image/video gen favorit."
+    "heroCtaPrimary": "Mulai Gratis",
+    "heroCtaSecondary": "Masuk",
+    "demoPreview": "PromptFlow Dashboard Preview",
+    "socialProof": {
+      "headline": "100+ kreator sudah pakai PromptFlow",
+      "subheadline": "Rating 4.8/5 dari beta tester"
+    },
+    "problemSolution": {
+      "sectionTitle": "Masalah yang Anda hadapi. Solusi yang PromptFlow berikan.",
+      "sectionSubtitle": "Workflow engine yang konsisten, otomatis, dan terorganisir",
+      "problem1Title": "Karakter tidak konsisten",
+      "problem1Desc": "Setiap adegan, karakter berubah wajah, tubuh, dan gaya. Frustasi.",
+      "problem2Title": "Prompt manual berjam-jam",
+      "problem2Desc": "Copy-paste prompt satu per satu. Produktivitas turun drastis.",
+      "problem3Title": "Sulit kolaborasi",
+      "problem3Desc": "Prompt tersimpan di file teks. Tidak ada versi, tidak ada tracking.",
+      "solution1Title": "Character Master",
+      "solution1Desc": "Karakter terstruktur dirujuk otomatis di setiap adegan. Identitas tetap.",
+      "solution2Title": "Generate otomatis",
+      "solution2Desc": "Masukkan judul, durasi, gaya. Sistem generate paket prompt lengkap.",
+      "solution3Title": "Project management",
+      "solution3Desc": "Semua prompt terorganisasi. Versi, status, dan tracking di satu tempat."
+    },
+    "howItWorks": {
+      "sectionTitle": "3 langkah sederhana untuk mulai.",
+      "sectionSubtitle": "Dari judul ke paket prompt dalam hitungan menit",
+      "step1Title": "Masukkan judul",
+      "step1Desc": "Ceritakan ide animasi Anda dalam satu kalimat.",
+      "step2Title": "Konfigurasi",
+      "step2Desc": "Pilih durasi, gaya, dan provider LLM favorit.",
+      "step3Title": "Generate & Export",
+      "step3Desc": "Paket prompt JSON + Markdown siap copy ke tool favorit Anda."
+    },
+    "features": {
+      "title": "Fitur Unggulan",
+      "f1Title": "Input Minimal",
+      "f1Desc": "Masukkan judul + durasi + gaya. Sistem generate paket lengkap.",
+      "f2Title": "Character Master",
+      "f2Desc": "Karakter terstruktur dirujuk lintas adegan — identitas tetap, adegan bervariasi.",
+      "f3Title": "Multi-Provider LLM",
+      "f3Desc": "Pilih Ollama, OpenRouter, 9router, atau custom. Fleksibel biaya dan kualitas.",
+      "f4Title": "Export JSON + Markdown",
+      "f4Desc": "Output terstruktur siap copy ke tool image/video gen favorit.",
+      "f5Title": "Real-time Logs",
+      "f5Desc": "Pantau proses generate. Tahu apa yang AI kerjakan setiap detik.",
+      "f6Title": "Upload Referensi",
+      "f6Desc": "Upload gambar referensi + AI klasifikasi otomatis."
+    },
+    "demo": {
+      "title": "Lihat PromptFlow Beraksi",
+      "inputLabel": "Input",
+      "outputLabel": "Output",
+      "browserUrl": "promptflow.app"
+    },
+    "testimonials": {
+      "title": "Cerita dari Beta Tester",
+      "subtitle": "Cerita dari beta tester",
+      "t1Quote": "Hemat 3 jam per video.",
+      "t1Name": "Rina",
+      "t1Role": "Kreator Solo",
+      "t2Quote": "Akhirnya karakter konsisten lintas adegan.",
+      "t2Name": "Dimas",
+      "t2Role": "Studio Animasi",
+      "t3Quote": "Murid paham dalam 5 menit.",
+      "t3Name": "Sari",
+      "t3Role": "Edukator"
+    },
+    "faq": {
+      "title": "Pertanyaan Umum",
+      "q1Question": "Provider LLM apa saja yang didukung?",
+      "q1Answer": "Ollama, OpenRouter, 9router, dan provider OpenAI-compatible custom. Ganti kapan saja di Settings.",
+      "q2Question": "Apakah PromptFlow gratis?",
+      "q2Answer": "Saat ini gratis untuk semua user. Model pricing future diumumkan via blog dan email.",
+      "q3Question": "Bagaimana konsistensi karakter dijamin?",
+      "q3Answer": "Character master tersimpan terstruktur dan dirujuk otomatis di setiap adegan. Edit master + regenerate scene tertentu.",
+      "q4Question": "Apakah data saya aman?",
+      "q4Answer": "API key dienkripsi AES-256-GCM. Data di Turso DB (encrypted at rest). Tidak pernah kirim ke pihak ketiga.",
+      "q5Question": "Bisa dipakai di mobile?",
+      "q5Answer": "Ya. Landing dan dashboard responsif. Generate optimal di desktop; mobile view + edit hasil.",
+      "q6Question": "Bahasa apa saja yang didukung?",
+      "q6Answer": "Indonesia (default) + English. Lebih banyak bahasa berdasarkan permintaan."
+    },
+    "finalCta": {
+      "title": "Mulai buat paket prompt pertama dalam 60 detik.",
+      "subtitle": "Tanpa kartu kredit. Tanpa komitmen.",
+      "button": "Mulai Gratis",
+      "disclaimer": "Tanpa kartu kredit. Tanpa komitmen."
+    },
+    "footer": {
+      "tagline": "Workflow engine otomasi prompt animasi AI.",
+      "copyright": "© 2026 PromptFlow. All rights reserved.",
+      "productLinks": {
+        "features": "Fitur",
+        "howItWorks": "Cara Kerja",
+        "faq": "FAQ"
+      },
+      "legalLinks": {
+        "privacy": "Kebijakan Privasi",
+        "terms": "Syarat Layanan"
+      },
+      "social": {
+        "twitter": "Twitter",
+        "github": "GitHub"
+      }
+    },
+    "seo": {
+      "title": "PromptFlow — Otomasi Prompt Animasi AI",
+      "description": "Workflow engine untuk menghasilkan paket prompt animasi AI terstruktur. Karakter konsisten. Multi-provider LLM. Export JSON/Markdown.",
+      "ogAlt": "PromptFlow — Workflow Engine Otomasi Prompt Animasi AI"
+    }
   },
   "auth": {
     "loginTitle": "Masuk ke PromptFlow",

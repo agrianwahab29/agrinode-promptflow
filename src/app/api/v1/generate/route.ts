@@ -93,27 +93,45 @@ export async function POST(req: NextRequest) {
         send({ event: 'log', data: entry as unknown as Record<string, unknown> });
       };
 
+      // Helper: send progress + log + small delay for visible stage progression
+      const advance = (stage: string, meta: Record<string, unknown> = {}, logMsg?: string) => {
+        send({ event: 'progress', data: { stage, ...meta } });
+        if (logMsg) emitLog('info', logMsg);
+      };
+      const tick = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
       try {
         send({ event: 'stage', data: { stage: 'starting', projectId: finalProjectId } });
         emitLog('info', `Memulai generate untuk project #${finalProjectId}`);
-        send({ event: 'progress', data: { stage: 'character_profiles', delta: '' } });
+        advance('character_profiles', { delta: '' }, 'Mempersiapkan profil karakter...');
+        await tick(200);
 
         emitLog('info', `Provider: ${cfg.name} (${cfg.model})`);
         console.log('[generate] Mulai LLM call project=%d', finalProjectId);
+        emitLog('info', 'Menghubungi LLM provider...');
         const pkg = await generatePromptPackage({
           provider: { provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, apiKeyEncrypted: cfg.apiKeyEncrypted },
           system: buildSystemPrompt(),
           messages: [{ role: 'user', content: buildUserMessage(inp, references) }],
         });
         console.log('[generate] LLM selesai project=%d scenes=%d chars=%d', finalProjectId, pkg.scenes?.length ?? 0, pkg.character_profiles?.length ?? 0);
+        emitLog('info', `LLM response diterima. ${pkg.character_profiles?.length ?? 0} karakter, ${pkg.scenes?.length ?? 0} scene.`);
 
         const validated = PromptPackageSchema.parse(pkg);
-        send({ event: 'progress', data: { stage: 'scenes', delta: '', count: validated.scenes.length } });
-        send({ event: 'progress', data: { stage: 'image_prompts', delta: '', characters: validated.image_prompts.characters.length, backgrounds: validated.image_prompts.backgrounds.length } });
-        send({ event: 'progress', data: { stage: 'supporting_characters', delta: '', count: validated.supporting_characters.length } });
-        send({ event: 'progress', data: { stage: 'moral_message', delta: validated.moral_message } });
+        emitLog('info', 'Validasi paket prompt berhasil.');
+
+        // Visible stage progression: send + tick between each
+        advance('scenes', { count: validated.scenes.length }, `Menyusun ${validated.scenes.length} scene...`);
+        await tick(300);
+        advance('image_prompts', { characters: validated.image_prompts.characters.length, backgrounds: validated.image_prompts.backgrounds.length }, `Membuat ${validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length} prompt gambar...`);
+        await tick(300);
+        advance('supporting_characters', { count: validated.supporting_characters.length }, validated.supporting_characters.length > 0 ? `Membuat ${validated.supporting_characters.length} karakter pendukung...` : 'Tidak ada karakter pendukung.');
+        await tick(300);
+        advance('moral_message', { delta: validated.moral_message }, 'Menulis pesan moral...');
+        await tick(300);
 
         console.log('[generate] Menyimpan ke DB project=%d', finalProjectId);
+        emitLog('info', 'Menyimpan hasil ke database...');
         await updateProjectResult(finalProjectId, userId, JSON.stringify(validated), 'complete');
         await deleteImagePromptsByProject(finalProjectId);
         await deleteSupportingCharactersByProject(finalProjectId);
@@ -121,6 +139,7 @@ export async function POST(req: NextRequest) {
         await deleteCharactersByProject(finalProjectId);
 
         if (validated.character_profiles.length > 0) {
+          emitLog('info', `Menyimpan ${validated.character_profiles.length} profil karakter...`);
           await bulkCreateCharacters(validated.character_profiles.map((c) => ({
             projectId: finalProjectId,
             nama: c.nama,
@@ -135,6 +154,7 @@ export async function POST(req: NextRequest) {
           })));
         }
         if (validated.scenes.length > 0) {
+          emitLog('info', `Menyimpan ${validated.scenes.length} scene...`);
           await bulkCreateScenes(validated.scenes.map((s) => ({
             projectId: finalProjectId,
             orderNo: s.order,
@@ -143,14 +163,18 @@ export async function POST(req: NextRequest) {
           })));
         }
         if (validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length > 0) {
+          const total = validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length;
+          emitLog('info', `Menyimpan ${total} prompt gambar...`);
           await bulkCreateImagePrompts([
             ...validated.image_prompts.characters.map((p) => ({ projectId: finalProjectId, sceneId: null, tipe: 'tokoh', target: p.target, promptText: p.prompt_text, referenceFilename: p.reference_filename })),
             ...validated.image_prompts.backgrounds.map((p) => ({ projectId: finalProjectId, sceneId: null, tipe: 'background', target: p.target, promptText: p.prompt_text, referenceFilename: p.reference_filename })),
           ]);
         }
         if (validated.supporting_characters.length > 0) {
+          emitLog('info', `Menyimpan ${validated.supporting_characters.length} karakter pendukung...`);
           await bulkCreateSupportingCharacters(validated.supporting_characters.map((s) => ({ projectId: finalProjectId, sceneId: null, nama: s.nama, tipe: s.tipe, aksi: s.aksi })));
         }
+        emitLog('info', 'Semua data tersimpan.');
 
         const warnings = checkConsistency(validated);
         const durationMs = Date.now() - start;

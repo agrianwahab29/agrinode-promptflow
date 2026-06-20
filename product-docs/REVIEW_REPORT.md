@@ -1,336 +1,342 @@
-# REVIEW_REPORT.md — PromptFlow V2
+# REVIEW_REPORT.md — PromptFlow Landing Page Redesign
 
-> **Versi:** 2.0 (OVERWRITE V1)
+> **Versi:** 2.0
 > **Tanggal:** 2026-06-20
 > **Reviewer:** docgen-reviewer subagent
-> **Siklus:** Review siklus ke-1 (review awal V2)
-> **Root proyek:** `C:\laragon\www\PromptFlow`
-> **Docs dir:** `C:\laragon\www\PromptFlow\product-docs`
-> **Cakupan:** Validasi lintas 11 dokumen V2 + RAG-CONTEXT.md
-> **Metode:** Baca semua dokumen + cross-check grounding RAG-CONTEXT + traceability matrix
+> **Siklus:** Review siklus ke-2 (re-review setelah perbaikan)
+> **Root proyek:** C:\laragon\www\PromptFlow
+> **Docs dir:** C:\laragon\www\PromptFlow\product-docs
+> **Cakupan:** Validasi ulang terhadap REVIEW_REPORT.md v1.0 — verifikasi CRIT-001/002/003 sudah diperbaiki + cari temuan baru
+> **Deliverable:** Landing page src/app/[locale]/page.tsx — redesign total
 
 ---
 
 ## 1. Ringkasan Eksekutif
 
-**Status keseluruhan: PASS WITH WARNINGS** — Semua 6 CRITICAL sudah di-fix oleh orchestrator + subagent. 7 WARNING tetap tercatat sebagai catatan. 3 INFO sebagai catatan peningkatan.
+**Status keseluruhan: PASS WITH WARNINGS** — Semua CRITICAL dari siklus 1 sudah di-fix. Build boleh dimulai. 2 WARNING residual (SRS S3.2 + UIUX_SPEC S1.3 masih menyebut "Lihat Demo" sebagai opsi CTA — kosmetik, bukan blocker). 1 INFO catatan.
 
 | Kategori | Jumlah | Status |
 |---|---|---|
-| CRITICAL | 6 | **FIXED** (post-fix verification oleh orchestrator) |
-| WARNING | 7 | Boleh lanjut dengan catatan |
-| INFO | 3 | Catatan peningkatan kualitas |
-| **Total** | **16** | — |
+| CRITICAL | **0** | **SEMUA FIXED** — build boleh mulai |
+| WARNING | 2 | Residual — sebaiknya perbaiki tapi tidak blocker |
+| INFO | 1 | Catatan peningkatan |
+| **Total** | **3** | — |
 
-### Post-fix Verification (dilakukan orchestrator)
+### CRITICAL Open
 
-| CRIT | Fix | Status |
+**0 CRITICAL open.**
+
+| ID lama | Temuan | Status |
 |---|---|---|
-| CRIT-001 | AGENTS.md "greenfield" → "V1 sudah built. V2 = upgrade iteratif." | ✅ FIXED |
-| CRIT-002 | AGENTS.md "AI SDK v6" → "^4.0.0" (ground truth package.json) | ✅ FIXED |
-| CRIT-003 | AGENTS.md "generateObject + 3x" → "direct HTTP + 2x backoff" | ✅ FIXED |
-| CRIT-004 | Dashboard path `/api/v1/dashboard` → `/api/v1/dashboard/stats` di SRS, PRD, PROJECT_ARCH, UIUX_SPEC, CODING_RULES | ✅ FIXED |
-| CRIT-005 | TC-135 (orphan ref attachment) ditambah ke TEST_PLAN | ✅ FIXED |
-| CRIT-006 | Endpoint `/api/v1/auth/session` ditambah ke AGENTS.md | ✅ FIXED |
+| CRIT-001 | Footer type mismatch | **RESOLVED** di siklus 2 |
+| CRIT-002 | Hero secondary CTA label conflict | **RESOLVED** di siklus 2 |
+| CRIT-003 | How It Works icons missing | **RESOLVED** di siklus 2 |
 
-### Ringkasan per dokumen
+### WARNING yang juga ikut ter-fix
 
-| # | Dokumen | Status |
+| ID lama | Temuan | Status |
 |---|---|---|
-| 1 | RAG-CONTEXT.md | PASS |
-| 2 | BRD.md V2 | PASS |
-| 3 | MRD.md V2 | PASS |
-| 4 | PRD.md V2 | PASS |
-| 5 | SRS.md V2 | PASS |
-| 6 | DATABASE_SCHEMA.md V2 | PASS |
-| 7 | PROJECT_ARCHITECTURE.md V2 | PASS |
-| 8 | UIUX_SPEC.md V2 | PASS |
-| 9 | API_CONTRACT.md V2 | PASS |
-| 10 | CODING_RULES.md V2 | PASS |
-| 11 | TEST_PLAN.md V2 | PASS |
-| 12 | AGENTS.md | **FAIL** (V1, belum OVERWRITE V2) |
+| WARN-001 | --muted-foreground dark mode hilang | **RESOLVED** (ada di PROJECT_ARCHITECTURE S9.3) |
+| WARN-005 | PRD A15 secondary CTA destination ambiguous | **RESOLVED** (PRD A15 tegas "Masuk" ke /login) |
 
 ---
 
-## 2. Daftar Dokumen Diperiksa
+## 2. Verifikasi Perbaikan CRITICAL
 
-| Path | Status |
-|---|---|
-| product-docs/RAG-CONTEXT.md | OK |
-| product-docs/BRD.md | OK |
-| product-docs/MRD.md | OK |
-| product-docs/PRD.md | OK |
-| product-docs/SRS.md | OK |
-| product-docs/DATABASE_SCHEMA.md | OK |
-| product-docs/PROJECT_ARCHITECTURE.md | OK |
-| product-docs/UIUX_SPEC.md | OK |
-| product-docs/API_CONTRACT.md | OK |
-| product-docs/CODING_RULES.md | OK |
-| product-docs/TEST_PLAN.md | OK |
-| product-docs/AGENTS.md | OK (V1 existing) |
+### CRIT-001 — Footer type FIXED
 
-Semua 11+V2 doc present. Tidak ada dokumen hilang.
+Bukti perbaikan di file:
+
+| Dokumen | Section | Status |
+|---|---|---|
+| SRS.md S2.1 line 84 | Footer (Server Component — static) | Server |
+| SRS.md S3.11 line 273 | Tipe: Server Component | Server |
+| PROJECT_ARCHITECTURE.md S4.1 line 158 | Footer (Server — static) | Server |
+| PROJECT_ARCHITECTURE.md S6 line 233 | footer.tsx: Server - static footer | Server |
+| UIUX_SPEC.md S3.11 line 333 | Tipe: Server Component | **Server** (was Client) |
+| CODING_RULES.md S17.2 line 1016 | Footer: footer.tsx: Server | Server |
+| PRD.md S7.1 line 540 | footer.tsx: Server Component | Server |
+
+**Verdict:** Footer type sekarang konsisten Server Component di SEMUA 7 dokumen. CRIT-001 RESOLVED.
+
+### CRIT-002 — Hero secondary CTA label FIXED
+
+Bukti perbaikan di file:
+
+| Dokumen | Section | Kutipan sekarang |
+|---|---|---|
+| PRD.md S7.3 line 577 | Hero copy ID | ctaSecondary: Masuk (existing) ke /login |
+| PRD.md S7.3 line 583 | Hero copy EN | ctaSecondary: Sign In ke /login |
+| PRD.md S6 line 403 | Acceptance Criteria Hero | 2 CTA: primary Mulai Gratis ke /register + secondary Masuk ke /login |
+| PRD.md S9 line 695 | PRD-A15 | Secondary CTA "Masuk" ke /login (existing i18n key loginCta) |
+| UIUX_SPEC.md S3.2 line 228 | Hero component | CTA Secondary: "Masuk" ke /login |
+| UIUX_SPEC.md S7.2 line 525 | Wireframe | [Mulai Gratis]  [Masuk] |
+| CODING_RULES.md line 561 | i18n key | heroCtaSecondary: "Masuk" |
+| TEST_PLAN.md line 113 | Test mock | heroCtaSecondary: 'Masuk' |
+| TEST_PLAN.md line 175 | TC-010 | "Masuk" ke /login — Both buttons exist with correct href |
+
+**Verdict:** PRD, UIUX_SPEC, CODING_RULES, TEST_PLAN, dan PRD A15 tegas "Masuk" ke /login. CRIT-002 RESOLVED.
+
+### CRIT-003 — How It Works icons FIXED
+
+Bukti perbaikan di file:
+
+UIUX_SPEC.md S8.1 icon mapping table lines 714-716:
+- How It Works | PenLine | Step 1 Input
+- How It Works | Wand2 | Step 2 Generate
+- How It Works | FileDown | Step 3 Export
+
+Cross-reference:
+- UIUX_SPEC S7.5 wireframe line 576: [PenLine], [Wand2], [FileDown] — match
+- TEST_PLAN TC-025 line 205: PenLine, Wand2, FileDown — match
+- lucide-react ^0.468.0 punya ketiga icon — match
+
+**Verdict:** Icon mapping table S8.1 sekarang lengkap + match dengan wireframe S7.5 + test case TC-25. CRIT-003 RESOLVED.
 
 ---
 
-## 3. Tech Stack Verification (package.json ground truth)
+## 3. Temuan Baru di Siklus 2
 
-| Lapisan | package.json | AGENTS.md | V2 Docs | Match? |
-|---|---|---|---|---|
-| Next.js | ^15.1.0 | ^15.1.0 | ^15.1.0 | YES |
-| React | ^19.0.0 | ^19.0.0 | ^19.0.0 | YES |
-| **AI SDK** | **^4.0.0** | **v6** | **v4** | **NO — CRIT-002** |
-| @ai-sdk/openai-compatible | ^1.0.0 | ^1.0.0 | ^1.0.0 | YES |
-| Zod | ^3.24.0 | ^3.24.0 | ^3.24.0 | YES |
-| next-auth | 5.0.0-beta.25 | 5.0.0-beta.25 | 5.0.0-beta.25 | YES |
-| Drizzle ORM | ^0.38.0 | ^0.38.0 | ^0.38.0 | YES |
-| @vercel/blob | ^0.27.0 | ^0.27.0 | ^0.27.0 | YES |
-| Tailwind | ^4.0.0 | ^4.0.0 | ^4.0.0 | YES |
-| Vitest | ^2.1.0 | ^2.1.0 | ^2.1.0 | YES |
-| Playwright | ^1.49.0 | ^1.49.0 | ^1.49.0 | YES |
-| pnpm | 11.7.0 | 11.7.0 | 11.7.0 | YES |
+### CRITICAL Baru
 
-Tech stack konsisten di SEMUA dokumen V2 KECUALI AGENTS.md (CRIT-002).
+**Tidak ada CRITICAL baru ditemukan.**
+
+Pemeriksaan mencakup: tech stack consistency, design tokens, section order, component file types, i18n key naming, traceability, asumsi, constraint user.
+
+### WARNING Baru
+
+#### WARN-001 (siklus 2) — SRS S3.2 masih menyebut "Lihat Demo atau Masuk"
+
+- **Lokasi:** SRS.md S3.2 line 170
+- **Kutipan:** CTA Secondary | Lihat Demo atau Masuk -> /login. Outline variant
+- **Bukti:** PRD S7.3, UIUX_SPEC S3.2, CODING_RULES, TEST_PLAN semua sudah tegas "Masuk" ke /login. Hanya SRS S3.2 yang masih pakai formulir "atau". "Lihat Demo" = ASUMSI lama yang sudah di-drop.
+- **Dampak:** Developer yang baca SRS sebagai acuan bisa ragu. Tapi karena destination sama-sama /login, implementasi tidak akan salah.
+- **Rekomendasi:** Panggil docgen-srs — ubah SRS S3.2 line 170 dari "Lihat Demo atau Masuk" menjadi "Masuk" (drop "Lihat Demo atau").
+- **Prioritas:** P3
+
+#### WARN-002 (siklus 2) — UIUX_SPEC S1.3 masih sebut "Lihat Demo" sebagai contoh CTA copy
+
+- **Lokasi:** UIUX_SPEC.md S1.3 line 63
+- **Kutipan:** CTA copy | Aksi-oriented: "Mulai Gratis", "Lihat Demo"
+- **Bukti:** UIUX_SPEC S3.2 + S7.2 wireframe sudah authoritative: CTA = "Mulai Gratis" + "Masuk". Baris S1.3 = contoh tone copy umum.
+- **Dampak:** Kosmetik. Tone guide tidak match actual CTA.
+- **Rekomendasi:** Panggil docgen-uiux — ubah UIUX_SPEC S1.3 line 63 dari "Lihat Demo" menjadi "Masuk".
+- **Prioritas:** P4 (kosmetik)
+
+### INFO Baru
+
+#### INFO-001 (siklus 2) — Project docs secara keseluruhan sudah konsisten untuk build landing page
+
+- **Lokasi:** Keseluruhan paket dokumen landing page
+- **Deskripsi:** Semua 12 dokumen sudah align. Tech stack konsisten, design tokens match, traceability 100%. Asumsi + constraint terdokumentasi. Build boleh mulai.
 
 ---
 
-## 4. Traceability Matrix — FR V2
+## 4. Daftar Dokumen Diperiksa (Siklus 2)
 
-| FR V2 | PRD | SRS | DB | API | Test | Status |
+| # | Path | Status | Catatan |
+|---|---|---|---|
+| 1 | product-docs/RAG-CONTEXT.md | OK | Sumber kebenaran faktual |
+| 2 | product-docs/BRD.md | OK | V1.0 Landing Page |
+| 3 | product-docs/MRD.md | OK | V1.0 Landing Page |
+| 4 | product-docs/PRD.md | OK | V1.0 — CRIT-002 fix verified |
+| 5 | product-docs/SRS.md | OK | V1.0 — WARN-001 residual di S3.2 |
+| 6 | product-docs/PROJECT_ARCHITECTURE.md | OK | V1.0 — WARN-001 lama fix (S9.3 dark mode) |
+| 7 | product-docs/UIUX_SPEC.md | OK | V1.0 — CRIT-001 + CRIT-003 fix verified |
+| 8 | product-docs/CODING_RULES.md | OK | V1.0 Landing Page Focus |
+| 9 | product-docs/TEST_PLAN.md | OK | V1.0 Landing Page Focus |
+| 10 | product-docs/DATABASE_SCHEMA.md | OK | V2.0 Web app — beda scope |
+| 11 | product-docs/API_CONTRACT.md | OK | V2.0 Web app — beda scope |
+| 12 | product-docs/AGENTS.md | OK | V2.0 — panduan build V2 web app |
+
+---
+
+## 5. Tech Stack Verification (Final, Siklus 2)
+
+| Lapisan | RAG-CONTEXT | SRS S1 | ARCH | CODING_RULES | UIUX_SPEC | Match? |
 |---|---|---|---|---|---|---|
-| FR-V2-01 Image ref di generate page | FR-V2-01 | S6.1 | asset_refs | upload (projectId opsional) | TC-118, TC-V2-069 | PASS |
-| FR-V2-02 AI image classification | FR-V2-02 | S6.2 | ai_classification col | upload/classify (NEW) | TC-102..105, TC-121..124 | PASS |
-| FR-V2-03 Extended role 6 opsi | FR-V2-03 + S8.3 | S6.3 + S9.4 | (Zod only) | Zod enum | TC-090..091, TC-119..120 | PASS |
-| FR-V2-04 Deskripsi cerita | FR-V2-04 | S6.4 | projects.story_description | projects +storyDescription | TC-087..089, TC-125..126 | PASS |
-| FR-V2-05 Real-time logs | FR-V2-05 | S6.5 | gen_logs.logs_json | generate SSE log event | TC-106..108, TC-134 | PASS |
-| FR-V2-06 Dashboard enrichment | FR-V2-06 | S6.6 | (no migration) | dashboard/stats (NEW) | TC-114..116, TC-131..133 | **WARN-007** path |
-| FR-V2-07 Konsistensi UI | FR-V2-07 | S6.7 | (frontend) | n/a | TC-V2-084..085 | PASS |
-| FR-V2-08 SQA testing | FR-V2-08 | S13.1 | n/a | n/a | TC-076..086 | PASS |
-| FR-V2-09 Navigation optimization | FR-V2-09 | S6.9 | (no migration) | projects?page=&limit= | TC-117, TC-128..130 | PASS |
-| FR-V2-10 Push ke GitHub | FR-V2-10 | S6.10 | (deployment) | n/a | TC-V2-099 | PASS |
+| Framework | Next.js 15 | ^15.1.0 | Next.js 15 | Next.js 15 | Next.js 15 | YES |
+| UI Library | React 19 | ^19.0.0 | React 19 | React 19 | React 19 | YES |
+| Styling | Tailwind v4 | ^4.0.0 | Tailwind v4 | Tailwind v4 | Tailwind v4 | YES |
+| UI Components | shadcn/ui | Radix ^1.1.0 | shadcn/ui | shadcn/ui | shadcn/ui | YES |
+| i18n | next-intl ^3.26.0 | ^3.26.0 | next-intl | ^3.26.0 | ^3.26.0 | YES |
+| Animation | framer-motion | ^11.x | framer-motion | ^11.x | ^11.x | YES |
+| Icons | lucide-react | ^0.468.0 | lucide-react | lucide-react | ^0.468.0 | YES |
+| Analytics | @vercel/analytics | latest | @vercel/analytics | @vercel/analytics | — | YES |
+| TypeScript | ^5.7.0 | ^5.7.0 | strict | strict | — | YES |
+| Package Mgr | pnpm 11.7.0 | 11.7.0 | pnpm | pnpm 11.7.0 | — | YES |
 
-Orphan attachment flow (FR-V2-01): ada di PRD + PROJECT_ARCH sequence diagram, TAPI tidak ada test case eksplisit → **CRIT-005**.
-
----
-
-## 5. Daftar Temuan
-
-### CRITICAL Findings
-
-#### CRIT-001 — AGENTS.md klaim proyek "greenfield" padahal V1 sudah built
-
-- **Lokasi:** AGENTS.md baris "Status kode = **Greenfield** — belum ada kode/schema/aset. Init dari nol."
-- **Bukti:** RAG-CONTEXT.md: "Proyek sudah bukan greenfield. Kode V1 sudah terbangun lengkap dengan 9 tabel DB, auth NextAuth, upload Vercel Blob, generate SSE streaming, export JSON/markdown, i18n dwibahasa, 21 endpoint API."
-- **Dampak:** Agent eksekutor akan overwrite atau init dari nol, kehilangan V1 codebase.
-- **Rekomendasi:** Panggil docgen-agentsmd → update "Status kode" jadi "V1 sudah built & berjalan. V2 = upgrade iteratif."
-- **Prioritas:** P0
-
-#### CRIT-002 — AGENTS.md klaim "AI SDK v6" padahal package.json v4
-
-- **Lokasi:** AGENTS.md §3 Tabel "AI orchestration" cell "Versi target": "AI SDK v6 (latest stabil)"
-- **Bukti:** RAG-CONTEXT.md §2: package.json:25 = `"ai": "^4.0.0"`. RAG-CONTEXT §2 KETIDAKSESUAIAN VERSI eksplisit menyebut ini.
-- **Dampak:** Agent install AI SDK v6, breaking changes besar. Production pakai v4.
-- **Rekomendasi:** Panggil docgen-agentsmd → update cell jadi "^4.0.0" + catatan "CATATAN: docs V1 sebut v6, kode = v4. Kode = ground truth."
-- **Prioritas:** P0
-
-#### CRIT-003 — AGENTS.md klaim "generateObject + 3x backoff" padahal code direct HTTP + 2 retry
-
-- **Lokasi:** AGENTS.md §7 Konvensi + F1-06 cell "Verifikasi": "generateObject/streamObject + retry 3x backoff"
-- **Bukti:** RAG-CONTEXT §5.2 + §8.7: direct HTTP POST ke /chat/completions, retry 2x default + exponential backoff max 8000ms (llm-client.ts:14,131).
-- **Dampak:** Implementasi ditulis ulang pakai AI SDK, production code stabil pakai direct HTTP.
-- **Rekomendasi:** Panggil docgen-agentsmd → update F1-06 jadi "direct HTTP fetch + retry 2x backoff + Zod validate".
-- **Prioritas:** P0
-
-#### CRIT-004 — Dashboard endpoint path inkonsisten
-
-- **Lokasi:**
-  - SRS §8.2: "GET /api/v1/dashboard"
-  - PRD §9.2: "GET /api/v1/dashboard"
-  - API_CONTRACT §5: "GET /api/v1/dashboard/stats"
-  - PROJECT_ARCHITECTURE §5: file "dashboard/route.ts" → resolves ke "/api/v1/dashboard"
-  - TEST_PLAN §6.2: "GET /api/v1/dashboard/stats"
-- **Dampak:** Implementasi bingung mana path, bisa 404.
-- **Rekomendasi:** Panggil docgen-api-spec → pilih "/api/v1/dashboard/stats". Update SRS §8.2 + PRD §9.2. Update PROJECT_ARCHITECTURE §5 folder "dashboard/route.ts" → "dashboard/stats/route.ts".
-- **Prioritas:** P0
-
-#### CRIT-005 — Orphan ref attachment flow tidak ada test case eksplisit
-
-- **Lokasi:** PRD V2 §5 FR-V2-01 + PROJECT_ARCHITECTURE §6 sequence diagram
-- **Bukti:** PRD: "Upload tanpa projectId (dibuat saat submit). Backward compat: project detail view refs." AC-V2-01: "Upload tanpa projectId (dibuat saat submit)."
-- **Dampak:** Bisa bug: orphan refs tetap NULL atau salah attach. V1 project detail tidak show ref baru.
-- **Rekomendasi:** Panggil docgen-test-plan → tambah TC-V2-091a/b/c: verify asset_references.project_id updated dari NULL ke project.id saat generate submit.
-- **Prioritas:** P0
-
-#### CRIT-006 — AGENTS.md missing endpoint /api/v1/auth/session
-
-- **Lokasi:** AGENTS.md §7 Tabel Endpoint API Ringkas
-- **Bukti:** API_CONTRACT §5 #2: "GET /api/v1/auth/session" (Auth, Session). TEST_PLAN TC-053 test endpoint ini.
-- **Dampak:** Frontend tidak bisa get current session. Missing endpoint.
-- **Rekomendasi:** Panggil docgen-agentsmd → tambah row "GET /api/v1/auth/session" di tabel. Update total count.
-- **Prioritas:** P0
+**Tech stack konsisten di SEMUA 6 dokumen. Tidak ada conflict.**
 
 ---
 
-### WARNING Findings
+## 6. Traceability Matrix (Final, Siklus 2)
 
-#### WARN-001 — PROJECT_ARCHITECTURE §1.2 vs CODING_RULES §4.7 retry count
+| PRD ID | Section | SRS Spec | ARCH Component | UIUX Component | Type Match | Test TC | Status |
+|---|---|---|---|---|---|---|---|
+| F-01 | Navbar | S3.1 | navbar.tsx | S3.1 | Client = Client | TC-001..007 | PASS |
+| F-02 | Hero | S3.2 | hero.tsx | S3.2 | Client = Client | TC-008..013 | PASS |
+| F-03 | Social Proof | S3.3 | social-proof-bar.tsx | S3.3 | Client = Client | TC-014..017 | PASS |
+| F-04 | Problem/Solution | S3.4 | problem-solution.tsx | S3.4 | Client = Client | TC-018..021 | PASS |
+| F-05 | How It Works | S3.5 | how-it-works.tsx | S3.5 | Client = Client | TC-022..025 | PASS (icons fixed) |
+| F-06 | Features Bento | S3.6 | features-bento.tsx | S3.6 | Client = Client | TC-026..030 | PASS |
+| F-07 | Product Demo | S3.7 | product-demo.tsx | S3.7 | Client = Client | TC-031..035 | PASS |
+| F-08 | Testimonials | S3.8 | testimonials.tsx | S3.8 | Client = Client | TC-036..039 | PASS |
+| F-09 | FAQ | S3.9 | faq.tsx | S3.9 | Client = Client | TC-040..046 | PASS |
+| F-10 | Final CTA | S3.10 | final-cta.tsx | S3.10 | Client = Client | TC-047..049 | PASS |
+| F-11 | Footer | S3.11 | footer.tsx | S3.11 | **Server = Server** | TC-050..053 | **PASS (fixed)** |
+| F-12 | Animations | S3.12 | section-wrapper.tsx | S10 | Client = Client | TC-054..060 | PASS |
+| F-13 | Dark Mode | S3.13 | CSS class | S2.2 | — | TC-061..063 | PASS |
+| F-14 | SEO Meta | S3.14 | layout.tsx metadata | — | Server | TC-064..067 | PASS |
+| F-15 | Analytics | S3.15 | layout.tsx + events.ts | — | Client | TC-068..072 | PASS |
+| F-16 | Responsive | — | Tailwind breakpoints | S4.3 | — | TC-073..076 | PASS |
+| — | i18n | S9.5 | next-intl config | S11.4 | — | TC-077..080 | PASS |
+| — | Build Quality | S8.5 | — | — | — | TC-081..083 | PASS |
 
-- **Lokasi:** PROJECT_ARCHITECTURE §1.2 vs CODING_RULES §4.7
-- **Deskripsi:** CODING_RULES §4.7 benar: "Retry 2x backoff (dari kode)". PROJECT_ARCHITECTURE §1.2 baris "AI Orkestrasi" kolom "Justifikasi" tidak eksplisit menyebut retry count, tapi ADR-002 tidak mention. Cek aktual: RAG-CONTEXT §5.2 = 2 retries. CODING_RULES §4.7 = "Retry 2x backoff". AGENTS.md §7 = "3x backoff" (CRIT-003).
-- **Dampak:** Minor inkonsistensi.
-- **Rekomendasi:** Panggil docgen-architecture → verify PROJECT_ARCHITECTURE tidak menyebut "3x". Fix CRIT-003 di AGENTS.md.
-- **Prioritas:** P2
-
-#### WARN-002 — PRD §9.2 + SRS §8.2 path dashboard /api/v1/dashboard tanpa /stats
-
-- **Lokasi:** PRD.md §9.2 + SRS.md §8.2
-- **Deskripsi:** Duplikat CRIT-004. Fix CRIT-004 menyelesaikan ini.
-- **Rekomendasi:** Diselesaikan oleh CRIT-004.
-- **Prioritas:** P2
-
-#### WARN-003 — TEST_PLAN §7.11 ringkasan statistik
-
-- **Lokasi:** TEST_PLAN.md §7.11
-- **Deskripsi:** Klaim 86 V1 + 81 V2 = 167 TC. Setelah verify: 81 V2 TC benar (12+10+9+17+2+17+5+9 = 81). Total 167 benar. **RESOLVED saat review.**
-- **Rekomendasi:** Tidak perlu fix.
-- **Prioritas:** RESOLVED
-
-#### WARN-004 — PROJECT_ARCHITECTURE §5 naming repo method
-
-- **Lokasi:** PROJECT_ARCHITECTURE §5 tabel "repositories/"
-- **Deskripsi:** PROJECT_ARCH nyebut "listActiveProjects hardcoded". SRS §6.9 + CODING_RULES §4.6 nyebut "paginate()". API_CONTRACT §4.1 tidak specify method name. Naming inkonsisten.
-- **Dampak:** Agent bingung naming convention.
-- **Rekomendasi:** Panggil docgen-architecture → standardize ke "paginate()".
-- **Prioritas:** P3
-
-#### WARN-005 — RAG-CONTEXT §12 V2-A1 Vision LLM provider belum eksplisit
-
-- **Lokasi:** RAG-CONTEXT §12 + PROJECT_ARCHITECTURE §9.1 + CODING_RULES §14 CR-V2-1
-- **Deskripsi:** PROJECT_ARCH §9.1: "VISION_LLM_PROVIDER = 'openai' | 'google'". RAG-CONTEXT: "Perlu konfirmasi user — provider mana?". Belum eksplisit mana yang dipakai.
-- **Dampak:** Implementasi bingung env config.
-- **Rekomendasi:** Tandai di §7 asumsi perlu konfirmasi. Default: openai (GPT-4o).
-- **Prioritas:** P3
-
-#### WARN-006 — UIUX_SPEC §3.4 vs PROJECT_ARCHITECTURE §5 nama kelas
-
-- **Lokasi:** UIUX_SPEC §3.4 vs PROJECT_ARCHITECTURE §5
-- **Deskripsi:** UIUX_SPEC: "PerProviderBreakdownTable". PROJECT_ARCH: "per-provider-table.tsx" (file name). Penamaan kelas = PascalCase, file = kebab-case (CODING_RULES §2). PROJECT_ARCH §5 tabel tidak capitalize kelas eksplisit.
-- **Dampak:** Minor inkonsistensi naming.
-- **Rekomendasi:** Panggil docgen-architecture → tambah kolom nama kelas React PascalCase di tabel.
-- **Prioritas:** P3
-
-#### WARN-007 — Dashboard endpoint path di SRS/PRD (CRIT-004 duplikat)
-
-- **Lokasi:** SRS §8.2 + PRD §9.2
-- **Deskripsi:** Duplikat CRIT-004. Sudah tercakup.
-- **Rekomendasi:** Diselesaikan oleh CRIT-004.
-- **Prioritas:** RESOLVED
+**Traceability rate: 100%** (18/18 PASS — sebelumnya 17/18, sekarang F-11 sudah match).
 
 ---
 
-### INFO Findings
+## 7. Konsistensi Design Tokens (Re-verify)
 
-#### INFO-001 — BRD stack ringkas tidak sebut tech detail (by design)
+| Token | UIUX_SPEC S2 | ARCH S9.3 | RAG-CONTEXT S4.1 | globals.css | Match? |
+|---|---|---|---|---|---|
+| --primary (light) | #7c3aed | #7c3aed | #7c3aed | #7c3aed | YES |
+| --primary (dark) | #a78bfa | #a78bfa | #a78bfa | #a78bfa | YES |
+| --background (light) | #ffffff | #ffffff | #ffffff | #ffffff | YES |
+| --background (dark) | #0a0a0a | #0a0a0a | #0a0a0a | #0a0a0a | YES |
+| --foreground (light) | #0a0a0a | #0a0a0a | #0a0a0a | #0a0a0a | YES |
+| --foreground (dark) | #fafafa | #fafafa | — | — | YES |
+| --accent (light) | #ede9fe | #ede9fe | #ede9fe | #ede9fe | YES |
+| --accent (dark) | #3b0764 | #3b0764 | #3b0764 | #3b0764 | YES |
+| --muted-foreground (light) | #71717a | #71717a | #71717a | #71717a | YES |
+| --muted-foreground (dark) | #a1a1aa | #a1a1aa | — | #a1a1aa | YES (fixed) |
+| --border | #e4e4e7 | #e4e4e7 | #e4e4e7 | #e4e4e7 | YES |
+| --radius | 6px | 6px | 6px | 6px | YES |
+| Font | Inter, system-ui | Inter, system-ui | Inter | Inter | YES |
+| Mono | JetBrains Mono | JetBrains Mono | JetBrains Mono | JetBrains Mono | YES |
 
-- **Lokasi:** BRD.md §1
-- **Deskripsi:** BRD = nilai bisnis. Detail teknis di SRS §5. Tidak perlu fix.
-
-#### INFO-002 — MRD §2.2 Market Size = ASUMSI (TIDAK ADA BUKTI data kuantitatif)
-
-- **Lokasi:** MRD.md §2.2
-- **Deskripsi:** MRD eksplisit tandai sizing pasar ASUMSI. Best practice. Tidak perlu fix.
-
-#### INFO-003 — PROJECT_ARCHITECTURE §13 ADR hanya 7 ADR
-
-- **Lokasi:** PROJECT_ARCHITECTURE.md §13
-- **Deskripsi:** 7 ADR cukup untuk V2 scope. Bisa tambah di fase berikutnya.
+**WARN-001 lama juga RESOLVED** — --muted-foreground dark = #a1a1aa ada di PROJECT_ARCHITECTURE S9.3 line 405.
 
 ---
 
-## 6. Hasil Grounding RAG
+## 8. Hasil Grounding RAG (Re-verify Siklus 2)
 
-| Klaim V2 | Sumber RAG | Status |
+| Klaim Utama | Sumber RAG | Status |
 |---|---|---|
-| V1 sudah built, 9 tabel, 21 endpoint | RAG-CONTEXT §1 | OK |
-| AI SDK v4 (bukan v6) | RAG-CONTEXT §2 + KETIDAKSESUAIAN VERSI | OK di V2 docs, GAGAL di AGENTS.md |
-| V2-1..V2-10 fitur | RAG-CONTEXT §9 | OK |
-| Vision LLM direct HTTP | RAG-CONTEXT §10 B | OK di V2 docs, GAGAL di AGENTS.md |
-| Rate limit 10/min | RAG-CONTEXT §5.2 + §9 | OK |
-| Retry 2x + backoff | RAG-CONTEXT §5.2 + llm-client.ts | OK di V2 docs, GAGAL di AGENTS.md |
-| Schema additive nullable 3 kolom | RAG-CONTEXT §9 V2-3,4,5 + §4 | OK |
-| Push GitHub URL | RAG-CONTEXT §9 V2-10 | OK |
+| Produk = animation prompt automation | RAG S1, GAP-01 | OK |
+| Tech stack: Next.js 15 + React 19 + Tailwind v4 + shadcn/ui + next-intl | RAG S2.1, S2.2 | OK |
+| Design tokens: primary #7c3aed, bg #0a0a0a (dark), Inter font | RAG S4.1 | OK |
+| Framer Motion = standard React animation library | RAG S7.1 | OK |
+| Best practice: 12 section pattern, 10-second rule, 1:1 attention ratio | RAG S5.1, S5.2 | OK |
+| Animasi: fade-in, stagger, hover, gradient, counter | RAG S7.2 | OK |
+| Landing page existing = hero + 3 cards, basic | RAG S3.1 | OK |
+| i18n keys existing: landing.heroTitle, heroSubtitle, cta, loginCta | RAG S3.2 | OK |
+| No animation library terinstall | RAG S1, GAP-06 | OK |
+| Dark mode prefers-reduced-motion sudah ada | RAG S7.3, globals.css:74-80 | OK |
+| Icon library lucide-react ^0.468.0 | RAG S2.1 | OK |
 
-**Ringkasan:** Semua V2 docs grounded ke RAG-CONTEXT. Kegagalan hanya di AGENTS.md (CRIT-001..003).
+**Semua klaim utama bersumber dari RAG-CONTEXT.md dengan sitasi valid. Tidak ada klaim karangan baru.**
 
 ---
 
-## 7. Daftar Asumsi Perlu Konfirmasi User
+## 9. Ringkasan Status Siklus Review
 
-| ID | Asumsi | Status | Dampak bila Salah |
+### Status Siklus
+
+- **Nomor siklus:** 2 (re-review setelah perbaikan)
+- **Tipe:** Re-review — CRITICAL dari siklus 1 diverifikasi fixed
+- **Hasil:** **PASS WITH WARNINGS** — 0 CRITICAL open, 2 WARNING residual, 1 INFO
+- **Verdict:** **Build boleh mulai.** Quality gate terbuka. WARNING residual = kosmetik, bisa diperbaiki paralel dengan build.
+
+### Diff Siklus 1 ke Siklus 2
+
+| Aspek | Siklus 1 | Siklus 2 | Delta |
 |---|---|---|---|
-| V2-A1 | Vision LLM provider = openai/gemini | Perlu konfirmasi | Pipeline V2-3 |
-| V2-A2 | Deskripsi cerita = optional, max 500 | ASUMSI | Schema + form |
-| V2-A3 | Real-time logs = Collapsible, default OFF | ASUMSI | Frontend |
-| V2-A4 | Dashboard = cards + tables + charts | ASUMSI | Dev time |
-| V2-A5 | Upload di generate = pre-submit | ASUMSI | UX flow |
-| V2-A6 | Role = 6 opsi | Dikonfirmasi | — |
-| V2-A7 | Push GitHub = public | ASUMSI | .gitignore |
-| V2-A8 | AI SDK tetap v4 | Dikonfirmasi | — |
-| V2-A9 | Schema additive only | Dikonfirmasi | — |
-| V2-A10 | Vision LLM key dari env | Dikonfirmasi | — |
-| V2-A11 | Auto-trigger classify saat upload | ASUMSI | UX flow |
-| V2-A12 | Batch classify max 5 | ASUMSI | API cost |
-| V2-A13 | Confidence threshold 0.7 | ASUMSI | UI behavior |
-| V2-A14 | Recharts untuk chart | ASUMSI | Bundle |
-| V2-A15 | Retry 2x + backoff 8000ms | Dikonfirmasi kode | — |
-| V2-A16 | Password hash bcryptjs | ASUMSI | — |
-| V2-A17 | Upload max 10MB | ASUMSI | — |
-| V2-A18 | Pagination 20/page max 100 | ASUMSI | — |
+| CRITICAL | 3 open | **0 open** | -3 (semua fix) |
+| WARNING | 5 open | 2 open | -3 (3 fix: WARN-001, WARN-005 + 1 resolved by CRIT fix) |
+| INFO | 3 | 1 | -2 (2 sudah tidak relevan) |
+| Total temuan | 11 | 3 | -8 |
+| Traceability rate | 94% (17/18) | 100% (18/18) | +6% |
+
+### CRITICAL Closed
+
+- **CRIT-001 RESOLVED** — Footer type konsisten Server Component di 7 dokumen
+- **CRIT-002 RESOLVED** — Hero secondary CTA = "Masuk" ke /login (PRD A15 + UIUX S3.2 + CODING_RULES + TEST_PLAN authoritative)
+- **CRIT-003 RESOLVED** — How It Works icons (PenLine/Wand2/FileDown) ada di UIUX_SPEC S8.1 icon table
+
+### WARNING Closed (bonus)
+
+- **WARN-001 RESOLVED** — --muted-foreground dark #a1a1aa ada di PROJECT_ARCHITECTURE S9.3 line 405
+- **WARN-005 RESOLVED** — PRD A15 tegas "Masuk" ke /login
+
+### WARNING Open (residual)
+
+- **WARN-001 (siklus 2)** — SRS S3.2 masih sebut "Lihat Demo atau Masuk" (tekstual residual, tidak membingungkan)
+- **WARN-002 (siklus 2)** — UIUX_SPEC S1.3 line 63 masih sebut "Lihat Demo" sebagai contoh CTA copy (kosmetik)
 
 ---
 
-## 8. Rekomendasi Tindak Lanjut untuk Orchestrator
+## 10. Rekomendasi Tindak Lanjut untuk Orchestrator
 
-### Urutan P0 (CRITICAL — blok build)
+### P0 — TIDAK ADA (semua CRITICAL sudah closed)
 
-1. **CRIT-001** → Panggil `docgen-agentsmd` → fix AGENTS.md "Status kode" dari "Greenfield" ke "V1 sudah built & berjalan. V2 = upgrade iteratif."
-2. **CRIT-002** → Panggil `docgen-agentsmd` → fix AGENTS.md §3 "AI SDK v6" ke "^4.0.0".
-3. **CRIT-003** → Panggil `docgen-agentsmd` → fix AGENTS.md §7 "generateObject + 3x backoff" ke "direct HTTP fetch + 2x backoff".
-4. **CRIT-004** → Panggil `docgen-api-spec` → pilih "/api/v1/dashboard/stats". Update SRS §8.2, PRD §9.2, PROJECT_ARCH §5.
-5. **CRIT-005** → Panggil `docgen-test-plan` → tambah TC-V2-091a/b/c untuk orphan attachment flow.
-6. **CRIT-006** → Panggil `docgen-agentsmd` → tambah row "/api/v1/auth/session" di tabel endpoint.
+### P3 (WARNING residual — boleh fix paralel dengan build)
 
-### Urutan P2-P3 (WARNING)
+1. **WARN-001 (siklus 2)** — Panggil docgen-srs — ubah SRS S3.2 line 170 dari "Lihat Demo atau Masuk ke /login. Outline variant" menjadi "Masuk ke /login. Outline variant". Dokumen: SRS.md S3.2.
 
-7. **WARN-001** → Panggil `docgen-architecture` → verify retry count di PROJECT_ARCH.
-8. **WARN-004** → Panggil `docgen-architecture` → standardize repo method ke "paginate()".
-9. **WARN-005** → Tandai asumsi perlu konfirmasi user. Default: openai (GPT-4o).
-10. **WARN-006** → Panggil `docgen-architecture` → tambah kolom nama kelas PascalCase.
+2. **WARN-002 (siklus 2)** — Panggil docgen-uiux — ubah UIUX_SPEC S1.3 line 63 dari "Aksi-oriented: Mulai Gratis, Lihat Demo" menjadi "Aksi-oriented: Mulai Gratis, Masuk". Dokumen: UIUX_SPEC.md S1.3.
 
-### Subagent yang sudah dipanggil ulang (post-fix)
+### Subagent yang Perlu Dipanggil Ulang
 
-| Subagent | ID Temuan | Dokumen | Status |
+| Subagent | ID Temuan | Dokumen | Bagian |
 |---|---|---|---|
-| docgen-agentsmd | CRIT-001, CRIT-002, CRIT-003, CRIT-006 | AGENTS.md §1, §3, §7 | ✅ FIXED (regenerate AGENTS.md V2) |
-| orchestrator (edit) | CRIT-004 | SRS.md, PRD.md, PROJECT_ARCHITECTURE.md, UIUX_SPEC.md, CODING_RULES.md | ✅ FIXED (path `/api/v1/dashboard/stats` di-apply ke 8 lokasi) |
-| orchestrator (edit) | CRIT-005 | TEST_PLAN.md | ✅ FIXED (TC-135 orphan ref attachment ditambah) |
-| — (SRS V2 sudah benar) | WARN-001, WARN-004, WARN-006 | PROJECT_ARCHITECTURE.md | ⚠️ TIDAK FIX (WARNING, bukan blocker) |
+| docgen-srs | WARN-001 (siklus 2) | SRS.md | S3.2 (Hero CTA spec) |
+| docgen-uiux | WARN-002 (siklus 2) | UIUX_SPEC.md | S1.3 (CTA copy tone) |
+
+**Catatan:** Kedua WARNING tidak memblokir build. Agent eksekutor sudah bisa mulai dari PRD Lampiran B (Definition of Done).
 
 ---
 
-## 9. Status Siklus Review
+## 11. Daftar Asumsi Perlu Konfirmasi User (Carry-over dari Siklus 1)
 
-- **Nomor siklus:** 2 (review awal + post-fix verification)
-- **Tipe:** Re-review (post-fix)
-- **Hasil:** **PASS WITH WARNINGS** — 0 CRITICAL open setelah fix, 7 WARNING tercatat, 3 INFO.
-- **Verdict:** Dokumen V2 lulus gerbang kualitas. Agent eksekutor boleh mulai bangun.
+15 asumsi landing page masih berlaku (LP-A01..LP-A15 di REVIEW_REPORT v1.0 S7). Tidak ada asumsi baru di siklus 2. Asumsi kritis untuk dikonfirmasi sebelum launch:
+
+- **LP-A01**: Produk = animation prompt automation (BUKAN document generation)
+- **LP-A04**: Primary CTA "Mulai Gratis" ke /register
+- **LP-A05**: Secondary CTA "Masuk" ke /login (SUDAH CONFIRMED via PRD/UIUX/CODING_RULES/TEST_PLAN)
+- **LP-A07**: Aesthetic = dark mode techno-futurist
+- **LP-A09**: Social proof = placeholder (user count, testimonial kosong)
 
 ---
 
-> **Dokumen ini = quality gate hasil review lintas 11 dokumen V2.**
-> **0 CRITICAL open, 7 WARNING, 3 INFO (post-fix).**
-> **Status: PASS WITH WARNINGS. Build boleh lanjut.**
+## 12. Status Siklus Review
 
-**Dibuat oleh:** docgen-reviewer subagent (siklus 1) + orchestrator post-fix (siklus 2)
+- **Nomor siklus:** 2 (re-review setelah perbaikan)
+- **Tipe:** Re-review — verifikasi perbaikan CRITICAL dari siklus 1
+- **Hasil:** **PASS WITH WARNINGS** — 0 CRITICAL open
+- **Verdict final:** **Build boleh mulai.** Quality gate terbuka untuk landing page PromptFlow.
+
+---
+
+## 13. Ringkasan untuk Orchestrator
+
+**Status: PASS WITH WARNINGS (build-ready)**
+- **0 CRITICAL open**
+- **2 WARNING residual** (kosmetik, tidak blocker)
+- **1 INFO catatan**
+
+**Subagent yang perlu dipanggil ulang (P3, opsional):**
+1. docgen-srs — WARN-001 (S3.2 "Lihat Demo atau" residual)
+2. docgen-uiux — WARN-002 (S1.3 "Lihat Demo" contoh copy)
+
+**Setelah CRITICAL = 0: build boleh LANJUT tanpa menunggu WARNING fix.**
+
+---
+
+> **Dokumen ini = quality gate review siklus 2 (re-review) untuk landing page PromptFlow.**
+> **0 CRITICAL. 2 WARNING residual (kosmetik). Build BOLEH MULAI.**
+
+**Dibuat oleh:** docgen-reviewer subagent
 **Tanggal:** 2026-06-20
-**Versi:** 2.0 (PASS)
+**Versi:** 2.0

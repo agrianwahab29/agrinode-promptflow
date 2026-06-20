@@ -9,16 +9,128 @@
     "logout": "Log out"
   },
   "landing": {
-    "heroTitle": "One title → ready-to-use animation prompt package",
+    "nav": {
+      "features": "Features",
+      "howItWorks": "How It Works",
+      "faq": "FAQ",
+      "cta": "Get Started",
+      "languageToggle": "ID",
+      "menuOpen": "Open menu",
+      "menuClose": "Close menu",
+      "languageSwitchTo": "Bahasa Indonesia"
+    },
+    "heroTitle": "One title to a ready-to-use animation prompt package",
     "heroSubtitle": "Consistent characters across scenes. Multi-provider LLM. Export JSON / Markdown.",
-    "cta": "Start Free",
-    "loginCta": "Log in",
-    "feature1Title": "Title Input",
-    "feature1Desc": "Enter title + duration + style. The system generates the full package.",
-    "feature2Title": "Character Consistency",
-    "feature2Desc": "Structured character master referenced across scenes — identity stays, scenes vary.",
-    "feature3Title": "Ready-to-Use Export",
-    "feature3Desc": "Structured JSON + Markdown. Copy to your favorite image/video gen tool."
+    "heroCtaPrimary": "Get Started Free",
+    "heroCtaSecondary": "Log In",
+    "demoPreview": "PromptFlow Dashboard Preview",
+    "socialProof": {
+      "headline": "100+ creators already using PromptFlow",
+      "subheadline": "4.8/5 rating from beta testers"
+    },
+    "problemSolution": {
+      "sectionTitle": "The problem you face. The solution PromptFlow provides.",
+      "sectionSubtitle": "A consistent, automated, and organized workflow engine",
+      "problem1Title": "Inconsistent characters",
+      "problem1Desc": "Every scene, characters change face, body, and style. Frustrating.",
+      "problem2Title": "Hours of manual prompting",
+      "problem2Desc": "Copy-paste prompts one by one. Productivity drops drastically.",
+      "problem3Title": "Hard to collaborate",
+      "problem3Desc": "Prompts saved in text files. No versioning, no tracking.",
+      "solution1Title": "Character Master",
+      "solution1Desc": "Structured characters referenced automatically in every scene. Identity stays.",
+      "solution2Title": "Automated generation",
+      "solution2Desc": "Enter title, duration, style. System generates complete prompt package.",
+      "solution3Title": "Project management",
+      "solution3Desc": "All prompts organized. Versioning, status, and tracking in one place."
+    },
+    "howItWorks": {
+      "sectionTitle": "3 simple steps to get started.",
+      "sectionSubtitle": "From title to prompt package in minutes",
+      "step1Title": "Enter a title",
+      "step1Desc": "Describe your animation idea in one sentence.",
+      "step2Title": "Configure",
+      "step2Desc": "Choose duration, style, and your favorite LLM provider.",
+      "step3Title": "Generate & Export",
+      "step3Desc": "JSON + Markdown prompt package ready to copy to your favorite tool."
+    },
+    "features": {
+      "title": "Key Features",
+      "f1Title": "Minimal Input",
+      "f1Desc": "Enter title + duration + style. System generates complete package.",
+      "f2Title": "Character Master",
+      "f2Desc": "Structured characters referenced across scenes — identity stays, scenes vary.",
+      "f3Title": "Multi-Provider LLM",
+      "f3Desc": "Choose Ollama, OpenRouter, 9router, or custom. Flexible cost and quality.",
+      "f4Title": "Export JSON + Markdown",
+      "f4Desc": "Structured output ready to copy to your favorite image/video gen tool.",
+      "f5Title": "Real-time Logs",
+      "f5Desc": "Monitor the generation process. Know what AI does every second.",
+      "f6Title": "Upload References",
+      "f6Desc": "Upload reference images + automatic AI classification."
+    },
+    "demo": {
+      "title": "See PromptFlow In Action",
+      "inputLabel": "Input",
+      "outputLabel": "Output",
+      "browserUrl": "promptflow.app"
+    },
+    "testimonials": {
+      "title": "Stories from Beta Testers",
+      "subtitle": "Stories from beta testers",
+      "t1Quote": "Saved 3 hours per video.",
+      "t1Name": "Rina",
+      "t1Role": "Solo Creator",
+      "t2Quote": "Finally, consistent characters across scenes.",
+      "t2Name": "Dimas",
+      "t2Role": "Animation Studio",
+      "t3Quote": "Students understood in 5 minutes.",
+      "t3Name": "Sari",
+      "t3Role": "Educator"
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "q1Question": "Which LLM providers are supported?",
+      "q1Answer": "Ollama, OpenRouter, 9router, and custom OpenAI-compatible providers. Switch anytime in Settings.",
+      "q2Question": "Is PromptFlow free?",
+      "q2Answer": "Currently free for all users. Future pricing will be announced via blog and email.",
+      "q3Question": "How is character consistency guaranteed?",
+      "q3Answer": "Character master is stored structurally and referenced automatically in every scene. Edit master + regenerate specific scenes.",
+      "q4Question": "Is my data safe?",
+      "q4Answer": "API keys encrypted with AES-256-GCM. Data in Turso DB (encrypted at rest). Never sent to third parties.",
+      "q5Question": "Can I use it on mobile?",
+      "q5Answer": "Yes. Landing and dashboard are responsive. Generation works best on desktop; mobile for viewing + editing results.",
+      "q6Question": "Which languages are supported?",
+      "q6Answer": "Indonesian (default) + English. More languages based on demand."
+    },
+    "finalCta": {
+      "title": "Start creating your first prompt package in 60 seconds.",
+      "subtitle": "No credit card. No commitment.",
+      "button": "Get Started Free",
+      "disclaimer": "No credit card. No commitment."
+    },
+    "footer": {
+      "tagline": "AI animation prompt automation workflow engine.",
+      "copyright": "© 2026 PromptFlow. All rights reserved.",
+      "productLinks": {
+        "features": "Features",
+        "howItWorks": "How It Works",
+        "faq": "FAQ"
+      },
+      "legalLinks": {
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service"
+      },
+      "social": {
+        "twitter": "Twitter",
+        "github": "GitHub"
+      }
+    },
+    "seo": {
+      "title": "PromptFlow — AI Animation Prompt Automation",
+      "description": "Workflow engine for structured AI animation prompt packages. Consistent characters. Multi-provider LLM. Export JSON/Markdown.",
+      "ogAlt": "PromptFlow — AI Animation Prompt Automation Workflow Engine"
+    }
   },
   "auth": {
     "loginTitle": "Log in to PromptFlow",
