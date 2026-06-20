@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/lib/auth/config';
+import { auth } from '@/lib/auth/edge';
 import { routing } from '@/lib/i18n/config';
 
 const PUBLIC_PATHS = [

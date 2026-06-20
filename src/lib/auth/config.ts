@@ -3,15 +3,13 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { findUserByEmail, findUserById } from '@/lib/db/repositories/user.repo';
+import { authConfig } from '@/lib/auth/edge';
 
 const secret = process.env.NEXTAUTH_SECRET;
 if (!secret) throw new Error('Missing NEXTAUTH_SECRET');
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
-  secret,
-  trustHost: true,
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/id/login', error: '/id/login' },
+  ...authConfig,
   providers: [
     Credentials({
       name: 'Credentials',
@@ -37,18 +35,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user?.id) token.userId = Number(user.id);
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && typeof token.userId === 'number') {
-        (session.user as { id?: number }).id = token.userId;
-      }
-      return session;
-    },
-  },
 });
 
 // Augment Session to include user.id (number)
