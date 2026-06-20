@@ -40,7 +40,8 @@ function LoginForm() {
       return;
     }
     toast.success('Login berhasil');
-    const cb = params.get('callbackUrl') ?? `/${locale}/generate`;
+    const raw = params.get('callbackUrl') ?? '';
+    const cb = raw && raw !== '/' ? raw : `/${locale}/generate`;
     router.push(cb);
   }
 

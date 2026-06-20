@@ -52,8 +52,8 @@ export default function RegisterPage() {
         return;
       }
       toast.success('Akun berhasil dibuat');
-      router.push(`/${locale}/generate`);
-      router.refresh();
+      // Use full page reload to ensure session cookie is processed by middleware
+      window.location.href = `/${locale}/generate`;
     } catch (err) {
       setLoading(false);
       setError(err instanceof Error ? err.message : 'Network error');

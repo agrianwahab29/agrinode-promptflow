@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt';
 import { routing } from '@/lib/i18n/config';
 
 const PUBLIC_PATHS = [
+  '/',
   '/login',
   '/register',
   '/api/auth',
@@ -92,7 +93,12 @@ export default async function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     const localizedLogin = localizeUrl('/login');
     url.pathname = localizedLogin;
-    url.searchParams.set('callbackUrl', pathname);
+    // If coming from landing page (/ or /[locale]), send to /generate instead
+    const stripped = stripLocale(pathname);
+    const callbackUrl = (stripped === '/' || stripped === '')
+      ? `/${routing.defaultLocale}/generate`
+      : pathname;
+    url.searchParams.set('callbackUrl', callbackUrl);
     return NextResponse.redirect(url);
   }
 
