@@ -64,6 +64,53 @@ export function renderMarkdown(pkg: PromptPackage): string {
     }
   }
 
+  // V3: Scene Transitions
+  lines.push('## Scene Transitions');
+  lines.push('');
+  for (const s of pkg.scenes) {
+    const dur = s.transition_duration_ms ?? 0;
+    const durLabel = dur === 0 ? 'instant' : `${dur}ms`;
+    lines.push(`- **Scene ${s.order}:** ${s.transition_type} (${durLabel}, ${s.transition_easing}, ${s.transition_direction})`);
+  }
+  lines.push('');
+
+  // V3: Voice Specifications
+  lines.push('## Voice Specifications');
+  lines.push('');
+  for (const s of pkg.scenes) {
+    const spd = s.voice_speed ?? 1.0;
+    lines.push(`- **Scene ${s.order}:** ${s.voice_type} — ${s.voice_emotion}, speed ${spd}x, pitch ${s.voice_pitch}`);
+  }
+  lines.push('');
+
+  // V3: Audio Specifications (from scene-level hints or empty)
+  lines.push('## Audio Specifications');
+  lines.push('');
+  lines.push('_Audio specifications are managed via the audio panel UI._');
+  lines.push('');
+
+  // V3: Image Prompt Layers
+  lines.push('## Image Prompt Layers');
+  lines.push('');
+  for (const s of pkg.scenes) {
+    const allPrompts = [...s.image_prompts.characters, ...s.image_prompts.backgrounds];
+    for (const p of allPrompts) {
+      const layers: string[] = [];
+      if (p.composition) layers.push(`Composition: ${p.composition}`);
+      if (p.lighting) layers.push(`Lighting: ${p.lighting}`);
+      if (p.camera) layers.push(`Camera: ${p.camera}`);
+      if (p.mood_atmosphere) layers.push(`Mood: ${p.mood_atmosphere}`);
+      if (p.style_references) layers.push(`Style: ${p.style_references}`);
+      if (layers.length > 0) {
+        lines.push(`- **Scene ${s.order} — ${p.target}:**`);
+        for (const l of layers) {
+          lines.push(`  - ${l}`);
+        }
+      }
+    }
+  }
+  lines.push('');
+
   lines.push('## Image Prompt Master List');
   lines.push('');
   if (pkg.image_prompts.characters.length > 0) {

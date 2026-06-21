@@ -160,6 +160,17 @@ export async function POST(req: NextRequest) {
             orderNo: s.order,
             description: s.description,
             voiceoverScript: s.voiceover_script,
+            transitionType: s.transition_type,
+            transitionDurationMs: s.transition_duration_ms,
+            transitionEasing: s.transition_easing,
+            transitionDirection: s.transition_direction,
+            voiceType: s.voice_type,
+            voiceEmotion: s.voice_emotion,
+            voiceSpeed: s.voice_speed,
+            voicePitch: s.voice_pitch,
+            durationSeconds: s.duration_seconds ?? null,
+            scenePacing: s.scene_pacing,
+            sceneMood: s.scene_mood ?? null,
           })));
         }
         if (validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length > 0) {
