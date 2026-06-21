@@ -234,6 +234,7 @@
     "layers.camera": "Camera",
     "layers.lighting": "Lighting",
     "layers.color": "Color",
+    "layers.colorPalette": "Color Palette",
     "layers.mood": "Mood",
     "layers.style": "Style",
     "layers.technical": "Technical",

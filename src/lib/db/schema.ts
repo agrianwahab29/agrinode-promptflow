@@ -108,6 +108,8 @@ export const scenes = sqliteTable('scenes', {
   // V3: Pacing & Mood (ASUMSI)
   scenePacing: text('scene_pacing').notNull().default('normal'),
   sceneMood: text('scene_mood'),
+  // V3: Voiceover speaker (who is speaking in this scene)
+  voiceoverSpeaker: text('voiceover_speaker').notNull().default('narrator'),
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_scenes_project_id').on(t.projectId),
@@ -130,6 +132,9 @@ export const imagePrompts = sqliteTable('image_prompts', {
   // V3: Metadata — SRS S4.4, PRD S7.2
   moodAtmosphere: text('mood_atmosphere'),
   styleReferences: text('style_references'),
+  // V3: Additional layers (8-layer completeness)
+  colorPalette: text('color_palette'),
+  technical: text('technical'),
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_image_prompts_project_id').on(t.projectId),

@@ -14,6 +14,8 @@ interface ImagePromptData {
   camera?: string | null;
   moodAtmosphere?: string | null;
   styleReferences?: string | null;
+  colorPalette?: string | null;
+  technical?: string | null;
   referenceFilename?: string | null;
 }
 
@@ -61,11 +63,14 @@ export function ImagePromptDisplay({ prompt }: { prompt: ImagePromptData }) {
           {prompt.styleReferences && (
             <LayerRow label={t('layers.style')} value={prompt.styleReferences} />
           )}
+          {prompt.colorPalette && (
+            <LayerRow label={t('layers.colorPalette')} value={prompt.colorPalette} />
+          )}
           <div className="pt-1">
             <span className="text-xs font-semibold text-muted-foreground">
               {t('layers.technical')}:
             </span>
-            <p className="mt-0.5 font-mono text-xs">{prompt.promptText}</p>
+            <p className="mt-0.5 font-mono text-xs">{prompt.technical ?? prompt.promptText}</p>
           </div>
         </div>
       )}

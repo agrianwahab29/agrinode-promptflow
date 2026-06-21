@@ -1,713 +1,524 @@
-# PRD — Product Requirement Document
-## PromptFlow V3 — Core Feature Expansion
+# Product Requirement Document (PRD)
+## PromptFlow V3 — Animation Brief Engine Update
 
-> **Versi:** 2.0 (V3 Update)
-> **Tanggal:** 2026-06-21
-> **Pemilik:** Product Owner PromptFlow
-> **Deliverable:** 5 fitur inti V3 — Light Theme, Scene Transition Flow Engine, Complex Image Prompts, Voiceover Voice Type Spec, Supporting Audio Spec
-> **Builds on:** V1 (workflow engine, deployed) + V2 (landing page, in production)
-> **Selaras dengan:** BRD.md v2.0 (why) + MRD.md v2.0 (who)
-> **Rujukan:** RAG-CONTEXT.md (fakta, refresh 2026-06-21) + AGENTS.md v1.0 (build V2)
+**Versi:** 3.0
+**Tanggal:** 2026-06-22
+**Status:** Draft
+**Penanggung Jawab:** PromptFlow Product Team
 
 ---
 
-## 1. Ringkasan Produk + Visi
+## 1. Ringkasan Produk & Visi
 
-### 1.1 Produk Saat Ini (V1/V2)
+### 1.1 Apa Itu PromptFlow
 
-**PromptFlow** = web app fullstack otomasi susun paket prompt animasi AI terstruktur (JSON + Markdown) dari input minimal (judul + durasi + gaya). Multi-provider LLM. Konsistensi karakter lintas adegan via character master. V1 deployed (9 tabel DB, 23 endpoint, NextAuth, SSE streaming). V2 landing page konversi-tinggi.
-
-**Tech stack:** Next.js 15 + React 19 + Tailwind CSS v4 + shadcn/ui + Drizzle ORM + Turso/libSQL + Vercel AI SDK v4 + next-intl + Framer Motion. (`RAG-CONTEXT S2.1`)
+PromptFlow adalah web application Next.js 15 yang berfungsi sebagai **AI Animation Brief Engine** — menghasilkan paket prompt animasi terstruktur (scene, transisi, voice, audio, image prompt berlapis) yang siap dikonsumsi oleh AI video generator (Runway, Pika, Kling, Sora). Mendukung multi-LLM provider (Ollama, OpenRouter, 9router, custom) dan di-deploy di Vercel.
 
 ### 1.2 Visi V3
 
-> PromptFlow bergeser dari "AI prompt tool" generik ke **"Production-grade animation prompt engine"** — output siap-pakai untuk downstream AI video tools (Runway, Pika, Kling, Sora), no re-edit needed. (`BRD S3.2`, `MRD S5.2`)
+> Mengubah PromptFlow dari "text prompt generator" menjadi **production-grade animation brief engine** yang menghasilkan paket produksi lengkap — scene, transisi, voice, audio, dan image prompt 8-lapis — dalam satu workflow.
 
-**5 gap yang dijawab V3:**
+### 1.3 Apa yang Baru di V3
 
-| # | Gap | Bukti Kode | Solusi V3 |
-|---|---|---|---|
-| 1 | App force dark — user siang tidak nyaman | `layout.tsx:66` hardcoded `className="dark"` | Light Theme Support |
-| 2 | Scene transition tanpa metadata — video "jarring" | `schema.ts:89-99` tanpa transition fields | Scene Transition Flow Engine |
-| 3 | Image prompt basic 1-baris — output generic | `prompt-builder.ts:35-36` contoh 1 baris | Complex Image Prompts (8 layer) |
-| 4 | Voiceover tanpa voice type — monoton | `schema.ts:94` plain string | Voiceover Voice Type Spec |
-| 5 | Audio ZERO di seluruh codebase | Tidak ada field audio | Supporting Audio Spec |
+V3 memperkenalkan 5 kapabilitas inti + menutup 6 critical data gaps antara LLM output dan database persistence:
 
-(`RAG-CONTEXT S1, S11.1`)
-
-### 1.3 Value Proposition V3
-
-> "Satu judul → paket prompt animasi production-ready. Karakter konsisten, transisi halus, voice variety, audio lengkap, image prompts 8-layer. Multi-provider LLM. Export JSON / Markdown ke Runway, Pika, Kling, Sora." (`MRD S5.2`)
-
-### 1.4 Prinsip Produk
-
-| ID | Prinsip | Manifestasi V3 |
-|---|---|---|
-| P-01 | Minimal input, maximum output | Input = judul + durasi + gaya → output = 12+ field metadata per scene |
-| P-02 | Production-ready output | Transition + voice + audio + image layers = no re-edit |
-| P-03 | Universal UX | Light + dark + system preference = comfortable di mana saja |
-| P-04 | Character consistency | Voice preset per character, transition library, audio template |
-| P-05 | Portable export | JSON + Markdown = universal ke Runway, Pika, Kling, Sora |
-| P-06 | Multi-provider flexibility | Pilih LLM sesuai budget/kualitas |
-| P-07 | Additive migration | V2 project → V3 = auto-migrate, tidak kehilangan data |
-| P-08 | Dwibahasa sinkron | ID + EN paralel untuk semua fitur baru |
+| # | Fitur V3 | Status Implementasi | Gap yang Harus Ditutup |
+|---|----------|--------------------|-----------------------|
+| F1 | Light Theme (dark/light/system) | Kode selesai | Root layout belum wrap Providers untuk landing page |
+| F2 | Scene Transition Flow Engine (6 jenis) | Kode selesai | Flow patterns perlu perbaikan agar tidak "jarring cuts" |
+| F3 | Complex Image Prompts (8-layer) | Kode selesai | `color_palette` + `technical` tidak ada di DB schema |
+| F4 | Voice Type Specification (7 tipe) | Kode selesai | `voiceover_speaker` tidak ada di `scenes` table |
+| F5 | Audio Specification (5 jenis/scene) | Kode selesai | Generate route TIDAK simpan `audio_specs` ke DB |
 
 ---
 
-## 2. Persona + User Story / Job-to-be-Done
+## 2. Persona & User Story
 
-### 2.1 Persona (Selaras MRD S3.1)
+### 2.1 Persona Utama
 
-| ID | Persona | Segmen | Pain V2 (Dijawab V3) | Sitasi |
-|---|---|---|---|---|
-| PERS-01 | Rian (Solo Creator) | Kreator konten pendek AI | Video "kaget", audio diam, voice monoton, dark mode silau | MRD S3.2, BRD S5 |
-| PERS-02 | Bumi Animasi (Indie Studio) | Studio animasi 2-10 orang | Transition tidak konsisten, voice tidak konsisten, tidak ada audio reusable | MRD S3.2, BRD S5 |
-| PERS-03 | Bu Sinta (Edukator) | Tutorial maker | Dark mode silau, suara monoton, tidak ada musik edukatif | MRD S3.2, BRD S5 |
+| Persona | Profil | Job-to-be-Done |
+|---------|--------|----------------|
+| **Andi — Solo YouTuber** | 25 th, konten edukasi, 10K subs, budget Rp 0-100rb/bln | "Saya ingin menghasilkan animation brief lengkap (scene + suara + audio + visual) dalam <5 menit supaya bisa langsung pakai di Runway tanpa bolak-balik ChatGPT." |
+| **Sari — Freelance Animator** | 30 th, terima brief dari klien di Upwork, 50+ proyek | "Saya ingin brief terstruktur dengan spesifikasi suara dan audio yang bisa langsung jadi production spec, supaya klien approve tanpa revisi." |
+| **Budi — Studio Owner** | 35 th, studio 5 orang, klien UMKM & startup | "Saya ingin template preset yang bisa dipakai seluruh tim supaya output konsisten antar animator." |
+| **Dewi — Content Agency PM** | 28 th, 10+ klien, 50+ brief/bulan | "Saya ingin generate animation brief dalam volume tinggi dengan konsistensi terjamin, tanpa tambah headcount." |
+| **Riko — Edukator Animasi** | 40 th, dosen, buat tutorial animasi AI | "Saya ingin contoh brief terstruktur yang bisa didemokan ke mahasiswa dan dibagikan sebagai template." |
 
-### 2.2 User Story per Persona
+### 2.2 User Stories (MoSCoW-categorized)
 
-**Rian (Solo Creator)**
+#### Must Have
 
-| ID | User Story | Acceptance |
-|---|---|---|
-| US-R01 | Generate paket prompt dengan transisi scene otomatis | Setiap scene: 4 field transition |
-| US-R02 | Image prompt terstruktur 8-layer | Prompt: subject + composition + camera + lighting + color + mood + style + technical |
-| US-R03 | Variasi voice type per scene | Setiap scene: voiceType + emotion + speed + pitch |
-| US-R04 | Audio spec per scene | Setiap scene: minimal 1 audio cue |
-| US-R05 | Pakai app di siang hari tanpa silau | Theme toggle light/dark/system, persist localStorage |
-| US-R06 | Export JSON/MD termasuk metadata V3 | Export menyertakan section transition, voice, audio, image layers |
+| ID | Sebagai... | Saya ingin... | Supaya... |
+|----|-----------|---------------|-----------|
+| US-M01 | Solo YouTuber | Generate animation brief dengan 8-layer image prompt per scene | Output visual saya konsisten dan granular saat dipakai di Runway/Pika |
+| US-M02 | Freelance Animator | Mendapat spesifikasi voice type per karakter (7 tipe + emosi + speed) | Saya tidak perlu menentukan suara secara manual |
+| US-M03 | Studio Owner | Setiap scene memiliki audio spec (BGM, SFX, ambient, music cue, transition audio) | Tim animator punya audio plan lengkap tanpa tool tambahan |
+| US-M04 | Semua user | Scene transition terdefinisi (6 jenis + durasi + easing + direction) | Video output tidak "jarring cuts" |
+| US-M05 | Semua user | Semua output LLM tersimpan ke database (audio_specs, color_palette, technical, voiceover_speaker) | Tidak ada data loss antara generate dan revisi |
+| US-M06 | Semua user | Beralih antara dark/light/system theme | Nyaman bekerja di lingkungan terang maupun gelap |
+| US-M07 | Semua user | Export brief sebagai JSON atau Markdown | Bisa dibagikan ke klien atau diimpor ke tool lain |
 
-**Bumi Animasi (Indie Studio)**
+#### Should Have
 
-| ID | User Story | Acceptance |
-|---|---|---|
-| US-B01 | Voice preset per character save & reuse | Voice type spec tersimpan per character |
-| US-B02 | Transition library konsisten antar episode | Transition type default per project |
-| US-B03 | Audio spec reusable sebagai template | Audio template per scene type |
-| US-B04 | Team lihat preview transisi di UI | Visual flow indicator antar scene cards |
+| ID | Sebagai... | Saya ingin... | Supaya... |
+|----|-----------|---------------|-----------|
+| US-S01 | Semua user | Memilih template preset (Tutorial, Sinematik, Anak-anak, Dokumenter, Aksi) | Tidak perlu konfigurasi manual setiap kali generate |
+| US-S02 | Content Agency PM | Landing page menampilkan fitur V3 | Calon pengguna tahu capability baru sebelum signup |
+| US-S03 | Studio Owner | E2E test coverage memadai (≥10 critical path) | Yakin tidak ada regresi saat deploy update |
+| US-S04 | Semua user | UI dan konten dalam Bahasa Indonesia dan English | Bisa dipakai sesuai preferensi bahasa |
 
-**Bu Sinta (Edukator)**
+#### Could Have
 
-| ID | User Story | Acceptance |
-|---|---|---|
-| US-S01 | Light mode saat bikin konten di kelas | Theme toggle light mode tersedia |
-| US-S02 | Suara karakter anak dan lansia | Voice type child + elderly tersedia |
-| US-S03 | Ambient music edukatif per scene | Audio spec mendukung ambient type |
+| ID | Sebagai... | Saya ingin... | Supaya... |
+|----|-----------|---------------|-----------|
+| US-C01 | Content Agency PM | API access untuk batch generation | Generate 50+ brief/bulan secara terprogram |
+| US-C02 | Studio Owner | Custom template — buat preset sendiri | Tim punya preset sesuai standar internal |
+| US-C03 | Freelance Animator | Direct integration ke Runway/Pika API | Brief langsung terkirim tanpa copy-paste |
 
-### 2.3 Job-to-be-Done
+#### Won't Have (V3)
 
-> When saya (kreator animasi AI) want to generate paket prompt production-ready dengan transisi halus, variasi suara, audio lengkap, image prompt detail dari input minimal, so I can langsung pakai output untuk downstream AI video tools tanpa re-edit.
+| ID | Item | Alasan |
+|----|------|--------|
+| US-W01 | Multi-tenant / team collaboration | Fitur masa depan |
+| US-W02 | Payment / billing integration | Belum ada model monetisasi aktif |
+| US-W03 | Redis rate limiting | Dibutuhkan di production, bukan bagian scope V3 fitur |
+| US-W04 | Mobile app / PWA | Web-first, mobile responsive cukup |
+| US-W05 | Real-time collaboration | Fitur masa depan |
+| US-W06 | Video rendering / preview | PromptFlow menghasilkan brief, bukan video |
+| US-W07 | LLM fine-tuning / custom training | Menggunakan provider existing |
 
 ---
 
 ## 3. Daftar Fitur Prioritas MoSCoW
 
-### 3.1 V3 Features
+### Must Have (Wajib)
 
-| Prioritas | ID | Fitur | Deskripsi | Sumber |
-|---|---|---|---|---|
-| **MUST** | F-V3-01 | Light Theme Support | Theme toggle (dark default). next-themes. All components both themes | BRD F-V3-01 |
-| **MUST** | F-V3-02 | Scene Transition Flow Engine | 6 types x 4 fields. LLM generates. UI flow preview | BRD F-V3-02 |
-| **MUST** | F-V3-03 | Complex Image Prompts | 8-layer structured prompt | BRD F-V3-03 |
-| **MUST** | F-V3-04 | Voiceover Voice Type Spec | 7 voice types + emotion + speed + pitch | BRD F-V3-04 |
-| **MUST** | F-V3-05 | Supporting Audio Spec | 5 audio categories per scene. Metadata only | BRD F-V3-05 |
-| **SHOULD** | F-V3-06 | Schema Migration | Additive: +11 fields scenes + new table scene_audio | BRD SCOPE-03..07 |
-| **SHOULD** | F-V3-07 | Prompt Builder Enhancement | 5 metadata instructions | BRD SCOPE-08,09 |
-| **SHOULD** | F-V3-08 | Zod Schema Extension | Extend + new schemas | BRD SCOPE-10 |
-| **SHOULD** | F-V3-09 | Export Extension | JSON + MD termasuk V3 metadata | BRD SCOPE-15 |
-| **SHOULD** | F-V3-10 | i18n V3 Keys | Keys untuk theme/transition/voice/audio/image (ID+EN) | BRD SCOPE-16 |
-| **SHOULD** | F-V3-11 | V2 to V3 Migration Script | Backfill defaults, reversible | BRD SCOPE-17 |
-| **SHOULD** | F-V3-12 | Analytics V3 Events | 5 event baru | BRD SCOPE-18 |
-| **COULD** | F-V3-13 | In-app Changelog Banner | "5 fitur baru, project aman" | BRD SCOPE-20 |
-| **COULD** | F-V3-14 | Landing Page Copy Update | Highlight 5 fitur baru | BRD SCOPE-19 |
-| **COULD** | F-V3-15 | UI Transition Preview | Visual flow indicator | BRD SCOPE-11 |
-| **COULD** | F-V3-16 | UI Voice Selector | Dropdown per scene | BRD SCOPE-12 |
-| **COULD** | F-V3-17 | UI Audio Panel | CRUD audio entries per scene | BRD SCOPE-13 |
-| **COULD** | F-V3-18 | UI Image Prompt Labels | Section labels + copy per-section | BRD SCOPE-14 |
-| **WON'T** | F-V3-19..28 | Audio gen, TTS, Image gen, Video assembly, Voice cloning, Waveform, Negative prompt, Multi-lang voice, Mobile app, Pricing | V4/V5 | BRD OOS-V3-01..12 |
+| # | Fitur | Deskripsi | Terkait Gap |
+|----|-------|-----------|-------------|
+| F-M01 | **Data Persistence — Audio Specs** | Generate route menyimpan `audio_specs` dari LLM output ke `scene_audio` table | GAP: generate/route.ts tidak simpan audio_specs ke DB |
+| F-M02 | **Data Persistence — Color Palette + Technical** | Tambah kolom `color_palette` dan `technical` ke `image_prompts` table, simpan saat generate | GAP: kolom tidak ada di DB |
+| F-M03 | **Data Persistence — Voiceover Speaker** | Tambah kolom `voiceover_speaker` ke `scenes` table, simpan saat generate | GAP: kolom tidak ada di DB |
+| F-M04 | **Scene Transition Flow Patterns** | Perbaiki flow patterns di prompt-builder agar transisi lebih halus, tidak "jarring cuts" | GAP: flow patterns kurang optimal |
+| F-M05 | **8-Layer Image Prompt Completeness** | Pastikan generate menghasilkan dan menyimpan semua 8 lapis: prompt_text, composition, lighting, camera, mood_atmosphere, style_references, color_palette, technical | GAP: color_palette & technical tidak tersimpan |
+| F-M06 | **Voice Type Mapping Specificity** | Perbaiki pemetaan voice type agar lebih spesifik (age → voice_type → emotion → speed → pitch) | GAP: mapping kurang detail |
+| F-M07 | **Light Theme Landing Page** | Pastikan root layout.tsx wrap dengan Providers untuk landing page agar theme toggle berfungsi di landing | GAP: providers belum wrap root layout |
 
-**Ringkasan:** MUST: 5 | SHOULD: 7 | COULD: 6 | WON'T: 10
+### Should Have (Penting)
 
----
+| # | Fitur | Deskripsi |
+|----|-------|-----------|
+| F-S01 | **Landing Page V3 Features Section** | Update `features.ts` dengan 4-5 fitur V3 (transitions, voice, audio, image layers, theme) |
+| F-S02 | **E2E Test Expansion** | Tambah minimal 10 E2E tests untuk critical paths (generate, project CRUD, settings, dashboard, export) |
+| F-S03 | **Image Prompt Display Enhancement** | Update `image-prompt-display.tsx` untuk render color_palette dan technical layer |
 
-## 4. Functional Requirement Detail per Fitur
+### Could Have (Nice-to-Have)
 
-Format: ID | Input | Proses | Output | Acceptance
+| # | Fitur | Deskripsi |
+|----|-------|-----------|
+| F-C01 | **Template Custom** | User bisa buat, simpan, dan pakai custom template preset |
+| F-C02 | **API Rate Limit Tiers** | Tiered rate limiting (free: 10/min, pro: 100/min) |
+| F-C03 | **Batch Generation** | Generate multiple briefs via API |
 
-### F-V3-01: Light Theme Support (FR-V3-01)
+### Won't Have (Diluar Scope V3)
 
-| Field | Detail |
-|---|---|
-| Input | User klik theme toggle (light/dark/system) / page load |
-| Proses | (a) Install `next-themes`. (b) Add ThemeProvider ke `providers.tsx`. (c) Remove hardcoded `className="dark"` dari `layout.tsx:66`. (d) Remove `<div className="dark">` dari `page.tsx:24`. (e) Add ThemeToggle component ke `app-header.tsx`. (f) Persist di localStorage via next-themes. (g) Detect system preference |
-| Output | App toggle light/dark/system. Persist localStorage. No FOUC |
-| Acceptance | Toggle visible. Persist. System preference detected. shadcn/ui render sempurna di light mode. WCAG AA kontras |
-| Schema | N/A (client-side only) |
-| Prompt | N/A |
-| i18n keys | `common.theme`, `common.themeToggle`, `common.lightMode`, `common.darkMode`, `common.systemMode` |
-| Files | `providers.tsx`, `layout.tsx:66`, `page.tsx:24`, `app-header.tsx`, `provider-card.tsx:88`, `globals.css` |
-| Sitasi | `RAG-CONTEXT S9.1-9.3`, `BRD S6.1` |
-
-### F-V3-02: Scene Transition Flow Engine (FR-V3-02)
-
-| Field | Detail |
-|---|---|
-| Input | LLM generate output JSON per scene |
-| Proses | (a) Extend `scenes` table: +transitionType (text), +transitionDurationMs (integer), +transitionEasing (text), +transitionDirection (text). (b) Extend Zod SceneSchema. (c) Enhance prompt-builder.ts — instruksi AI pilih transition sesuai narasi. (d) Update save handler route.ts:156-164. (e) UI: visual flow indicator antar scene |
-| Output | Setiap scene punya 4 field transition + scene_pacing + scene_mood |
-| Acceptance | LLM generate transition dari enum: cut/dissolve/fade_to_black/fade_to_white/wipe/match_cut. Default = cut, 0ms. scene_pacing: fast/medium/slow (EXTENDED ASUMSI). scene_mood: tense/relaxed/dramatic/neutral (EXTENDED ASUMSI). UI flow indicator |
-| Schema | `scenes` table: +6 fields (4 transition + 2 EXTENDED ASUMSI: scene_pacing, scene_mood) |
-| Prompt | Instruksi: action=cut, time passage=dissolve, chapter end=fade_to_black, dream=fade_to_white, location change=wipe, visual continuity=match_cut |
-| Transition types | cut (0ms), dissolve (500-2000ms), fade_to_black (1000-3000ms), fade_to_white (1000-3000ms), wipe (500-1000ms), match_cut (0ms) |
-| Sitasi | `RAG-CONTEXT S5.3-5.4`, `BRD S6.2` |
-
-### F-V3-03: Complex Image Prompts (FR-V3-03)
-
-| Field | Detail |
-|---|---|
-| Input | LLM generate output JSON per image prompt |
-| Proses | (a) promptText tetap single string. (b) Enhance prompt-builder.ts — 8-layer formula. (c) Extend image_prompts: +composition (EXTENDED ASUMSI), +lighting (EXTENDED ASUMSI), +camera (EXTENDED ASUMSI), +moodAtmosphere, +styleReferences. (d) UI: section labels collapsible |
-| Output | Setiap prompt mengandung 8 layer terstruktur + 5 metadata fields |
-| Acceptance | Minimal 6 dari 8 layer: subject, composition, camera, lighting, color, mood, style, technical. Metadata: composition (deskripsi komposisi visual), lighting (deskripsi pencahayaan), camera (tipe shot/kamera), moodAtmosphere, styleReferences |
-| Schema | `image_prompts.promptText` tetap. +5 fields (2 core + 3 EXTENDED ASUMSI: composition, lighting, camera) + moodAtmosphere + styleReferences |
-| Prompt | Formula: [Subject]+[Composition]+[Camera]+[Lighting]+[Color]+[Mood]+[Style]+[Technical] |
-| Sitasi | `RAG-CONTEXT S6.1-6.4`, `BRD S6.3` |
-
-### F-V3-04: Voiceover Voice Type Spec (FR-V3-04)
-
-| Field | Detail |
-|---|---|
-| Input | LLM generate output JSON per scene |
-| Proses | (a) Extend `scenes`: +voiceType, +voiceEmotion, +voiceSpeed, +voicePitch. (b) Extend Zod SceneSchema. (c) Enhance prompt-builder.ts. (d) UI: voice type selector per scene |
-| Output | Setiap scene punya 4 field voice |
-| Acceptance | VoiceType: child/teen/adult_male/adult_female/elderly_male/elderly_female/narrator. Emotion: neutral/happy/sad/excited/calm/dramatic. Speed: 0.5-2.0 (default 1.0). Pitch: low/medium/high/auto |
-| Schema | `scenes` table: +4 fields (additive) |
-| Prompt | Instruksi: pilih voiceType berdasarkan karakter. Emotion sesuai konteks adegan |
-| Sitasi | `RAG-CONTEXT S7.1-7.3`, `BRD S6.4` |
-
-### F-V3-05: Supporting Audio Spec (FR-V3-05)
-
-| Field | Detail |
-|---|---|
-| Input | LLM generate output JSON per scene |
-| Proses | (a) New table scene_audio (19 fields: 7 core + 12 EXTENDED ASUMSI). (b) New Zod SceneAudioSchema. (c) +durationSeconds di scenes. (d) Enhance prompt-builder.ts. (e) API route scene_audio CRUD. (f) UI: audio panel per scene |
-| Output | Setiap scene punya minimal 1 audio cue dengan metadata lengkap |
-| Acceptance | AudioType: background_music/sfx/ambient/music_cue/transition_audio. Timing: start/throughout/end/specific_moment. Volume 0.0-1.0. EXTENDED ASUMSI fields: music_genre (text), music_mood (text), music_tempo_bpm (integer), music_instruments (text), music_volume (real), sfx_list (text), ambient_type (text), ambient_volume (real), music_key (text), rhythm_pattern (text), spatial_audio (boolean), audio_tags (text) |
-| Schema | New table scene_audio (19 fields) + scenes: +durationSeconds |
-| Prompt | Instruksi: generate minimal 1 audio cue per scene (background_music atau ambient atau sfx) |
-| Sitasi | `RAG-CONTEXT S8.1-8.3`, `BRD S6.5` |
-
-### F-V3-06: Schema Migration (FR-V3-06)
-
-| Field | Detail |
-|---|---|
-| Proses | (a) drizzle-kit generate. (b) drizzle-kit push ke Turso. (c) Backfill script V2→V3 defaults. (d) Rollback tested |
-| Acceptance | Migration success di staging. Dry-run 100% data retained. Rollback tested. Tidak drop kolom V2 |
-| Sitasi | `RAG-CONTEXT S3.3`, `BRD SCOPE-03..07` |
-
-### F-V3-07: Prompt Builder Enhancement (FR-V3-07)
-
-| Field | Detail |
-|---|---|
-| Proses | Extend buildSystemPrompt() + buildUserMessage() dengan instruksi 5 metadata |
-| Acceptance | LLM generate 5 metadata konsisten (>= 90%/field). Zod validation pass. Fallback defaults |
-| Files | `src/lib/ai/prompt-builder.ts:71-97,100-126` |
-| Sitasi | `RAG-CONTEXT S4.1-4.3`, `BRD SCOPE-08,09` |
-
-### F-V3-08: Zod Schema Extension (FR-V3-08)
-
-| Field | Detail |
-|---|---|
-| Proses | Extend SceneSchema (+10 field: 8 core + 2 EXTENDED ASUMSI), ImagePromptItemSchema (+5 field), new SceneAudioSchema (19 field), update ProjectResultSchema |
-| Acceptance | `pnpm typecheck` 0 error. Semua field V3 tervalidasi |
-| Files | `src/lib/validation/schemas.ts:16-32` |
-| Sitasi | `RAG-CONTEXT S4.1` |
-
-### F-V3-09: Export Extension (FR-V3-09)
-
-| Field | Detail |
-|---|---|
-| Proses | Extend JSON export + Markdown template untuk V3 metadata sections |
-| Acceptance | JSON: scenes[].transitionType, scenes[].voiceType, scenes[].audio[], image_prompts[].promptText (structured). Markdown: section headers |
-| Files | `src/lib/export/markdown.template.ts`, export route |
-| Sitasi | `BRD SCOPE-15` |
-
-### F-V3-10: i18n V3 Keys (FR-V3-10)
-
-| Field | Detail |
-|---|---|
-| Proses | Tambah keys di messages/id.json + en.json untuk theme, transition (6 types), voice (7 types + 6 emotions + 3 pitch), audio (5 categories + timing), image layers (8 labels) |
-| Acceptance | ID+EN sinkron. Semua V3 UI text via useTranslations(). Tidak hardcoded |
-| Sitasi | `RAG-CONTEXT S4.5`, `BRD SCOPE-16` |
-
-### F-V3-11: V2→V3 Migration Script (FR-V3-11)
-
-| Field | Detail |
-|---|---|
-| Proses | Backfill: transitionType=cut, voiceType=narrator, no audio. durationSeconds estimated. Dry-run mode. Rollback |
-| Acceptance | Success rate >= 95%. 100% data retained. Rollback tested |
-| Sitasi | `BRD SCOPE-17`, KPI-V3-08 |
-
-### F-V3-12: Analytics V3 Events (FR-V3-12)
-
-| Field | Detail |
-|---|---|
-| Proses | Track: theme_change, scene_transition_generated, voice_type_assigned, audio_spec_generated, image_prompt_layers_count |
-| Acceptance | Events fired. No PII. KPI V3 measurable |
-| Sitasi | `BRD SCOPE-18`, KPI-V3-01..10 |
+| # | Item | Alasan |
+|----|------|--------|
+| F-W01 | Multi-tenant / team collaboration | Fitur masa depan, butuh arsitektur berbeda |
+| F-W02 | Payment / billing integration | Belum ada model monetisasi aktif |
+| F-W03 | Redis rate limiting production | Dibutuhkan, tapi bukan scope V3 |
+| F-W04 | Mobile app / PWA | Web-first cukup |
+| F-W05 | Real-time collaboration | Fitur masa depan |
+| F-W06 | Video rendering / preview | PromptFlow = brief generator, bukan video editor |
+| F-W07 | LLM fine-tuning | Menggunakan provider existing |
 
 ---
 
-## 5. Non-Functional Requirement (V3 Update)
+## 4. Functional Requirement Detail Per Fitur
+
+### FR-M01: Data Persistence — Audio Specs
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | LLM output `audio_specs` array per scene (5 tipe: background_music, sfx, ambient, music_cue, transition_audio) |
+| **Proses** | 1. Generate route parse LLM response → `SceneAudioSpecSchema` (Zod). 2. Loop setiap scene. 3. Untuk setiap audio_spec, INSERT ke `scene_audio` table dengan mapping: `project_id`, `scene_id`, `audio_type`, `description`, `timing`, `duration_seconds`, `volume`, `fade_in_ms`, `fade_out_ms`, `music_genre`, `music_mood`, `music_tempo_bpm`, `music_instruments`, `music_volume`, `sfx_list`, `ambient_type`, `ambient_volume` |
+| **Output** | Setiap scene memiliki 0-5 record di `scene_audio` table |
+| **Files terkait** | `src/app/api/v1/generate/route.ts`, `src/lib/db/repositories/scene-audio.repository.ts`, `src/lib/validation/schemas.ts` |
+
+### FR-M02: Data Persistence — Color Palette + Technical
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | LLM output `image_prompts[].color_palette` (string) dan `image_prompts[].technical` (string) |
+| **Proses** | 1. ALTER TABLE `image_prompts` — tambah kolom `color_palette TEXT` dan `technical TEXT`. 2. Update Drizzle schema (`schema.ts`). 3. Update generate route INSERT untuk sertakan kedua kolom. 4. Jalankan migration |
+| **Output** | `image_prompts` table memiliki kolom `color_palette` dan `technical`, terisi saat generate |
+| **Files terkait** | `src/lib/db/schema.ts`, `drizzle/0001_v3_core_features.sql` (atau migration baru), `src/app/api/v1/generate/route.ts` |
+
+### FR-M03: Data Persistence — Voiceover Speaker
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | LLM output `scenes[].voiceover_speaker` (string — nama karakter atau "narrator") |
+| **Proses** | 1. ALTER TABLE `scenes` — tambah kolom `voiceover_speaker TEXT`. 2. Update Drizzle schema. 3. Update generate route INSERT untuk sertakan kolom. 4. Jalankan migration |
+| **Output** | `scenes` table memiliki kolom `voiceover_speaker`, terisi saat generate |
+| **Files terkait** | `src/lib/db/schema.ts`, migration baru, `src/app/api/v1/generate/route.ts` |
+
+### FR-M04: Scene Transition Flow Patterns
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | Scene descriptions, scene_mood, scene_pacing dari LLM output |
+| **Proses** | 1. Perbaiki instruksi di `prompt-builder.ts` (lines 246-278) agar LLM memilih transisi berdasarkan mood dan pacing. 2. Tambah rule: scene pembuka → fade_from_black, scene penutup → fade_to_black. 3. Tambah rule: perubahan mood signifikan → dissolve/fade, adegan aksi cepat → match_cut. 4. Tambah rule: scene berurutan dengan mood sama → cut atau dissolve, bukan wipe/match_cut. 5. Tambah durasi minimum per transisi (cut=0ms, dissolve≥800ms, fade≥1200ms, wipe≥400ms, match_cut≥200ms) |
+| **Output** | Setiap scene memiliki `transition_type`, `transition_duration_ms`, `transition_easing`, `transition_direction` yang selaras dengan mood/pacing |
+| **Files terkait** | `src/lib/ai/prompt-builder.ts` (lines 246-278) |
+
+### FR-M05: 8-Layer Image Prompt Completeness
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | Scene description, characters, style_type dari project |
+| **Proses** | 1. Perkuat instruksi di `prompt-builder.ts` (lines 313-335) agar LLM WAJIB mengisi semua 8 layer. 2. Tambah validasi Zod: `color_palette` dan `technical` required (bukan optional). 3. Update response-parser untuk handle jika layer kosong — isi default atau flag warning. 4. Pastikan generate route menyimpan semua 8 layer ke DB (termasuk color_palette + technical setelah FR-M02 selesai) |
+| **Output** | Setiap image_prompt memiliki 8 kolom terisi: prompt_text, composition, lighting, camera, mood_atmosphere, style_references, color_palette, technical |
+| **Files terkait** | `src/lib/ai/prompt-builder.ts`, `src/lib/validation/schemas.ts`, `src/lib/ai/response-parser.ts`, `src/app/api/v1/generate/route.ts` |
+
+### FR-M06: Voice Type Mapping Specificity
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | Karakter profile (nama, usia, peran) dari project |
+| **Proses** | 1. Perkuat mapping rules di `prompt-builder.ts` (lines 281-310): usia 5-12 → child, 13-19 → teen, 20-45 → adult_male/female (berdasarkan gender), 46+ → elderly_male/female, narrator → narrator. 2. Tambah rule: emosi mengikuti scene_mood (happy scene → joyful emotion, sad scene → melancholy). 3. Tambah rule: speed mengikuti scene_pacing (fast pacing → 1.2x, slow → 0.8x). 4. Tambah rule: pitch "auto" untuk mayoritas, "high" untuk child, "low" untuk elderly_male |
+| **Output** | Setiap scene memiliki `voice_type`, `voice_emotion`, `voice_speed`, `voice_pitch` yang spesifik dan konsisten |
+| **Files terkait** | `src/lib/ai/prompt-builder.ts` (lines 281-310) |
+
+### FR-M07: Light Theme Landing Page
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | User mengakses landing page |
+| **Proses** | 1. Pastikan root `layout.tsx` (di `src/app/[locale]/layout.tsx`) wrap konten dengan `Providers` component yang sudah include `ThemeProvider` + `SessionProvider`. 2. Pastikan landing page components (`src/components/landing/`) menggunakan CSS variables dari `globals.css` (bukan hardcoded warna). 3. Test theme toggle di landing page: dark → light → system |
+| **Output** | Landing page mendukung dark/light/system theme dengan transisi halus |
+| **Files terkait** | `src/app/[locale]/layout.tsx`, `src/components/providers.tsx`, `src/components/landing/` |
+
+### FR-S01: Landing Page V3 Features Section
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | Data fitur V3 |
+| **Proses** | 1. Update `src/lib/landing/features.ts` — tambah 4-5 fitur V3: Scene Transition Engine, Voice Type Mapping, Audio Specification, Complex Image Prompts (8-layer), Theme Toggle. 2. Pastikan i18n keys tersedia di `messages/id.json` dan `messages/en.json` |
+| **Output** | Landing page menampilkan section fitur V3 dengan ikon, judul, dan deskripsi |
+| **Files terkait** | `src/lib/landing/features.ts`, `src/components/landing/`, `messages/id.json`, `messages/en.json` |
+
+### FR-S02: E2E Test Expansion
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | Critical paths aplikasi |
+| **Proses** | 1. Buat E2E test files menggunakan Playwright. 2. Minimal 10 tests: (a) Login, (b) Register, (c) Create project, (d) Generate animation brief (mock LLM), (e) View project detail, (f) View scene transitions, (g) View voice type, (h) View audio specs, (i) Export brief, (j) Theme toggle |
+| **Output** | ≥10 E2E tests passing, coverage report di CI |
+| **Files terkait** | `e2e/`, `playwright.config.ts` |
+
+### FR-S03: Image Prompt Display Enhancement
+
+| Aspek | Detail |
+|-------|--------|
+| **Input** | `image_prompts` data dengan `color_palette` dan `technical` |
+| **Proses** | Update `image-prompt-display.tsx` — tambah render section untuk color_palette (visual color chips atau text) dan technical (camera settings, resolution, format) |
+| **Output** | UI menampilkan semua 8 layer image prompt |
+| **Files terkait** | `src/components/generate/image-prompt-display.tsx` |
+
+---
+
+## 5. Non-Functional Requirement
 
 ### 5.1 Performa
 
-| ID | Kriteria | Target | Sumber |
-|---|---|---|---|
-| NFR-V3-P01 | Lighthouse Performance mobile | >= 85 | BRD LIM-V3-06 |
-| NFR-V3-P02 | LCP | <= 2.5s | BRD KPI-09 |
-| NFR-V3-P03 | CLS | <= 0.1 | BRD KPI-10 |
-| NFR-V3-P04 | Bundle tambahan V3 | <= +20KB gzipped | BRD RISK-15 |
-| NFR-V3-P05 | next-themes size | ~2KB gzipped | ASM-1 |
-| NFR-V3-P06 | LLM response time | <= 30s (sama V2) | ASUMSI |
-| NFR-V3-P07 | Migration execution time | <= 5s per project | ASUMSI |
+| # | Requirement | Target | Pengukuran |
+|----|-------------|--------|------------|
+| NFR-P01 | Generate response time (SSE streaming) | ≤ 240 detik (Vercel Hobby timeout) | Monitoring `generation_logs.duration_ms` |
+| NFR-P02 | Landing page load time (LCP) | ≤ 2.5 detik | Lighthouse, Vercel Analytics |
+| NFR-P03 | Theme switch latency | ≤ 100ms (no visible flash) | Manual test + framer-motion transition |
+| NFR-P04 | DB write latency per scene (audio_specs) | ≤ 500ms untuk 5 audio records | Turso query log |
+| NFR-P05 | API response time (non-generate) | ≤ 500ms (P95) | Vercel Function logs |
 
 ### 5.2 Keamanan
 
-| ID | Kriteria | Detail | Sumber |
-|---|---|---|---|
-| NFR-V3-S01 | Schema migration additive only | Tidak drop kolom V2 | BRD LIM-V3-01 |
-| NFR-V3-S02 | LLM provider multi | Tidak lock 1 provider | BRD LIM-V3-02 |
-| NFR-V3-S03 | V2 codebase tidak break | V3 = additive | BRD LIM-V3-03 |
-| NFR-V3-S04 | No heavy library tambahan | Bundle impact minimal | BRD LIM-V3-07 |
-| NFR-V3-S05 | Audio spec free-to-use | Tidak referensi konten berlisensi | BRD LIM-V3-10 |
-| NFR-V3-S06 | Voice prompt tidak bias | Ethics review | BRD LIM-V3-11 |
+| # | Requirement | Detail |
+|----|-------------|--------|
+| NFR-S01 | Auth required untuk semua generate/project/settings endpoints | NextAuth v5 JWT, middleware guard |
+| NFR-S02 | API key encryption | AES-256-GCM, key dari env `ENCRYPTION_KEY` |
+| NFR-S03 | Rate limiting generate endpoint | 10 req/min/user (in-memory) |
+| NFR-S04 | Input validation | Zod schema validation di semua API routes |
+| NFR-S05 | SQL injection prevention | Drizzle ORM parameterized queries |
+| NFR-S06 | Soft delete untuk projects | `deleted_at` column, tidak hard delete |
 
 ### 5.3 Aksesibilitas
 
-| ID | Kriteria | Target | Sumber |
-|---|---|---|---|
-| NFR-V3-A01 | WCAG compliance | 2.1 AA light + dark mode | BRD DoD V3 |
-| NFR-V3-A02 | Kontras light mode | >= 4.5:1 body | BRD RISK-V3-06 |
-| NFR-V3-A03 | Theme toggle keyboard | Focus ring visible | Best practice |
-| NFR-V3-A04 | Screen reader | ARIA labels untuk transition/voice/audio | ASUMSI |
+| # | Requirement | Detail |
+|----|-------------|--------|
+| NFR-A01 | Theme toggle accessible via keyboard | ThemeToggle component: focusable, Enter/Space to select |
+| NFR-A02 | Color contrast ratio ≥ 4.5:1 (WCAG AA) | Light dan dark theme CSS variables |
+| NFR-A03 | Screen reader support untuk image prompt layers | aria-labels pada expandable sections |
+| NFR-A04 | Responsive design | Mobile-first Tailwind breakpoints |
 
-### 5.4 UX/Desain
+### 5.4 UX
 
-| ID | Kriteria | Detail | Sumber |
-|---|---|---|---|
-| NFR-V3-U01 | Design tokens semantic | Pakai primary/background, bukan hardcoded hex | BRD LIM-V3-05 |
-| NFR-V3-U02 | Light theme bukan inverted dark | Design ulang palette | BRD LIM-V3-12 |
-| NFR-V3-U03 | Undo/redo edit metadata | Semua 5 fitur | BRD LIM-V3-08 |
-| NFR-V3-U04 | Export JSON + MD | Tambah format baru | BRD LIM-V3-09 |
-| NFR-V3-U05 | No FOUC theme switch | next-themes blocking script | BRD RISK-V3-01 |
+| # | Requirement | Detail |
+|----|-------------|--------|
+| NFR-U01 | No flash of wrong theme (FOWT) | next-themes `attribute="class"` + inline script |
+| NFR-U02 | Smooth theme transition | CSS `transition: background-color 0.2s, color 0.2s` |
+| NFR-U03 | Visual feedback saat generate (SSE stages) | Stage progress bar di generate-form.tsx |
+| NFR-U04 | Error handling yang informatif | Toast notifications (sonner) untuk semua error states |
+| NFR-U05 | Loading skeleton untuk halaman berat | page-loading-skeleton.tsx |
 
-### 5.5 i18n
+### 5.5 Maintainability
 
-| ID | Kriteria | Detail | Sumber |
-|---|---|---|---|
-| NFR-V3-I01 | Dwibahasa | ID + EN paralel | BRD LIM-V3-04 |
-| NFR-V3-I02 | Semua V3 UI text via i18n | Tidak hardcoded | Best practice |
-| NFR-V3-I03 | Voice type bilingual | child/anak, narrator/narator | ASUMSI |
+| # | Requirement | Detail |
+|----|-------------|--------|
+| NFR-M01 | TypeScript strict mode | `noImplicitAny`, `noImplicitReturns`, `noFallthroughCasesInSwitch` |
+| NFR-M02 | Unit test coverage ≥ 80% | Vitest coverage thresholds (lines, branches, functions, statements) |
+| NFR-M03 | E2E test coverage ≥ 10 critical paths | Playwright |
+| NFR-M04 | Database migration reversible | Rollback script tersedia (`rollbackV2ToV3`) |
+| NFR-M05 | i18n coverage 100% untuk V3 keys | `messages/id.json` + `messages/en.json` sync |
 
-### 5.6 Maintainability
+### 5.6 Kompatibilitas
 
-| ID | Kriteria | Detail | Sumber |
-|---|---|---|---|
-| NFR-V3-M01 | TypeScript strict | No any | AGENTS.md L06 |
-| NFR-V3-M02 | Lint + Typecheck | 0 error | AGENTS.md |
-| NFR-V3-M03 | Conventional commit | feat(v3): ... atomic | BRD DoD V3 |
-| NFR-V3-M04 | No direct push main | Via PR + review | AGENTS.md L20 |
-| NFR-V3-M05 | Rollback plan | Migration reversible | BRD LIM-V3-13 |
+| # | Requirement | Detail |
+|----|-------------|--------|
+| NFR-C01 | Browser support | Chrome 90+, Firefox 90+, Safari 15+, Edge 90+ |
+| NFR-C02 | Node.js ≥ 20 | package.json engines |
+| NFR-C03 | Vercel Hobby plan compatible | maxDuration=300, serverless function size |
+| NFR-C04 | Turso/libSQL compatible | Drizzle ORM with @libsql/client |
 
 ---
 
-## 6. Acceptance Criteria per Fitur
+## 6. Acceptance Criteria Per Fitur
 
-### AC-V3-01: Light Theme Support
-- [ ] next-themes terinstall
-- [ ] ThemeProvider di providers.tsx dengan attribute class
-- [ ] Hardcoded className="dark" removed dari layout.tsx:66
-- [ ] <div className="dark"> removed dari page.tsx:24
-- [ ] ThemeToggle component di app-header.tsx (3 mode: light/dark/system)
-- [ ] Default = dark
-- [ ] Persist di localStorage
-- [ ] System preference detected via prefers-color-scheme
-- [ ] No FOUC saat first load
-- [ ] shadcn/ui render sempurna di light mode
-- [ ] provider-card.tsx:88 hardcoded dark: variants removed
-- [ ] WCAG 2.1 AA kontras light + dark
-- [ ] i18n keys lengkap ID+EN
-- [ ] Analytics event theme_change fired
+### AC-M01: Data Persistence — Audio Specs
 
-### AC-V3-02: Scene Transition Flow Engine
-- [ ] scenes table: +6 fields (4 transition + 2 EXTENDED ASUMSI: scene_pacing, scene_mood)
-- [ ] Zod SceneSchema extended dengan 4 field enum validated + scene_pacing + scene_mood
-- [ ] prompt-builder.ts generate transition dari enum
-- [ ] Default = cut, 0ms, linear, forward
-- [ ] scene_pacing: fast/medium/slow (EXTENDED ASUMSI, default medium)
-- [ ] scene_mood: tense/relaxed/dramatic/neutral (EXTENDED ASUMSI, default neutral)
-- [ ] Save handler route.ts:156-164 persist 6 field baru
-- [ ] UI: visual flow indicator antar scene cards
-- [ ] Export JSON: scenes[].transitionType/DurationMs/Easing/Direction/scene_pacing/scene_mood
-- [ ] Export Markdown: section Scene Transitions dengan table
-- [ ] i18n keys untuk 6 transition types + pacing + mood (ID+EN)
-- [ ] Analytics event scene_transition_generated fired
+- [ ] Generate route menyimpan setiap `audio_spec` dari LLM output ke `scene_audio` table
+- [ ] Setiap scene memiliki 0-5 record audio (sesuai LLM output)
+- [ ] Semua kolom terisi: `audio_type`, `description`, `timing`, `volume`, `fade_in_ms`, `fade_out_ms`
+- [ ] Kolom optional terisi jika LLM menghasilkan: `music_genre`, `music_mood`, `music_tempo_bpm`, `music_instruments`, `sfx_list`, `ambient_type`
+- [ ] Tidak ada error saat LLM tidak menghasilkan audio_spec (graceful skip)
+- [ ] Audio specs muncul di UI (`audio-panel.tsx`) setelah generate
+- [ ] Audio specs termasuk dalam export JSON dan Markdown
 
-### AC-V3-03: Complex Image Prompts
-- [ ] prompt-builder.ts generate 8-layer formula
-- [ ] Minimal 6 dari 8 layer terisi per prompt
-- [ ] Layer: subject, composition, camera, lighting, color, mood, style, technical
-- [ ] image_prompts: +5 fields (2 core + 3 EXTENDED ASUMSI: composition, lighting, camera)
-- [ ] composition: deskripsi komposisi visual (EXTENDED ASUMSI)
-- [ ] lighting: deskripsi pencahayaan (EXTENDED ASUMSI)
-- [ ] camera: tipe shot/kamera (EXTENDED ASUMSI)
-- [ ] UI: display dengan section labels (collapsible)
-- [ ] Copy per-section tersedia
-- [ ] Export JSON: image_prompts[].promptText structured + composition/lighting/camera
-- [ ] Export Markdown: section Image Prompt Layers
-- [ ] i18n keys untuk 8 layer labels + composition/lighting/camera (ID+EN)
-- [ ] Analytics event image_prompt_layers_count fired
+### AC-M02: Data Persistence — Color Palette + Technical
 
-### AC-V3-04: Voiceover Voice Type Spec
-- [ ] scenes table: +4 fields (additive)
-- [ ] Zod SceneSchema extended
-- [ ] prompt-builder.ts generate voice type dari 7 enum
-- [ ] Default = narrator, neutral, 1.0, auto
-- [ ] Save handler persist 4 field
-- [ ] UI: voice type selector per scene (dropdown)
-- [ ] Export JSON: scenes[].voiceType/Emotion/Speed/Pitch
-- [ ] Export Markdown: section Voice Specifications
-- [ ] i18n keys untuk 7 voice types + 6 emotions + 3 pitch (ID+EN)
-- [ ] Analytics event voice_type_assigned fired
+- [ ] `image_prompts` table memiliki kolom `color_palette` (TEXT, nullable) dan `technical` (TEXT, nullable)
+- [ ] Drizzle schema `schema.ts` mencerminkan kolom baru
+- [ ] Migration script tersedia dan reversible
+- [ ] Generate route menyimpan `color_palette` dan `technical` dari LLM output
+- [ ] Data terbaca kembali via `GET /api/v1/projects/[id]/image-prompts`
 
-### AC-V3-05: Supporting Audio Spec
-- [ ] New table scene_audio (19 fields: 7 core + 12 EXTENDED ASUMSI) — additive migration
-- [ ] New Zod SceneAudioSchema validated (19 fields)
-- [ ] scenes: +durationSeconds (integer)
-- [ ] prompt-builder.ts generate minimal 1 audio cue per scene
-- [ ] AudioType: 5 enum
-- [ ] Core fields: audioType, description, timing, durationSeconds, volume, fadeInMs, fadeOutMs
-- [ ] EXTENDED ASUMSI fields: music_genre, music_mood, music_tempo_bpm, music_instruments, music_volume, sfx_list, ambient_type, ambient_volume, music_key, rhythm_pattern, spatial_audio, audio_tags
-- [ ] UI: audio panel per scene (CRUD)
-- [ ] API route: CRUD scene_audio
-- [ ] Export JSON: scenes[].audio[] array (19 fields)
-- [ ] Export Markdown: section Audio Specifications
-- [ ] i18n keys untuk 5 audio categories + timing + extended fields (ID+EN)
-- [ ] Analytics event audio_spec_generated fired
+### AC-M03: Data Persistence — Voiceover Speaker
 
-### AC-V3-06: Schema Migration
-- [ ] 1 migration file generated via drizzle-kit generate
-- [ ] Migration push ke Turso sukses
-- [ ] Dry-run: 100% V2 data retained
-- [ ] Backfill script: V2 scenes → V3 defaults
-- [ ] Rollback plan tested
-- [ ] Tidak drop kolom V2
+- [ ] `scenes` table memiliki kolom `voiceover_speaker` (TEXT, nullable)
+- [ ] Drizzle schema mencerminkan kolom baru
+- [ ] Migration script tersedia dan reversible
+- [ ] Generate route menyimpan `voiceover_speaker` dari LLM output
+- [ ] Data terbaca kembali via `GET /api/v1/projects/[id]/scenes`
 
-### AC-V3-07: Prompt Builder Enhancement
-- [ ] buildSystemPrompt() extended 5 instruksi metadata
-- [ ] LLM generate 5 metadata konsisten (>= 90%/field)
-- [ ] Zod validation pass
-- [ ] Fallback default values
-- [ ] Token usage monitor (biaya naik <= 50%)
+### AC-M04: Scene Transition Flow Patterns
 
-### AC-V3-08: Zod Schema Extension
-- [ ] SceneSchema +10 field (8 core + 2 EXTENDED ASUMSI)
-- [ ] ImagePromptItemSchema extended (opsional)
-- [ ] SceneAudioSchema created
-- [ ] ProjectResultSchema updated
-- [ ] pnpm typecheck 0 error
+- [ ] Scene pembuka selalu menggunakan `fade_from_black` atau `fade_to_black` (bukan `cut`)
+- [ ] Scene penutup selalu menggunakan `fade_to_black`
+- [ ] Scene dengan perubahan mood signifikan → `dissolve` atau `fade`
+- [ ] Scene aksi cepat → `match_cut` dengan durasi pendek (≤300ms)
+- [ ] Scene berurutan dengan mood sama → `cut` atau `dissolve` (bukan `wipe`/`match_cut`)
+- [ ] Durasi minimum per transisi: cut=0ms, dissolve≥800ms, fade≥1200ms, wipe≥400ms, match_cut≥200ms
+- [ ] ≥70% scene menggunakan transisi selain `cut` (KPI BRD G2)
 
-### AC-V3-09: Export Extension
-- [ ] JSON export: transition, voice, audio, image layers per scene
-- [ ] Markdown: section headers
-- [ ] Backward compatible V2 format
+### AC-M05: 8-Layer Image Prompt Completeness
 
-### AC-V3-10: i18n V3 Keys
-- [ ] messages/id.json: V3 keys
-- [ ] messages/en.json: V3 keys paralel
-- [ ] ID+EN sinkron
-- [ ] Semua V3 UI text via useTranslations()
+- [ ] Setiap image_prompt memiliki ≥6 dari 8 layer terisi (target ≥90% — KPI BRD G3)
+- [ ] `color_palette` terisi (format: palet warna dominan, misal "deep blue #1a365d, gold #d4a017, white #f5f5f5")
+- [ ] `technical` terisi (format: spesifikasi teknis, misal "4K, cinematic depth of field, film grain")
+- [ ] Zod schema memvalidasi kehadiran layer (minimal warning jika kosong)
+- [ ] Response parser handle missing layers gracefully
 
-### AC-V3-11: V2→V3 Migration
-- [ ] Backfill V3 defaults
-- [ ] Dry-run mode
-- [ ] Rollback
-- [ ] Success rate >= 95%
+### AC-M06: Voice Type Mapping Specificity
 
-### AC-V3-12: Analytics V3
-- [ ] 5 event fired: theme_change, scene_transition_generated, voice_type_assigned, audio_spec_generated, image_prompt_layers_count
-- [ ] No PII
+- [ ] Setiap scene memiliki `voice_type` yang sesuai dengan usia karakter (bukan default "narrator" untuk semua)
+- [ ] `voice_emotion` mengikuti `scene_mood` (happy→joyful, sad→melancholy, tense→serious)
+- [ ] `voice_speed` mengikuti `scene_pacing` (fast→1.2, normal→1.0, slow→0.8)
+- [ ] `voice_pitch`: child→"high", elderly_male→"low", lainnya→"auto"
+- [ ] `voiceover_speaker` terisi dengan nama karakter atau "narrator"
 
-### AC-V3-13: Quality Gates
-- [ ] pnpm lint 0 error
-- [ ] pnpm typecheck 0 error
-- [ ] pnpm build pass
-- [ ] Lighthouse Performance mobile >= 85
-- [ ] Bundle size <= +20KB gzipped
-- [ ] axe-core: 0 critical (light+dark)
-- [ ] WCAG 2.1 AA
-- [ ] Conventional commit feat(v3): per fitur (5 atomic)
-- [ ] PR reviewed + merged
-- [ ] Preview deploy Vercel sukses
-- [ ] V2 dry-run: 100% retained
+### AC-M07: Light Theme Landing Page
+
+- [ ] Landing page mendukung dark/light/system theme
+- [ ] Theme toggle berfungsi di landing page (tanpa harus login)
+- [ ] Tidak ada flash of wrong theme (FOWT) saat pertama load
+- [ ] Semua teks terbaca di kedua theme (contrast ratio ≥ 4.5:1)
+- [ ] CSS variables `globals.css` bekerja di semua landing page components
+
+### AC-S01: Landing Page V3 Features Section
+
+- [ ] `features.ts` memiliki 4-5 fitur V3
+- [ ] Setiap fitur: ikon, judul (id + en), deskripsi (id + en)
+- [ ] Section muncul di landing page
+- [ ] Responsive di mobile dan desktop
+
+### AC-S02: E2E Test Expansion
+
+- [ ] ≥10 E2E test files di `e2e/` directory
+- [ ] Semua tests passing di Chromium
+- [ ] Critical paths ter-cover: auth, generate, project CRUD, settings, export, theme
+- [ ] CI pipeline menjalankan E2E tests
+
+### AC-S03: Image Prompt Display Enhancement
+
+- [ ] `image-prompt-display.tsx` menampilkan color_palette (visual color chips atau text block)
+- [ ] `image-prompt-display.tsx` menampilkan technical (text block dengan spesifikasi)
+- [ ] Expandable sections untuk setiap layer (8 total)
+- [ ] Responsive di mobile
 
 ---
 
 ## 7. Spesifikasi Deliverable Konkret
 
-### 7.1 File Changes
+### 7.1 Database Migration
 
-| Path | Tipe | Deskripsi | Fitur |
-|---|---|---|---|
-| `src/lib/db/schema.ts` | MODIFY | +11 fields scenes + new table scene_audio | F-V3-02,04,05 |
-| `src/lib/validation/schemas.ts` | MODIFY | Extend SceneSchema, ImagePromptItemSchema, new SceneAudioSchema | F-V3-08 |
-| `src/lib/ai/prompt-builder.ts` | MODIFY | Enhance buildSystemPrompt() + buildUserMessage() | F-V3-07 |
-| `src/app/api/v1/generate/route.ts` | MODIFY | Persist V3 fields saat save scene | F-V3-02,04,05 |
-| `src/app/api/v1/projects/[id]/export/route.ts` | MODIFY | Extend export V3 metadata | F-V3-09 |
-| `src/lib/export/markdown.template.ts` | MODIFY | Extend template V3 sections | F-V3-09 |
-| `src/components/providers.tsx` | MODIFY | Add ThemeProvider | F-V3-01 |
-| `src/app/layout.tsx` | MODIFY | Remove hardcoded className="dark" | F-V3-01 |
-| `src/app/[locale]/page.tsx` | MODIFY | Remove <div className="dark"> | F-V3-01 |
-| `src/components/common/app-header.tsx` | MODIFY | Add ThemeToggle | F-V3-01 |
-| `src/components/settings/provider-card.tsx` | MODIFY | Remove hardcoded dark: variants | F-V3-01 |
-| `src/components/common/theme-toggle.tsx` | NEW | Theme toggle component | F-V3-01 |
-| `src/components/generate/scene-transition-card.tsx` | NEW | Scene card + transition flow | F-V3-02 |
-| `src/components/generate/voice-type-selector.tsx` | NEW | Voice type dropdown | F-V3-04 |
-| `src/components/generate/audio-panel.tsx` | NEW | Audio panel CRUD | F-V3-05 |
-| `src/components/generate/image-prompt-display.tsx` | NEW | Image prompt section labels | F-V3-03 |
-| `src/lib/db/repositories/scene-audio.repository.ts` | NEW | CRUD scene_audio | F-V3-05 |
-| `src/app/api/v1/projects/[id]/scenes/[sceneId]/audio/route.ts` | NEW | API scene_audio CRUD | F-V3-05 |
-| `src/lib/migration/v2-to-v3.ts` | NEW | Migration script | F-V3-11 |
-| `messages/id.json` | MODIFY | V3 keys (theme, transition, voice, audio, image) | F-V3-10 |
-| `messages/en.json` | MODIFY | V3 keys paralel | F-V3-10 |
-| `drizzle/0001_v3_core_features.sql` | NEW | Migration file additive | F-V3-06 |
-| `package.json` | MODIFY | +next-themes | F-V3-01 |
+| Item | Detail |
+|------|--------|
+| File | `drizzle/0002_v3_gap_closure.sql` (atau nama serupa) |
+| Content | `ALTER TABLE image_prompts ADD COLUMN color_palette TEXT;`, `ALTER TABLE image_prompts ADD COLUMN technical TEXT;`, `ALTER TABLE scenes ADD COLUMN voiceover_speaker TEXT;` |
+| Rollback | `ALTER TABLE ... DROP COLUMN ...` statements |
+| Drizzle schema update | `schema.ts` — tambah 3 kolom baru |
 
-### 7.2 DB Schema Changes (Additive Only)
+### 7.2 Generate Route Update
 
-**scenes table — +11 fields (9 core + 2 EXTENDED ASUMSI):**
+| Item | Detail |
+|------|--------|
+| File | `src/app/api/v1/generate/route.ts` |
+| Changes | 1. Setelah INSERT scenes, INSERT `voiceover_speaker`. 2. Setelah INSERT image_prompts, INSERT `color_palette` + `technical`. 3. Setelah INSERT scenes + scene_id didapat, LOOP INSERT audio_specs ke `scene_audio` |
+| Error handling | Graceful skip jika field kosong, log warning |
 
-| Field | Type | Default | Fitur |
-|---|---|---|---|
-| `transitionType` | text | 'cut' | F-V3-02 |
-| `transitionDurationMs` | integer | 0 | F-V3-02 |
-| `transitionEasing` | text | 'linear' | F-V3-02 |
-| `transitionDirection` | text | 'forward' | F-V3-02 |
-| `voiceType` | text | 'narrator' | F-V3-04 |
-| `voiceEmotion` | text | 'neutral' | F-V3-04 |
-| `voiceSpeed` | real | 1.0 | F-V3-04 |
-| `voicePitch` | text | 'auto' | F-V3-04 |
-| `durationSeconds` | integer | NULL | F-V3-05 |
-| `scene_pacing` | text | 'medium' | F-V3-02 (EXTENDED ASUMSI) |
-| `scene_mood` | text | 'neutral' | F-V3-02 (EXTENDED ASUMSI) |
+### 7.3 Prompt Builder Update
 
-**New table scene_audio — 19 fields (7 core + 12 EXTENDED ASUMSI):**
+| Item | Detail |
+|------|--------|
+| File | `src/lib/ai/prompt-builder.ts` |
+| Changes | 1. Lines 246-278: perkuat transition flow rules (opening/closing, mood-based, pacing-based, durasi minimum). 2. Lines 281-310: perkuat voice mapping (age→type, mood→emotion, pacing→speed, age→pitch). 3. Lines 313-335: perkuat 8-layer requirements (WAJIB semua layer, format contoh) |
 
-| Field | Type | Default | Notes |
-|---|---|---|---|
-| `id` | text (UUID) | auto | PK |
-| `projectId` | text | — | FK projects.id |
-| `sceneId` | text | — | FK scenes.id |
-| `audioType` | text | — | enum: 5 types (core) |
-| `description` | text | — | deskripsi audio (core) |
-| `timing` | text | 'throughout' | enum: 4 options (core) |
-| `durationSeconds` | integer | NULL | durasi detik (core) |
-| `volume` | real | 0.7 | 0.0-1.0 (core) |
-| `fadeInMs` | integer | 0 | fade in ms (core) |
-| `fadeOutMs` | integer | 0 | fade out ms (core) |
-| `music_genre` | text | NULL | EXTENDED ASUMSI |
-| `music_mood` | text | NULL | EXTENDED ASUMSI |
-| `music_tempo_bpm` | integer | NULL | EXTENDED ASUMSI |
-| `music_instruments` | text | NULL | EXTENDED ASUMSI |
-| `music_volume` | real | NULL | EXTENDED ASUMSI |
-| `sfx_list` | text | NULL | EXTENDED ASUMSI |
-| `ambient_type` | text | NULL | EXTENDED ASUMSI |
-| `ambient_volume` | real | NULL | EXTENDED ASUMSI |
-| `created_at` | timestamp | now() | audit |
+### 7.4 Zod Schema Update
 
-**image_prompts table — +5 fields (2 core + 3 EXTENDED ASUMSI):**
+| Item | Detail |
+|------|--------|
+| File | `src/lib/validation/schemas.ts` |
+| Changes | 1. `ImagePromptItemSchema` — `color_palette` dan `technical` dari optional ke required (atau minimal non-empty string). 2. Pastikan `SceneSchema.voiceover_speaker` tetap optional (nullable) |
 
-| Field | Type | Default | Fitur |
-|---|---|---|---|
-| `moodAtmosphere` | text | NULL | F-V3-03 |
-| `styleReferences` | text | NULL | F-V3-03 |
-| `composition` | text | NULL | F-V3-03 (EXTENDED ASUMSI) |
-| `lighting` | text | NULL | F-V3-03 (EXTENDED ASUMSI) |
-| `camera` | text | NULL | F-V3-03 (EXTENDED ASUMSI) |
+### 7.5 UI Component Updates
 
-### 7.3 Prompt Builder Changes
+| Component | File | Changes |
+|-----------|------|---------|
+| Image Prompt Display | `src/components/generate/image-prompt-display.tsx` | Tambah section color_palette (color chips) + technical (text) |
+| Audio Panel | `src/components/generate/audio-panel.tsx` | Sudah ada — verifikasi render data dari DB |
+| Voice Type Selector | `src/components/generate/voice-type-selector.tsx` | Sudah ada — verifikasi voiceover_speaker tampil |
+| Scene Transition Card | `src/components/generate/scene-transition-card.tsx` | Sudah ada — verifikasi flow patterns tampil |
 
-**System prompt additions (`prompt-builder.ts:71-97`):**
+### 7.6 Landing Page Update
 
-JSON schema output tambah:
-- scenes[].transitionType: enum (cut/dissolve/fade_to_black/fade_to_white/wipe/match_cut)
-- scenes[].transitionDurationMs: integer
-- scenes[].transitionEasing: enum (linear/ease_in/ease_out/ease_in_out)
-- scenes[].transitionDirection: enum (forward/backward/loop)
-- scenes[].scene_pacing: enum (fast/medium/slow) (EXTENDED ASUMSI)
-- scenes[].scene_mood: enum (tense/relaxed/dramatic/neutral) (EXTENDED ASUMSI)
-- scenes[].voiceType: enum (child/teen/adult_male/adult_female/elderly_male/elderly_female/narrator)
-- scenes[].voiceEmotion: enum (neutral/happy/sad/excited/calm/dramatic)
-- scenes[].voiceSpeed: float (0.5-2.0)
-- scenes[].voicePitch: enum (low/medium/high/auto)
-- scenes[].durationSeconds: integer
-- scenes[].audio[]: array of {audioType, description, timing, durationSeconds, volume, fadeInMs, fadeOutMs, music_genre, music_mood, music_tempo_bpm, music_instruments, music_volume, sfx_list, ambient_type, ambient_volume}
-- image_prompts[].promptText: structured 8-layer (bukan 1 baris)
-- image_prompts[].composition: text (EXTENDED ASUMSI)
-- image_prompts[].lighting: text (EXTENDED ASUMSI)
-- image_prompts[].camera: text (EXTENDED ASUMSI)
+| Item | Detail |
+|------|--------|
+| File | `src/lib/landing/features.ts` |
+| Content | Tambah 5 fitur: Scene Transitions (6 jenis), Voice Type (7 tipe), Audio Specs (5 jenis), Image Prompts (8-layer), Theme Toggle (3 mode) |
+| i18n | `messages/id.json` + `messages/en.json` — tambah keys untuk fitur V3 |
 
-Instruksi baru:
-1. Transition: action=cut, time passage=dissolve, chapter end=fade_to_black, dream=fade_to_white, location change=wipe, visual continuity=match_cut
-2. Voice: pilih berdasarkan karakter yang berbicara
-3. Audio: minimal 1 audio cue per scene
-4. Image prompt: formula 8-layer
-5. Duration: estimate per-scene dari dialogue length
+### 7.7 E2E Tests
 
-### 7.4 Zod Schema Changes
+| # | Test | File | Priority |
+|---|------|------|----------|
+| 1 | Login flow | `e2e/login.spec.ts` (sudah ada) | Must |
+| 2 | Register flow | `e2e/register.spec.ts` | Must |
+| 3 | Create project | `e2e/project-create.spec.ts` | Must |
+| 4 | Generate animation brief | `e2e/generate.spec.ts` | Must |
+| 5 | View project detail | `e2e/project-detail.spec.ts` | Must |
+| 6 | View scene transitions | `e2e/scene-transitions.spec.ts` | Should |
+| 7 | View audio specs | `e2e/audio-specs.spec.ts` | Should |
+| 8 | Export brief | `e2e/export.spec.ts` | Should |
+| 9 | Theme toggle | `e2e/theme-toggle.spec.ts` | Should |
+| 10 | Settings — provider config | `e2e/settings.spec.ts` | Should |
 
-**SceneSchema extended:**
-```
-// Existing retained
-order, description, voiceover_script, image_prompts
+### 7.8 Aset yang Dibutuhkan
 
-// V3 additions
-transitionType: z.enum(['cut','dissolve','fade_to_black','fade_to_white','wipe','match_cut']).default('cut')
-transitionDurationMs: z.number().default(0)
-transitionEasing: z.enum(['linear','ease_in','ease_out','ease_in_out']).default('linear')
-transitionDirection: z.enum(['forward','backward','loop']).default('forward')
-scene_pacing: z.enum(['fast','medium','slow']).default('medium')  // EXTENDED ASUMSI
-scene_mood: z.enum(['tense','relaxed','dramatic','neutral']).default('neutral')  // EXTENDED ASUMSI
-voiceType: z.enum(['child','teen','adult_male','adult_female','elderly_male','elderly_female','narrator']).default('narrator')
-voiceEmotion: z.enum(['neutral','happy','sad','excited','calm','dramatic']).default('neutral')
-voiceSpeed: z.number().min(0.5).max(2.0).default(1.0)
-voicePitch: z.enum(['low','medium','high','auto']).default('auto')
-durationSeconds: z.number().optional()
-audio: z.array(SceneAudioSchema).optional()
-```
-
-**SceneAudioSchema (new — 19 fields: 7 core + 12 EXTENDED ASUMSI):**
-```
-// Core fields
-audioType: z.enum(['background_music','sfx','ambient','music_cue','transition_audio'])
-description: z.string()
-timing: z.enum(['start','throughout','end','specific_moment']).default('throughout')
-durationSeconds: z.number().optional()
-volume: z.number().min(0).max(1).default(0.7)
-fadeInMs: z.number().default(0)
-fadeOutMs: z.number().default(0)
-
-// EXTENDED ASUMSI fields
-music_genre: z.string().optional()
-music_mood: z.string().optional()
-music_tempo_bpm: z.number().optional()
-music_instruments: z.string().optional()
-music_volume: z.number().min(0).max(1).optional()
-sfx_list: z.string().optional()
-ambient_type: z.string().optional()
-ambient_volume: z.number().min(0).max(1).optional()
-music_key: z.string().optional()
-rhythm_pattern: z.string().optional()
-spatial_audio: z.boolean().optional()
-audio_tags: z.string().optional()
-```
+| Aset | Lokasi | Status |
+|------|--------|--------|
+| Logo PromptFlow | Sudah ada di public/ | ✅ |
+| Theme icons (Sun/Moon/Monitor) | lucide-react | ✅ |
+| Feature icons untuk landing page | lucide-react | ✅ |
+| Color palette visual (CSS chips) | Komponen baru di image-prompt-display.tsx | Perlu dibuat |
+| Audio type icons | lucide-react (Music, Volume2, Waves, Radio, Zap) | ✅ |
+| Transition type visual | scene-transition-card.tsx | ✅ Sudah ada |
 
 ---
 
-## 8. Out of Scope Eksplisit (V3)
+## 8. Out of Scope Eksplisit
 
-| ID | Item | Alasan | Sumber |
-|---|---|---|---|
-| OOS-V3-01 | Audio generation actual | Spec only, bukan file — V4 | BRD OOS-V3-01 |
-| OOS-V3-02 | TTS engine actual | Spec only — V4 | BRD OOS-V3-02 |
-| OOS-V3-03 | Image generation actual | PromptFlow = prompt engine | BRD OOS-V3-03 |
-| OOS-V3-04 | Video assembly actual | PromptFlow = prompt engine | BRD OOS-V3-04 |
-| OOS-V3-05 | Custom voice cloning | Butuh consent + legal — V5 | BRD OOS-V3-05 |
-| OOS-V3-06 | Audio waveform preview | Butuh audio file — V4 | BRD OOS-V3-06 |
-| OOS-V3-07 | A/B testing infrastructure | Cukup Vercel Analytics | BRD OOS-V3-07 |
-| OOS-V3-08 | Negative prompt | V4 — user feedback dulu | BRD OOS-V3-08 |
-| OOS-V3-09 | Multi-language voice | Fokus Indonesia — V5 | BRD OOS-V3-09 |
-| OOS-V3-10 | Prompt builder refactor | Cukup V3 — refactor V5 | BRD OOS-V3-10 |
-| OOS-V3-11 | Mobile app | Web-only V3 | BRD OOS-V3-11 |
-| OOS-V3-12 | Pricing changes | Tidak ada pricing V2 — V4 | BRD OOS-V3-12 |
-| OOS-V3-13 | Audio template presets | V4 — post user feedback | BRD RISK-V3-07 |
-| OOS-V3-14 | Complexity toggle | V4 — post user feedback | BRD RISK-V3-09 |
+Berikut item yang **TIDAK** termasuk dalam scope V3 update:
+
+| # | Item | Alasan | Rencana Masa Depan |
+|---|------|--------|-------------------|
+| 1 | Multi-tenant / team collaboration | Butuh arsiteur multi-user, belum ada model bisnisnya | V4+ |
+| 2 | Payment / billing integration | Belum ada model monetisasi aktif | Setelah product-market fit |
+| 3 | Redis rate limiting | Dibutuhkan di production, tapi in-memory cukup untuk 1 instance | Saat multi-instance |
+| 4 | Mobile app / PWA | Web-first, responsive cukup | Setelah web stabil |
+| 5 | Real-time collaboration | Butuh WebSocket/CRDT, kompleks | V4+ |
+| 6 | Video rendering / preview | PromptFlow = brief generator, bukan video editor | Partnership dengan Runway/Pika |
+| 7 | LLM fine-tuning / custom training | Menggunakan provider existing | Saat ada data training cukup |
+| 8 | Component test (.test.tsx) | Lib layer unit test + E2E cukup untuk sekarang | Saat team grow |
+| 9 | Multi-language support (selain id/en) | id/en cukup untuk target pasar | Berdasarkan user demand |
+| 10 | Direct integration ke Runway/Pika API | Partnership dependent, bukan core product | Saat partnership ready |
 
 ---
 
-## 9. Asumsi Produk (V3)
+## Lampiran
 
-| ID | Asumsi | Alasan | Dampak bila Salah | Sumber |
-|---|---|---|---|---|
-| PRD-V3-A01 | Theme toggle pakai next-themes | Standard, zero-config shadcn/ui | Custom solution complex | RAG-CONTEXT ASM-1 |
-| PRD-V3-A02 | Transition = field di scenes table | Simple, cukup MVP | Perlu new table | RAG-CONTEXT ASM-2 |
-| PRD-V3-A03 | Image prompts = enhance prompt builder | promptText tetap single string | Schema extension besar | RAG-CONTEXT ASM-3 |
-| PRD-V3-A04 | Voice type = field di scenes table | Simple, cukup MVP | Perlu new table | RAG-CONTEXT ASM-4 |
-| PRD-V3-A05 | Audio = new table scene_audio | Multiple audio per scene | Single field tidak cukup | RAG-CONTEXT ASM-5 |
-| PRD-V3-A06 | 1 schema migration untuk semua | Drizzle additive | Multiple migration | RAG-CONTEXT ASM-6 |
-| PRD-V3-A07 | Export tetap JSON + MD | Tidak ada requirement baru | Perlu format baru | RAG-CONTEXT ASM-7 |
-| PRD-V3-A08 | 7 voice types cukup MVP | Cover 80% use case ID | V4 extend cepat | RAG-CONTEXT ASM-8 |
-| PRD-V3-A09 | 6 transition types cukup MVP | Cover 95% use cases | V4 extend | RAG-CONTEXT ASM-9 |
-| PRD-V3-A10 | 5 audio categories cukup MVP | Cover basic needs | V4 extend | RAG-CONTEXT ASM-10 |
-| PRD-V3-A11 | LLM generate metadata konsisten | V1 sudah pakai LLM | Output random | BRD ASM-B-V3-04 |
-| PRD-V3-A12 | User V2 mau update ke V3 | 5 fitur additive | Churn | BRD ASM-B-V3-05 |
-| PRD-V3-A13 | Spec > actual audio file (MVP) | Spec portable, file lock-in | V4 tambah audio gen | BRD ASM-B-V3-06 |
-| PRD-V3-A14 | Migration additive only | Drizzle additive | Data loss | BRD ASM-B-V3-07 |
-| PRD-V3-A15 | Biaya LLM naik <= 50% | Prompt optimize | Margin turun | BRD ASM-B-V3-08 |
-| PRD-V3-A16 | User Indonesia dominan | Persona Rian + Bu Sinta | Pasar EN kurang | BRD ASM-B-V3-09 |
-| PRD-V3-A17 | 5 fitur = 1 sprint (2-3 minggu) | Effort manageable | Timeline molor | BRD ASM-B-V3-10 |
-| PRD-V3-A18 | V3 = spec only, bukan actual generation | PromptFlow = prompt engine | User expect 1-click video | MRD S7.3 |
+### L1. Mapping BRD → PRD
 
----
+| BRD Tujuan | PRD Fitur Terkait |
+|-----------|-------------------|
+| G1 (Theme adoption ≥30%) | FR-M07, AC-M07 |
+| G2 (Transition usage ≥70% non-cut) | FR-M04, AC-M04 |
+| G3 (Image prompt ≥6/8 layers ≥90%) | FR-M05, AC-M05 |
+| G4 (Audio spec generation ≥80%) | FR-M01, AC-M01 |
+| G5 (Data persistence 100%) | FR-M01, FR-M02, FR-M03, AC-M01, AC-M02, AC-M03 |
+| G6 (E2E ≥10 tests) | FR-S02, AC-S02 |
+| G7 (Landing page V3 section) | FR-S01, AC-S01 |
 
-## Lampiran A — Cross-Reference
+### L2. Mapping MRD → PRD
 
-| Topik | Sumber Utama | Pendukung |
-|---|---|---|
-| Value Proposition | MRD S5.2 | BRD S3.2 |
-| Personas | MRD S3.1-3.2 | BRD S5 |
-| KPI | BRD S4.2 | MRD S8.1 |
-| Schema Gaps | RAG-CONTEXT S3.2 | BRD S2.3 |
-| Prompt Gaps | RAG-CONTEXT S4.3 | BRD S2.3 |
-| Transition | RAG-CONTEXT S5.3, S10.1 | BRD S6.2 |
-| Image Prompt | RAG-CONTEXT S6.3, S10.2 | BRD S6.3 |
-| Voice Types | RAG-CONTEXT S7.2, S10.3 | BRD S6.4 |
-| Audio | RAG-CONTEXT S8.2, S10.4 | BRD S6.5 |
-| Theme | RAG-CONTEXT S9.1-9.3 | BRD S6.1 |
-| Competitive | MRD S4.1-4.3 | BRD S3.1 |
-| Risk | BRD S9 | RAG-CONTEXT S11 |
-| Tech Constraint | BRD LIM-V3-01..13 | AGENTS.md |
+| MRD Kebutuhan | PRD Fitur Terkait |
+|--------------|-------------------|
+| K1 (Animation brief terstruktur) | FR-M01 s/d FR-M06 |
+| K2 (Scene transition terdefinisi) | FR-M04 |
+| K3 (Image prompt berlapis) | FR-M02, FR-M05 |
+| K4 (Voice type mapping) | FR-M03, FR-M06 |
+| K5 (Audio spec per scene) | FR-M01 |
+| K6 (Data persistence) | FR-M01, FR-M02, FR-M03 |
+| K12 (Landing page informatif) | FR-S01 |
+| K13 (E2E test coverage) | FR-S02 |
 
----
+### L3. Referensi Teknis
 
-## Lampiran B — Definition of Done (V3)
+- Tech stack: lihat `RAG-CONTEXT.md` Section 2
+- Database schema: lihat `RAG-CONTEXT.md` Section 4
+- API endpoints: lihat `RAG-CONTEXT.md` Section 5
+- Gap analysis: lihat `RAG-CONTEXT.md` Section 18
+- Prompt builder V3 details: lihat `RAG-CONTEXT.md` Section 7
+- Zod schemas: lihat `RAG-CONTEXT.md` Section 8
 
-- [ ] Light theme toggle berfungsi + persist + system preference
-- [ ] Hardcoded dark class removed dari layout.tsx + page.tsx
-- [ ] Schema migration additive: +11 fields scenes + new table scene_audio
-- [ ] Prompt builder enhanced 5 metadata
-- [ ] Zod schema extended + validated
-- [ ] UI: transition flow, voice selector, audio panel, image prompt labels
-- [ ] Export JSON + Markdown termasuk V3 metadata
-- [ ] i18n ID+EN sinkron semua V3
-- [ ] V2→V3 migration tested (dry-run + reversible)
-- [ ] In-app changelog banner V2 user
-- [ ] Landing page copy updated
-- [ ] 5 analytics event V3 wired
-- [ ] Lighthouse Performance >= 85
-- [ ] Bundle <= +20KB gzipped
-- [ ] pnpm lint 0 + typecheck 0 + build pass
-- [ ] WCAG 2.1 AA light + dark
-- [ ] V2 dry-run: 100% retained
-- [ ] Conventional commit feat(v3): per fitur (5 atomic)
-- [ ] PR reviewed + merged
-- [ ] Preview deploy Vercel sukses
+### L4. Asumsi
+
+| # | Asumsi | Basis | Tandai |
+|---|--------|-------|--------|
+| 1 | Pengguna punya akses minimal satu LLM provider | Multi-provider design | ASUMSI |
+| 2 | Output PromptFlow dipakai sebagai input ke Runway/Pika/Kling/Sora | Prompt builder target tools | ASUMSI |
+| 3 | Vercel Hobby plan tetap digunakan (max 300s timeout) | `maxDuration=300` di generate route | ASUMSI |
+| 4 | Turso/libSQL handle schema V3 tanpa breaking migration | Migration sudah dijalankan | ASUMSI |
+| 5 | Kualitas output bergantung pada LLM model yang dipakai | PromptFlow kontrol struktur, bukan model | ASUMSI |
+| 6 | Indonesia-first dengan English support | Default locale `id` | ASUMSI |
 
 ---
 
-> **Dokumen ini = kontrak produk V3 untuk 5 fitur inti PromptFlow. Eksekutor baca PRD + BRD V3 + MRD V3 + RAG-CONTEXT + AGENTS.md. Semua klaim bersitasi. Klaim tanpa bukti = ASUMSI (ditandai di S9). Acceptance criteria S6 = quality gate sebelum merge.**
-
-**Dibuat oleh:** docgen-prd subagent
-**Tanggal:** 2026-06-21
-**Versi:** 2.0 (V3 Update)
+*Dokumen ini disusun berdasarkan BRD.md, MRD.md, dan RAG-CONTEXT.md (codebase evidence) per 2026-06-22. Seluruh claim teknis memiliki sitasi ke file dan baris kode di RAG-CONTEXT.md.*

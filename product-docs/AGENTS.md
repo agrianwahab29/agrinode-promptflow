@@ -1,793 +1,411 @@
-# AGENTS.md — Panduan Build PromptFlow V3 Core Features
+# AGENTS.md — PromptFlow V3 Build Guide
+## Operational Guide for LLM/Agent Executor
 
-> **Versi:** 2.0 (V3 Core Features)
-> **Tanggal:** 2026-06-21
-> **Deliverable:** 5 fitur inti V3 — Light Theme Support, Scene Transition Flow Engine, Complex Image Prompts (8 layer), Voiceover Voice Type Spec, Supporting Audio Spec
-> **Menggantikan:** AGENTS.md v1.0 (Landing Page Focus)
-> **Status:** PASS WITH WARNINGS (REVIEW_REPORT v2.0). 0 CRITICAL, 2 WARNING (WARN-005, WARN-006). Build boleh mulai, WARNING diperbaiki paralel.
-> **Builds on:** V1 (workflow engine, deployed) + V2 (landing page, in production)
-
----
-
-## 1. Project Overview
-
-### 1.1 Apa Itu PromptFlow
-
-**PromptFlow** = workflow engine otomasi prompt animasi AI. Web app fullstack (Next.js 15 + React 19 + Tailwind v4 + shadcn/ui + Drizzle ORM + Turso/libSQL + Vercel AI SDK v4 + next-intl). Output = paket prompt terstruktur (JSON + Markdown) dari input minimal (judul + durasi + gaya). Multi-provider LLM. Character consistency lintas adegan.
-
-### 1.2 V3 Scope — 5 Fitur Inti (MUST)
-
-V1 = workflow engine (deployed). V2 = landing page (in production). **V3 = core feature expansion** menjawab 5 gap dari feedback user V2.
-
-| # | Fitur | Masalah V2 yang Dijawab | Bukti Kode |
-|---|---|---|---|
-| **F-V3-01** | **Light Theme Support** | App force dark — user siang/office silau | `layout.tsx:66` hardcoded `className="dark"` |
-| **F-V3-02** | **Scene Transition Flow Engine** | Video output "adegan kaget" (jarring cut) | `scenes` table tanpa transition fields |
-| **F-V3-03** | **Complex Image Prompts (8 layer)** | Output AI image generic 1-baris | `prompt-builder.ts` prompt basic |
-| **F-V3-04** | **Voiceover Voice Type Spec** | Voiceover monoton, semua scene satu suara | `voiceoverScript` plain string |
-| **F-V3-05** | **Supporting Audio Spec** | ZERO audio — video diam tanpa musik/SFX/ambient | Tidak ada field audio |
-
-### 1.3 V3 Positioning
-
-> "Production-grade animation prompt engine — output siap-pakai untuk downstream AI video tools (Runway, Pika, Kling, Sora), no re-edit needed."
-
-V3 = **spec only**, BUKAN actual generation. Generate metadata transition/voice/audio/image layer, BUKAN generate video/audio/image file asli.
-
-### 1.4 V3 Stats
-
-- **5 fitur MUST** + 7 SHOULD + 6 COULD
-- **29 file touched** (13 baru + 16 modify)
-- **1 dep baru** (next-themes ^0.4.4)
-- **+11 fields scenes** (9 core + 2 EXTENDED ASUMSI: scenePacing, sceneMood)
-- **+5 fields image_prompts** (2 core + 3 EXTENDED ASUMSI: composition, lighting, camera)
-- **+1 field projects** (theme_preference — ASUMSI)
-- **1 new table scene_audio** (19 fields: 7 core + 12 EXTENDED ASUMSI)
-- **+5 V3 analytics events** (no PII)
-- **~60 i18n keys V3** (ID+EN paralel)
-- **Bundle impact:** ~2KB gzipped (next-themes only, target <= +20KB)
-- **205 test case V3** (288 total termasuk V1 landing)
-
-### 1.5 Out-of-Scope V3 (JANGAN Dikerjakan)
-
-| # | OOS | Alasan |
-|---|---|---|
-| OOS-01 | Audio file generation (royalty API) | V3 = spec only — V4 |
-| OOS-02 | TTS engine actual (ElevenLabs) | V3 = voice metadata — V4 |
-| OOS-03 | Image generation (Midjourney/DALL-E) | PromptFlow = prompt engine |
-| OOS-04 | Video assembly (Runway/Pika) | PromptFlow = prompt engine |
-| OOS-05 | Custom voice cloning | V5 |
-| OOS-06 | Audio waveform preview | V4 |
-| OOS-07 | A/B testing infrastructure | Cukup Vercel Analytics |
-| OOS-08 | Negative prompt | V4 |
-| OOS-09 | Multi-language voice | V5 |
-| OOS-10 | Prompt builder refactor | V5 |
-| OOS-11 | Mobile app | Web-only V3 |
-| OOS-12 | Pricing changes | Tidak ada pricing V2 |
+**Versi:** 3.0
+**Tanggal:** 2026-06-22
+**Project Root:** C:\laragon\www\PromptFlow
+**Docs Dir:** C:\laragon\www\PromptFlow\product-docs
 
 ---
 
-## 2. Tech Stack
+## 1. Identitas & Tujuan
 
-### 2.1 Stack Retained (V1+V2)
-
-| Lapisan | Teknologi | Versi |
-|---|---|---|
-| Framework | Next.js (App Router) | ^15.1.0 |
-| UI Library | React + ReactDOM | ^19.0.0 |
-| Styling | Tailwind CSS v4 | ^4.0.0 |
-| UI Components | shadcn/ui (Radix UI) | ^1.1.0 |
-| ORM | Drizzle ORM | ^0.38.0 |
-| Database | Turso/libSQL | ^0.14.0 |
-| Auth | NextAuth v5 (beta.25) | 5.0.0-beta.25 |
-| AI SDK | Vercel AI SDK v4 (`ai`) | ^4.0.0 |
-| AI Provider | `@ai-sdk/openai-compatible` | ^1.0.0 |
-| Validation | Zod | ^3.24.0 |
-| i18n | next-intl | ^3.26.0 |
-| Animation | framer-motion | ^12.40.0 |
-| Analytics | @vercel/analytics | latest |
-| TypeScript | typescript | ^5.7.0 |
-| Package Manager | pnpm | 11.7.0 |
-| Node | Node.js | >=20.0.0 |
-
-### 2.2 Dependency BARU (V3) — 1-satunya
-
-| Package | Versi | Install |
-|---|---|---|
-| **next-themes** | ^0.4.4 | `pnpm add next-themes` |
-
-### 2.3 Dependency DILARANG (V3)
-
-AI SDK v6, GSAP, Anime.js, Tone.js, Howler.js, ElevenLabs SDK, Midjourney/DALL-E SDK, custom font berbayar.
+Kamu adalah agent eksekutor yang bertugas membangun **PromptFlow V3 Update** — menutup critical data gaps antara LLM output dan database persistence, memperkuat prompt builder, memperbarui UI, landing page, dan menambah E2E tests. Seluruh kode existing sudah jalan; tugasmu adalah **incremental gap closure**, bukan rewrite.
 
 ---
 
-## 3. File Structure
+## 2. Konteks Proyek
 
-### 3.1 File BARU (13 files)
+**PromptFlow** adalah web app Next.js 15 App Router yang berfungsi sebagai **AI Animation Brief Engine** — menghasilkan paket prompt animasi terstruktur (scene, transisi, voice, audio, image prompt 8-lapis) untuk AI video generator (Runway, Pika, Kling, Sora).
 
-| # | Path | Tipe | Fitur |
-|---|---|---|---|
-| 1 | `src/components/common/theme-toggle.tsx` | Client | Dropdown light/dark/system. Sun/Moon/Monitor. `useTheme()` dari next-themes |
-| 2 | `src/components/common/changelog-banner.tsx` | Client | V3 in-app changelog. Dismissable |
-| 3 | `src/components/generate/scene-transition-card.tsx` | Client | Scene + transition icon Lucide + duration badge + flow arrow |
-| 4 | `src/components/generate/voice-type-selector.tsx` | Client | Voice type + emotion + speed slider + pitch per scene |
-| 5 | `src/components/generate/audio-panel.tsx` | Client | CRUD audio entries per scene. Dialog add/edit/delete |
-| 6 | `src/components/generate/image-prompt-display.tsx` | Client | Collapsible 8 layer labels + copy per-section |
-| 7 | `src/lib/db/repositories/scene-audio.repository.ts` | Module | CRUD scene_audio (getByScene, create, update, delete, list) |
-| 8 | `src/app/api/v1/projects/[id]/scenes/[sceneId]/audio/route.ts` | API | Audio CRUD: GET list + POST create |
-| 9 | `src/app/api/v1/projects/[id]/scenes/[sceneId]/audio/[audioId]/route.ts` | API | Audio CRUD: PATCH update + DELETE |
-| 10 | `src/app/api/v1/projects/[id]/theme/route.ts` | API | PATCH theme preference (server-side sync) |
-| 11 | `src/lib/migration/v2-to-v3.ts` | Module | Backfill + dry-run + rollback |
-| 12 | `drizzle/0001_v3_core_features.sql` | SQL | Additive migration (generated by drizzle-kit) |
-| 13 | `src/lib/templates/presets.ts` | Module | Template presets (tutorial/cinematic/kids/documentary/action) |
+**Stack:** Next.js 15, React 19, TypeScript 5.7 strict, Tailwind v4, shadcn/ui, Drizzle ORM 0.38, Turso/libSQL, NextAuth v5, Zod 3.24, next-intl, next-themes, framer-motion, Vitest, Playwright, pnpm 11.7.
 
-### 3.2 File MODIFY (16 files)
+**Status saat ini:** ~80+ source files, 10 DB tables, 20+ API endpoints, 7 unit test files, 1 E2E spec. Semua 5 fitur V3 sudah diimplementasi pada level kode dan skema DB V3 (migration 0001). Namun ada **critical data gaps** yang harus ditutup.
 
-| # | Path | Perubahan | Fitur |
-|---|---|---|---|
-| 1 | `package.json` | +next-themes | F-V3-01 |
-| 2 | `src/components/providers.tsx` | +NextThemesProvider wrapper | F-V3-01 |
-| 3 | `src/app/layout.tsx` | Remove `className="dark"` line 66 + `suppressHydrationWarning` | F-V3-01 |
-| 4 | `src/app/[locale]/page.tsx` | Remove `<div className="dark">` line 24 | F-V3-01 |
-| 5 | `src/components/common/app-header.tsx` | +ThemeToggle sebelum LanguageToggle | F-V3-01 |
-| 6 | `src/components/settings/provider-card.tsx` | Replace `dark:bg-green-950` line 88 | F-V3-01 |
-| 7 | `src/lib/db/schema.ts` | +11 scenes +5 image_prompts +1 projects + scene_audio table | F-V3-02..05 |
-| 8 | `src/lib/validation/schemas.ts` | Extend SceneSchema +11 fields + new SceneAudioSchema + ThemePreferenceSchema | F-V3-08 |
-| 9 | `src/lib/ai/prompt-builder.ts` | 5 metadata instructions | F-V3-07 |
-| 10 | `src/app/api/v1/generate/route.ts` | Save handler persist 11 V3 fields + batch insert scene_audio | F-V3-02,04,05,06 |
-| 11 | `src/app/api/v1/projects/[id]/export/route.ts` | Extend JSON serialize + Markdown 4 V3 sections | F-V3-09 |
-| 12 | `src/lib/export/markdown.template.ts` | +V3 sections (Transitions/Voice/Audio/Image Layers) | F-V3-09 |
-| 13 | `src/components/generate/result-tabs.tsx` | Integrate 4 new V3 components inline per scene | F-V3-02..05 |
-| 14 | `src/lib/analytics/events.ts` | +5 V3 events | F-V3-12 |
-| 15 | `messages/id.json` | +~60 V3 keys | F-V3-10 |
-| 16 | `messages/en.json` | +~60 V3 keys paralel | F-V3-10 |
+---
 
-### 3.3 Total: 13 baru + 16 modify = 29 file touched
+## 3. Lokasi & Peran Dokumen
 
-### 3.4 Folder Structure Update
+| Dokumen | Peran | Path |
+|---------|-------|------|
+| **BRD.md** | WHY — justifikasi bisnis, tujuan, KPI, stakeholder, risiko | `C:\laragon\www\PromptFlow\product-docs\BRD.md` |
+| **MRD.md** | WHO — pasar, persona, pesaing, positioning, strategi peluncuran | `C:\laragon\www\PromptFlow\product-docs\MRD.md` |
+| **PRD.md** | WHAT — fitur, user stories, MoSCoW, acceptance criteria, deliverable | `C:\laragon\www\PromptFlow\product-docs\PRD.md` |
+| **SRS.md** | HOW — arsitektur, spesifikasi teknis, data model, API, tahapan implementasi | `C:\laragon\www\PromptFlow\product-docs\SRS.md` |
+| **DATABASE_SCHEMA.md** | DB — 10 tabel, ERD, indexes, constraints, migration plan | `C:\laragon\www\PromptFlow\product-docs\DATABASE_SCHEMA.md` |
+| **PROJECT_ARCHITECTURE.md** | ARCH — layers, folder structure, data flows, integrasi, deployment | `C:\laragon\www\PromptFlow\product-docs\PROJECT_ARCHITECTURE.md` |
+| **UIUX_SPEC.md** | UI — design tokens, komponen, layout, wireframes, user flows | `C:\laragon\www\PromptFlow\product-docs\UIUX_SPEC.md` |
+| **API_CONTRACT.md** | API — endpoint specs, request/response schemas, SSE events | `C:\laragon\www\PromptFlow\product-docs\API_CONTRACT.md` |
+| **CODING_RULES.md** | RULES — naming, code style, Drizzle patterns, error handling, testing | `C:\laragon\www\PromptFlow\product-docs\CODING_RULES.md` |
+| **TEST_PLAN.md** | TEST — unit, integration, E2E test matrix, coverage targets | `C:\laragon\www\PromptFlow\product-docs\TEST_PLAN.md` |
+| **RAG-CONTEXT.md** | EVIDENCE — codebase scan, file-level citations, gap analysis | `C:\laragon\www\PromptFlow\product-docs\RAG-CONTEXT.md` |
 
-```
-src/
-  app/
-    layout.tsx                         (MODIFY - remove hardcoded className="dark")
-    [locale]/
-      layout.tsx                       (Server - wrap ThemeProvider + SessionProvider)
-      page.tsx                         (MODIFY - remove div.dark wrap)
-    api/v1/
-      generate/route.ts                (MODIFY - persist V3 fields)
-      projects/[id]/
-        export/route.ts                (MODIFY - extend JSON/MD)
-        theme/route.ts                 (NEW - PATCH theme)
-        scenes/[sceneId]/
-          audio/route.ts               (NEW - GET/POST audio)
-          audio/[audioId]/route.ts     (NEW - PATCH/DELETE audio)
-  components/
-    providers.tsx                      (MODIFY - add NextThemesProvider)
-    common/
-      app-header.tsx                   (MODIFY - add ThemeToggle)
-      theme-toggle.tsx                 (NEW - 3-state toggle)
-      changelog-banner.tsx             (NEW - V3 announcement)
-    generate/
-      result-tabs.tsx                  (MODIFY - integrate 4 new)
-      scene-transition-card.tsx        (NEW)
-      voice-type-selector.tsx          (NEW)
-      audio-panel.tsx                  (NEW)
-      image-prompt-display.tsx         (NEW)
-    settings/
-      provider-card.tsx                (MODIFY - remove hardcoded dark:)
-  lib/
-    ai/prompt-builder.ts               (MODIFY - 5 metadata instructions)
-    db/
-      schema.ts                        (MODIFY - +17 fields + scene_audio table)
-      repositories/
-        scene-audio.repository.ts      (NEW - CRUD)
-    validation/schemas.ts              (MODIFY - extend + new SceneAudioSchema)
-    export/markdown.template.ts        (MODIFY - V3 sections)
-    migration/v2-to-v3.ts              (NEW - backfill + dry-run + rollback)
-    analytics/events.ts                (MODIFY - +5 V3 events)
-    templates/presets.ts               (NEW - 5 presets)
+---
 
-drizzle/
-  0000_gigantic_genesis.sql            (V1/V2 - retained)
-  0001_v3_core_features.sql            (NEW - additive migration)
+## 4. 5 Fitur V3 — Status & Gap
 
-messages/
-  id.json                              (MODIFY - +~60 V3 keys)
-  en.json                              (MODIFY - +~60 V3 keys paralel)
+| # | Fitur | Status Kode | Gap yang Harus Ditutup |
+|---|-------|-------------|----------------------|
+| F1 | **Light Theme** (dark/light/system) | DONE | Root layout mungkin belum wrap Providers untuk landing page. Verifikasi CSS variables dipakai di semua landing components. |
+| F2 | **Scene Transitions** (6 jenis + flow patterns) | DONE | Flow patterns kurang optimal — perlu aturan tambahan: mood change, action fast, same mood, durasi minimum. |
+| F3 | **Complex Image Prompts** (8-layer) | DONE (prompt+schema partial) | `color_palette` + `technical` TIDAK ada di DB `image_prompts` table. Generate route hanya simpan 4 dari 8 layer. |
+| F4 | **Voice Type Mapping** (7 tipe) | DONE | `voiceover_speaker` TIDAK ada di DB `scenes` table. Mapping rules perlu diperkuat (mood->emotion, pacing->speed, pitch per age). |
+| F5 | **Audio Specs** (5 jenis/scene) | DONE (table+repo+api) | Generate route **TIDAK menyimpan** `audio_specs` ke `scene_audio` table. Data loss antara generate dan revisi. |
+
+---
+
+## 5. Critical Data Gaps — Detail Teknis
+
+### 5.1 Generate Route Gaps (src/app/api/v1/generate/route.ts)
+
+**GAP-1: voiceover_speaker tidak tersimpan**
+- Lines 158-174: `bulkCreateScenes` mapping TIDAK include `voiceoverSpeaker`
+- Fix: tambah `voiceoverSpeaker: s.voiceover_speaker ?? 'narrator'`
+
+**GAP-2: color_palette + technical tidak tersimpan**
+- Lines 179-182: `bulkCreateImagePrompts` mapping hanya 4 field (projectId, sceneId, tipe, target, promptText, referenceFilename)
+- Fix: tambah 7 fields: `composition`, `lighting`, `camera`, `moodAtmosphere`, `styleReferences`, `colorPalette` (handle array->string), `technical`
+
+**GAP-3: audio_specs tidak tersimpan ke scene_audio**
+- Setelah `bulkCreateScenes`, TIDAK ada loop INSERT ke `scene_audio`
+- Fix: tambah blok loop: for each scene, for each audio_spec, INSERT ke scene_audio
+- PREREQUISITE: `bulkCreateScenes` harus RETURN rows (`.returning()`)
+
+**GAP-4: image_prompts.scene_id tidak ter-link**
+- `bulkCreateImagePrompts` tidak map `sceneId` dari created scenes
+- Fix: map `sceneId` dari `createdScenes[i].id`
+
+### 5.2 Database Schema Gaps
+
+**Kolom hilang di DB:**
+- `scenes` table: TIDAK punya `voiceover_speaker` (Zod schema sudah ada)
+- `image_prompts` table: TIDAK punya `color_palette` dan `technical` (Zod schema sudah ada)
+
+**Migration diperlukan:** 3 ALTER TABLE statements
+
+---
+
+## 6. Deliverable Target
+
+| # | Deliverable | Format | Lokasi Output |
+|---|------------|--------|---------------|
+| 1 | Migration SQL | `.sql` | `drizzle/0002_v3_gap_closure.sql` |
+| 2 | Rollback SQL | `.sql` | `drizzle/0002_v3_gap_closure_rollback.sql` |
+| 3 | Drizzle schema update | `.ts` | `src/lib/db/schema.ts` |
+| 4 | Generate route patch | `.ts` | `src/app/api/v1/generate/route.ts` |
+| 5 | Prompt builder refinement | `.ts` | `src/lib/ai/prompt-builder.ts` |
+| 6 | Image prompt display enhancement | `.tsx` | `src/components/generate/image-prompt-display.tsx` |
+| 7 | Landing page features update | `.ts` | `src/lib/landing/features.ts` |
+| 8 | i18n keys (id + en) | `.json` | `messages/id.json`, `messages/en.json` |
+| 9 | E2E tests (9 new) | `.spec.ts` | `e2e/*.spec.ts` |
+| 10 | Unit test updates | `.test.ts` | `tests/**/*.test.ts` |
+
+---
+
+## 7. Constraint Teknis WAJIB
+
+### 7.1 TypeScript
+- Strict mode: `noImplicitAny`, `noImplicitReturns`, `noFallthroughCasesInSwitch`
+- Target: ES2022, module resolution: bundler
+- Path alias: `@/*` -> `./src/*`
+- Exported functions: explicit return types
+- Enum-like values: snake_case string literals (`'fade_to_black'`, `'adult_female'`)
+
+### 7.2 Database (Drizzle + Turso)
+- Schema: `src/lib/db/schema.ts` — 10 tables, camelCase TS properties -> snake_case SQL columns
+- Migration: `drizzle/` directory, SQL files
+- Repository pattern: `src/lib/db/repositories/*.repo.ts`
+- Soft delete: only `projects` table (`deleted_at`), queries MUST filter `WHERE deleted_at IS NULL`
+- `updated_at` does NOT auto-update — MUST set explicitly in UPDATE queries
+
+### 7.3 CSS & UI
+- **SEMUA warna dari CSS variables** `globals.css` — JANGAN hardcoded colors
+- Dark mode: `.dark` class override via `next-themes` `attribute="class"`
+- Icons: `lucide-react` only, JANGAN custom SVG
+- Component library: `shadcn/ui` primitives di `src/components/ui/`
+- Responsive: mobile-first Tailwind breakpoints (`sm:`, `md:`, `lg:`)
+- Animations: `framer-motion` untuk theme transitions
+- Font: Inter (sans), JetBrains Mono (mono)
+- Spacing: Tailwind default scale (space-1=4px, space-2=8px, dst)
+
+### 7.4 Validation
+- Zod schemas di `src/lib/validation/schemas.ts` — single source of truth
+- `color_palette` di Zod: `z.union([z.string(), z.array(z.string())])` — handle BOTH format di generate route
+- API input dan LLM output: SEMPAI divalidasi via Zod
+
+### 7.5 i18n
+- Locales: `['id', 'en']`, default `'id'`
+- Files: `messages/id.json`, `messages/en.json` — HARUS punya key yang sama
+- V3 keys: `landing.features.transitions.*`, `landing.features.voice.*`, `landing.features.audio.*`, `landing.features.imagePrompts.*`, `landing.features.theme.*`
+
+### 7.6 Testing
+- Unit: Vitest ^2.1.0, coverage 80% (lines, branches, functions, statements)
+- E2E: Playwright ^1.49.0, Chromium only, 120s timeout, base URL `http://localhost:3000`
+- Coverage include: `src/lib/**`, `src/app/api/**`
+- Coverage exclude: `**/*.test.ts`, `src/components/ui/**`
+
+### 7.7 Deployment
+- Platform: Vercel, pnpm 11.7.0, `pnpm install --frozen-lockfile`
+- Generate endpoint: `maxDuration = 300s` (Vercel Hobby)
+- External packages: `@libsql/client` (serverExternalPackages)
+
+---
+
+## 8. Tahapan Implementasi (7 Phase)
+
+### Phase 1: Database Migration (30 menit)
+
+| # | Task | File | Detail |
+|---|------|------|--------|
+| 1.1 | Buat migration | `drizzle/0002_v3_gap_closure.sql` | `ALTER TABLE scenes ADD voiceover_speaker TEXT DEFAULT 'narrator';` + `ALTER TABLE image_prompts ADD color_palette TEXT;` + `ALTER TABLE image_prompts ADD technical TEXT;` |
+| 1.2 | Buat rollback | `drizzle/0002_v3_gap_closure_rollback.sql` | 3 `DROP COLUMN` statements |
+| 1.3 | Update Drizzle schema | `src/lib/db/schema.ts` | Tambah: `voiceoverSpeaker: text('voiceover_speaker').default('narrator')` di scenes; `colorPalette: text('color_palette')` + `technical: text('technical')` di imagePrompts |
+| 1.4 | Generate types | Run `pnpm drizzle-kit generate` | Pastikan typesync |
+| 1.5 | Jalankan migration | Run `pnpm drizzle-kit migrate` atau manual | Verify: `PRAGMA table_info(scenes)` -> voiceover_speaker ada; `PRAGMA table_info(image_prompts)` -> color_palette, technical ada |
+
+**VERIFIKASI:**
+```sql
+PRAGMA table_info(scenes);        -- voiceover_speaker ada
+PRAGMA table_info(image_prompts); -- color_palette, technical ada
 ```
 
 ---
 
-## 4. Build Steps (T1-T8)
-
-5 atomic commit `feat(v3): <scope>` per fitur.
-
-### Fase 1: Design & Spec — SUDAH SELESAI
-
-| # | Task | Status |
-|---|---|---|
-| 1.1 | Finalisasi SRS V3 | DONE |
-| 1.2 | Finalisasi UIUX_SPEC V3 | DONE |
-| 1.3 | Finalisasi DATABASE_SCHEMA V3 | DONE |
-| 1.4 | Finalisasi API_CONTRACT V3 | DONE |
-| 1.5 | Finalisasi CODING_RULES V3 | DONE |
-| 1.6 | Finalisasi TEST_PLAN V3 | DONE |
-| 1.7 | REVIEW_REPORT v2.0 PASS | DONE |
-
-### Fase 2: Setup + Schema & Migration (Minggu 2) — MULAI DARI SINI
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 2.1 | `pnpm add next-themes` | package.json updated |
-| 2.2 | Update `src/lib/db/schema.ts` +11 scenes +5 image_prompts +1 projects + scene_audio (19 fields) | `pnpm typecheck` 0 error |
-| 2.3 | `pnpm drizzle-kit generate` | `drizzle/0001_v3_core_features.sql` created |
-| 2.4 | `pnpm drizzle-kit push` (staging) | Push sukses |
-| 2.5 | Grep `DROP COLUMN` di SQL = 0 | 0 DROP for V2 |
-| 2.6 | Grep `DEFAULT` di ALTER V3 | All have DEFAULT |
-| 2.7 | Grep `CASCADE` di scene_audio FK | Both CASCADE |
-| 2.8 | Verify 3 indexes di scene_audio | Created |
-| 2.9 | Update `src/lib/validation/schemas.ts` | `pnpm typecheck` 0 error |
-| 2.10 | Implement `src/lib/migration/v2-to-v3.ts` | Unit test pass |
-| 2.11 | Test rollback di staging | 100% reverted |
-| 2.12 | Implement `src/lib/templates/presets.ts` | 5 presets |
-
-**Commit:** `feat(v3): add V3 schema migration + zod extension + next-themes`
-
-### Fase 3: Prompt Builder + API (Minggu 2-3)
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 3.1 | Extend `src/lib/ai/prompt-builder.ts` 5 instruksi metadata | Token monitor <= +50% |
-| 3.2 | Test LLM 10 calls | >= 90% valid per field |
-| 3.3 | Update `src/app/api/v1/generate/route.ts` save handler | Save + reload |
-| 3.4 | Implement `src/lib/db/repositories/scene-audio.repository.ts` | Unit test pass |
-| 3.5 | Create audio API route (GET/POST) | E2E jalan |
-| 3.6 | Create audio ID API route (PATCH/DELETE) | E2E jalan |
-| 3.7 | Create theme API route (PATCH) | E2E jalan |
-| 3.8 | Update export route + markdown template | Export validate |
-| 3.9 | Update `src/lib/analytics/events.ts` +5 events | Events fire |
-
-**Commit:** `feat(v3): add V3 prompt builder + API routes + analytics events`
-
-### Fase 4: UI Components (Minggu 3)
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 4.1 | `theme-toggle.tsx` (NEW) | Visual + keyboard |
-| 4.2 | providers.tsx + layout.tsx + page.tsx remove hardcoded dark | Toggle end-to-end |
-| 4.3 | provider-card.tsx remove hardcoded dark: | No hardcoded |
-| 4.4 | app-header.tsx +ThemeToggle | Toggle visible |
-| 4.5 | `scene-transition-card.tsx` (NEW) | Visual flow |
-| 4.6 | `voice-type-selector.tsx` (NEW) | Inline edit |
-| 4.7 | `audio-panel.tsx` (NEW) | CRUD jalan |
-| 4.8 | `image-prompt-display.tsx` (NEW) | Copy per-section |
-| 4.9 | `result-tabs.tsx` (MODIFY) integrate 4 new | Render lengkap |
-| 4.10 | `changelog-banner.tsx` (NEW) | Banner tampil |
-| 4.11 | Expand `messages/id.json` + `messages/en.json` ~60 keys | ID+EN sinkron |
-| 4.12 | Add `prefers-reduced-motion` | Animasi disabled |
-
-**Commit:** `feat(v3): add 6 V3 UI components + i18n keys + theme toggle`
-
-### Fase 5: QA & Migration (Minggu 4)
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 5.1 | `pnpm test --coverage` | Coverage >= 80% unit, >= 60% integration |
-| 5.2 | V2 dry-run migration | 100% V2 retained, >= 95% success |
-| 5.3 | Real migration ke staging | All V2 projects migrated |
-| 5.4 | Analytics events fire | Vercel Analytics dashboard |
-| 5.5 | Lighthouse mobile | >= 85 |
-| 5.6 | axe-core a11y light + dark | 0 critical |
-| 5.7 | Bundle size | <= +20KB gzipped |
-| 5.8 | E2E Playwright critical path | All green |
-| 5.9 | Backward compat V2 | V2 data retained |
-| 5.10 | Reduced motion test | No FM anims |
-
-### Fase 6: Launch (Minggu 4)
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 6.1 | Deploy Vercel preview | URL accessible |
-| 6.2 | PR review + merge | No direct push main |
-| 6.3 | Deploy production | Live |
-| 6.4 | In-app changelog | Visible |
-
-### Fase 7: Monitor (Minggu 4-8)
-
-| # | Task | Verifikasi |
-|---|---|---|
-| 7.1 | Track 10 KPI V3 | Analytics dashboard |
-| 7.2 | In-app survey NPS | Feedback collected |
-| 7.3 | Iteration bugfix | Patch release |
-
----
-
-## 5. Key Decisions — ADR
-
-Dari `PROJECT_ARCHITECTURE.md` S13.
-
-| ADR | Keputusan | Alasan | Sitasi |
-|---|---|---|---|
-| **ADR-01** | **Additive-only schema migration** | V2 production ada data. Zero data loss | BRD LIM-V3-01 |
-| **ADR-02** | **Transition + Voice sebagai fields di scenes** | 1:1 relationship, query simpler | RAG-CONTEXT ASM-2,4 |
-| **ADR-03** | **scene_audio sebagai new table** | 1:N relationship, CRUD per-entry | RAG-CONTEXT ASM-5 |
-| **ADR-04** | **next-themes untuk Light Theme** | Standard, zero-config shadcn/ui, ~2KB | RAG-CONTEXT ASM-1 |
-| **ADR-05** | **8-Layer Image Prompt via prompt enhancement** | promptText tetap single string, backward compat | RAG-CONTEXT ASM-3 |
-| **ADR-06** | **V3 = spec only, BUKAN actual generation** | Scope control. Actual gen = V4+ | BRD OOS-V3-01..04 |
-| **ADR-07** | **Additive migration = zero downtime** | SQLite ALTER ADD COLUMN = instant | SRS S3.6 |
-| **ADR-08** | **Template presets di application-level** | Convenience, no DB overhead | DATABASE_SCHEMA S10.3 |
-| **ADR-09** | **AI SDK tetap v4** | Kode V1 pakai v4, upgrade = breaking | SRS TC-02 |
-| **ADR-10** | **Theme preference = dual storage** | next-themes (primary) + DB optional sync | WARN-005 |
-
----
-
-## 6. Warnings from Review
-
-**REVIEW_REPORT v2.0: PASS WITH WARNINGS (0 CRITICAL, 2 WARNING, 3 INFO).**
-
-### 6.1 WARN-005 (OPEN — Priority P2)
-
-PRD F-V3-01 Schema field = "N/A (client-side only)". Tapi DATABASE_SCHEMA add `theme_preference` ke projects (ASUMSI), dan API_CONTRACT define PATCH `/theme` endpoint.
-
-**Action:** Implement BOTH — client-side localStorage (primary) + server-side PATCH /theme (optional sync). ADR-10.
-
-### 6.2 WARN-006 (OPEN — Priority P3)
-
-RAG-CONTEXT S5.3 list 8 transition types (incl. morph, zoom_transition). V3 implement 6 only. morph + zoom = V4.
-
-**Action:** Implement 6 types only. Jangan tambah morph/zoom.
-
-### 6.3 INFO-003
-
-Stale ASUMSI note di DATABASE_SCHEMA S5.1: "SRS S4.3 = TEXT(UUID)". Kenyataannya INTEGER. Cleanup paralel.
-
-### 6.4 Build Permission
-
-> "0 CRITICAL open, boleh lanjut ke build phase. WARNING tidak memblokir build — diperbaiki paralel." — REVIEW_REPORT v2.0 S7
-
----
-
-## 7. Do Not — 35 Larangan
-
-Wajib dipatuhi. Traced ke `CODING_RULES.md` S11.
-
-| # | Larangan | Sumber |
-|---|---|---|
-| L-01 | Jangan pakai `any` (TS strict). Pakai `unknown` + Zod narrow | TC-14 |
-| L-02 | Jangan hardcoded teks UI. Semua via `useTranslations()` | TC-15 |
-| L-03 | Jangan hardcoded warna/hex. Pakai Tailwind design tokens | TC-16 |
-| L-04 | Jangan campur Server + Client Component di file sama | TC-18 |
-| L-05 | Jangan pakai `dangerouslySetInnerHTML` | SEC-08 |
-| L-06 | Jangan log sensitive data (API keys, tokens, PII) | SEC-01 |
-| L-07 | Jangan push ke `main` langsung. Via PR + review | TC-20 |
-| L-08 | Jangan commit `.env.local` | — |
-| L-09 | Jangan pakai `width`/`height`/`top` di FM. GPU-only: `transform`, `opacity` | — |
-| L-10 | Jangan skip `prefers-reduced-motion`. `useReducedMotion()` wajib | D-07 |
-| L-11 | Jangan pakai GSAP / heavy lib | S1.3 |
-| L-12 | Jangan hardcode `href` internal. Routing via next-intl | — |
-| L-13 | Jangan pakai `window` / `document` di Server Component | TC-18 |
-| L-14 | Jangan lupa `rel="noopener noreferrer"` untuk `target="_blank"` | — |
-| L-15 | Jangan animasi tanpa `viewport={{ once: true }}` | — |
-| L-16 | Jangan inline object/array di props re-render | — |
-| L-17 | Jangan pakai `React.FC`. Function declaration | — |
-| L-18 | Jangan Magic number. Extract ke constants | — |
-| L-19 | Jangan nesting > 3 level. Extract ke child | — |
-| L-20 | Jangan default export component. Named export saja | — |
-| L-21 | **Jangan pakai AI SDK v6**. Kode V1 pakai v4. Upgrade = breaking | TC-02, ADR-09 |
-| L-22 | **Jangan drop kolom V2**. Migration additive only | TC-05,06 |
-| L-23 | Jangan tanpa Zod validation. Semua LLM output + request body | TC-10 |
-| L-24 | Jangan bypass auth check. `getServerSession()` wajib | SEC-06 |
-| L-25 | Jangan bypass ownership check | SEC-07 |
-| L-26 | Jangan tambah dep baru tanpa approval. V3 = 1 dep baru (next-themes) | S1.3 |
-| L-27 | Jangan upgrade AI SDK. Tetap v4 | TC-02, ADR-09 |
-| L-28 | **Jangan hardcode `className="dark"`**. Pakai next-themes ThemeProvider | S3.1 |
-| L-29 | **Jangan pakai `dark:` Tailwind variants**. Pakai CSS variables | D-08 |
-| L-30 | Jangan tanpa default values di migration | TC-06 |
-| L-31 | Jangan tanpa dry-run sebelum migration production | TC-32 |
-| L-32 | Jangan generate prompt tanpa JSON schema compliance | TC-10 |
-| L-33 | Jangan tanpa error envelope di API | S3.3 |
-| L-34 | Jangan lupa i18n key ID+EN sinkron | S3.10 |
-| L-35 | Jangan hardcode enum values di component. Pakai constant arrays | — |
-
----
-
-## 8. Acceptance Criteria
-
-### 8.1 Per-Fitur AC
-
-#### AC-V3-01: Light Theme Support
-
-- next-themes terinstall
-- `<NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>` di providers.tsx
-- Hardcoded `className="dark"` removed dari `layout.tsx:66`
-- `<div className="dark">` removed dari `page.tsx:24`
-- `ThemeToggle` component di app-header.tsx (3 mode: light/dark/system)
-- Default = dark, persist localStorage, system preference detected
-- No FOUC (`suppressHydrationWarning`)
-- shadcn/ui render sempurna di light mode
-- provider-card.tsx hardcoded dark: variants removed
-- WCAG 2.1 AA kontras
-- i18n keys ID+EN, analytics event `theme_change`
-
-#### AC-V3-02: Scene Transition Flow Engine
-
-- scenes table: +11 fields (9 core + 2 EXTENDED ASUMSI: scenePacing, sceneMood)
-- Zod SceneSchema extended, prompt-builder generate transition (6 types)
-- Default: cut, 0ms, linear, forward. scenePacing: normal. sceneMood: peaceful
-- Save handler persist 11 V3 fields
-- UI: SceneTransitionCard + visual flow arrow (dashed=cut, solid=duration>0)
-- Export JSON + Markdown `## Scene Transitions`
-- i18n `transition.types.*` (6), analytics `scene_transition_generated`
-
-#### AC-V3-03: Complex Image Prompts (8 layer)
-
-- prompt-builder generate 8-layer formula, min 6/8 layer per prompt
-- image_prompts: +5 fields (2 core + 3 EXTENDED ASUMSI: composition, lighting, camera)
-- UI: ImagePromptDisplay collapsible 8 layer + copy per-section
-- Export JSON + Markdown `## Image Prompt Layers`
-- i18n `imagePrompt.layers.*` (8), analytics `image_prompt_layers_count`
-
-#### AC-V3-04: Voiceover Voice Type Spec
-
-- scenes: +4 fields (voiceType, voiceEmotion, voiceSpeed, voicePitch)
-- prompt-builder generate voice type dari 7 enum
-- Default: narrator, neutral, 1.0, auto
-- UI: VoiceTypeSelector dropdown + emotion + speed slider + pitch
-- Export JSON + Markdown `## Voice Specifications`
-- i18n `voice.types.*` (7) + `voice.emotions.*` (6) + `voice.pitch.*` (4), analytics `voice_type_assigned`
-
-#### AC-V3-05: Supporting Audio Spec
-
-- New table scene_audio (19 fields: 7 core + 12 EXTENDED ASUMSI)
-- 3 indexes + CASCADE delete, new Zod SceneAudioSchema
-- scenes: +durationSeconds
-- prompt-builder: min 1 audio cue per scene (>= 80%)
-- UI: AudioPanel CRUD, 4 API endpoints (GET/POST/PATCH/DELETE)
-- Repository: scene-audio.repository.ts
-- Export JSON + Markdown `## Audio Specifications`
-- i18n `audio.types.*` (5) + `audio.timing.*` (4) + `audio.fields.*`, analytics `audio_spec_generated`
-
-#### AC-V3-06..13: Supporting Features
-
-- **AC-V3-06:** 1 file migration, push sukses, dry-run 100% V2 retained, rollback tested
-- **AC-V3-07:** buildSystemPrompt extended 5 instruksi, >= 90% valid/field, fallback defaults, token <= +50%
-- **AC-V3-08:** SceneSchema +11, ImagePromptItemSchema +5, SceneAudioSchema 19, ThemePreferenceSchema, typecheck 0 error
-- **AC-V3-09:** JSON + MD export V3, backward compat V2
-- **AC-V3-10:** ~60 V3 keys ID+EN paralel, 100% sinkron
-- **AC-V3-11:** Backfill defaults, dry-run, rollback, success >= 95%
-- **AC-V3-12:** 5 events V3, no PII
-- **AC-V3-13:** lint 0 + typecheck 0 + build pass, Lighthouse >= 85, bundle <= +20KB, axe-core 0 critical, WCAG 2.1 AA, 5 atomic commit feat(v3), PR + preview deploy
-
-### 8.2 V3 Definition of Done (PRD Lampiran B — 22 Items)
-
-- [ ] Light theme toggle berfungsi + persist + system preference
-- [ ] Hardcoded dark class removed dari layout.tsx + page.tsx
-- [ ] Schema migration additive: +11 fields scenes + new table scene_audio (19 fields)
-- [ ] Prompt builder enhanced 5 metadata
-- [ ] Zod schema extended + validated
-- [ ] UI: transition flow, voice selector, audio panel, image prompt labels
-- [ ] Export JSON + Markdown termasuk V3 metadata
-- [ ] i18n ID+EN sinkron semua V3 (~60 keys)
-- [ ] V2 to V3 migration tested (dry-run + reversible)
-- [ ] In-app changelog banner V2 user
-- [ ] Landing page copy updated (opsional)
-- [ ] 5 analytics event V3 wired
-- [ ] Lighthouse Performance >= 85
-- [ ] Bundle <= +20KB gzipped (actual ~2KB)
-- [ ] pnpm lint 0 + typecheck 0 + build pass
-- [ ] WCAG 2.1 AA light + dark
-- [ ] V2 dry-run: 100% retained
-- [ ] Conventional commit feat(v3): per fitur (5 atomic)
-- [ ] PR reviewed + merged
-- [ ] Preview deploy Vercel sukses
-- [ ] WARN-005 parallel fix: PATCH /theme endpoint
-- [ ] WARN-006 parallel fix: Note RAG-CONTEXT morph/zoom = V4
-
----
-
-## 9. Design Tokens
-
-Sumber: `UIUX_SPEC.md` S2 + `globals.css`. Pakai CSS variables, JANGAN hardcode hex.
-
-### 9.1 Light Mode
-
-| Token | HEX | Kegunaan | Kontras |
-|---|---|---|---|
-| `--color-background` | #ffffff | Body bg | — |
-| `--color-foreground` | #0a0a0a | Body text | 18.4:1 |
-| `--color-card` | #ffffff | Card bg | — |
-| `--color-card-foreground` | #0a0a0a | Card text | 18.4:1 |
-| `--color-primary` | #7c3aed | CTA, brand | 5.1:1 AA |
-| `--color-primary-foreground` | #ffffff | Teks di primary | 4.6:1 |
-| `--color-secondary` | #f4f4f5 | Card bg subtle | — |
-| `--color-secondary-foreground` | #18181b | Teks secondary | 15.4:1 |
-| `--color-muted` | #f4f4f5 | Muted surface | — |
-| `--color-muted-foreground` | #71717a | Helper text | 4.6:1 |
-| `--color-accent` | #ede9fe | Highlight, hover | — |
-| `--color-accent-foreground` | #4c1d95 | Teks di accent | 8.2:1 |
-| `--color-destructive` | #dc2626 | Error | 5.6:1 |
-| `--color-destructive-foreground` | #ffffff | Teks error | 4.6:1 |
-| `--color-success` | #16a34a | Success | 4.5:1 |
-| `--color-warning` | #d97706 | Warning | 4.6:1 |
-| `--color-info` | #2563eb | Info | 5.3:1 |
-| `--color-border` | #e4e4e7 | Border | — |
-| `--color-input` | #e4e4e7 | Input border | — |
-| `--color-ring` | #7c3aed | Focus ring | 5.1:1 |
-
-### 9.2 Dark Mode (DEFAULT)
-
-| Token | HEX | Kegunaan | Kontras |
-|---|---|---|---|
-| `--color-background` | #0a0a0a | Body bg | — |
-| `--color-foreground` | #fafafa | Body text | 18.1:1 |
-| `--color-card` | #0f0f0f | Card bg | — |
-| `--color-card-foreground` | #fafafa | Card text | 17.4:1 |
-| `--color-primary` | #a78bfa | CTA, brand | 8.5:1 |
-| `--color-primary-foreground` | #0a0a0a | Teks di primary | 10.4:1 |
-| `--color-secondary` | #27272a | Card bg dark | — |
-| `--color-secondary-foreground` | #fafafa | Teks secondary | 14.5:1 |
-| `--color-muted` | #27272a | Muted surface | — |
-| `--color-muted-foreground` | #a1a1aa | Helper text | 6.2:1 |
-| `--color-accent` | #3b0764 | Highlight dark | — |
-| `--color-accent-foreground` | #ddd6fe | Teks di accent | 9.8:1 |
-| `--color-destructive` | #ef4444 | Error | 4.7:1 |
-| `--color-destructive-foreground` | #fafafa | Teks error | 16.8:1 |
-| `--color-success` | #22c55e | Success | 5.9:1 |
-| `--color-warning` | #f59e0b | Warning | 8.1:1 |
-| `--color-info` | #3b82f6 | Info | 5.0:1 |
-| `--color-border` | #27272a | Border | — |
-| `--color-input` | #27272a | Input border | — |
-| `--color-ring` | #a78bfa | Focus ring | 8.5:1 |
-
-### 9.3 Tipografi
-
-- `--font-sans`: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
-- `--font-mono`: "JetBrains Mono", "Fira Code", ui-monospace, monospace
-- Type scale: text-xs(12) / text-sm(14) / text-base(16) / text-lg(18) / text-xl(20) / text-2xl(24)
-
-### 9.4 Spacing + Radius
-
-- `--radius`: 6px
-- Spacing base: 4px (Tailwind p-1)
-- Container max-width: 1280px
-
-### 9.5 Breakpoint
-
-- Mobile: < 640px | sm: 640px | md: 768px | lg: 1024px | xl: 1280px | 2xl: 1536px
-
-### 9.6 V3 Badge Colors (UIUX_SPEC S2.4-S2.6)
-
-**Transition (Light / Dark):**
-- cut = #71717a / #a1a1aa (gray) — icon Zap
-- dissolve = #2563eb / #60a5fa (blue) — icon Blend
-- fade_to_black = #1f2937 / #6b7280 (dark gray) — icon Moon
-- fade_to_white = #d97706 / #fbbf24 (amber) — icon Sun
-- wipe = #16a34a / #4ade80 (green) — icon ArrowRight
-- match_cut = #7c3aed / #a78bfa (violet) — icon Link
-
-**Voice (Light / Dark):**
-- child = pink #ec4899 / #f472b6 — icon Baby
-- teen = orange #f97316 / #fb923c — icon User
-- adult_male = blue #2563eb / #60a5fa — icon User
-- adult_female = purple #9333ea / #c084fc — icon User
-- elderly_male = gray #6b7280 / #9ca3af — icon User
-- elderly_female = slate #475569 / #94a3b8 — icon User
-- narrator = violet #7c3aed / #a78bfa — icon Mic
-
-**Audio (Light / Dark):**
-- background_music = indigo #4f46e5 / #818cf8 — icon Music
-- sfx = amber #d97706 / #fbbf24 — icon Volume2
-- ambient = teal #0d9488 / #2dd4bf — icon CloudRain
-- music_cue = rose #e11d48 / #fb7185 — icon Music2
-- transition_audio = cyan #0891b2 / #22d3ee — icon AudioLines
-
----
-
-## 10. Section Order — Result Tabs
-
-Untuk `src/components/generate/result-tabs.tsx` (MODIFY):
-
-```
-1. AppHeader (sticky, z-50)              — sudah ada
-   [Logo] [Nav] [ThemeToggle] [LangToggle] [Auth]
-
-2. Generate Form (max-w-2xl mx-auto)     — sudah ada
-   Title / Duration / Style / [Generate]
-
-3. Result Tabs (max-w-4xl mx-auto)        — MODIFY
-   [Scenes] [Characters] [Export] tabs
-
-4. Tab Scenes content:
-   +-- SceneTransitionCard[1]            — NEW V3
-   |   +-- Description + Voiceover
-   |   +-- Transition Flow (badge + arrow)
-   |   +-- Voice Spec (VoiceTypeSelector) — NEW V3
-   |   +-- Image Prompts (ImagePromptDisplay, 8 layer) — NEW V3
-   |   +-- Audio Specs (AudioPanel CRUD) — NEW V3
-   +-- SceneTransitionCard[2]
-   |   (flow arrow, dashed=cut, solid=duration>0)
-   +-- SceneTransitionCard[3]
-   +-- ...
-
-5. ChangelogBanner                        — NEW V3 (dismissable)
+### Phase 2: Generate Route Update (1 jam)
+
+| # | Task | File | Detail |
+|---|------|------|--------|
+| 2.1 | Update bulkCreateScenes | `route.ts:158-174` | Tambah: `voiceoverSpeaker: s.voiceover_speaker ?? 'narrator'` |
+| 2.2 | Update bulkCreateImagePrompts | `route.ts:179-182` | Tambah 7 fields: `composition`, `lighting`, `camera`, `moodAtmosphere`, `styleReferences`, `colorPalette` (Array.isArray ? join : null), `technical` |
+| 2.3 | Modifikasi bulkCreateScenes repo | `*.repo.ts` | Pastikan `.returning()` — harus RETURN rows untuk dapat scene_id |
+| 2.4 | Tambah audio_specs INSERT block | `route.ts` (new block after bulkCreateScenes) | Loop scenes -> loop audio_specs -> `createSceneAudio(...)` dengan mapping lengkap (18 kolom scene_audio) |
+| 2.5 | Tambah import | `route.ts` | `import { createSceneAudio } from '@/lib/db/repositories/scene-audio.repository'` |
+| 2.6 | Handle color_palette array->string | `route.ts` | `Array.isArray(p.color_palette) ? p.color_palette.join(', ') : (p.color_palette ?? null)` |
+
+**PENTING:** `color_palette` bisa berupa string ATAU array dari LLM. Zod schema pakai `z.union([z.string(), z.array(z.string())])`. Generate route HARUS normalisasi ke string sebelum INSERT.
+
+**VERIFIKASI:** Generate test project, cek DB:
+```sql
+SELECT voiceover_speaker FROM scenes WHERE project_id = ?;
+SELECT color_palette, technical FROM image_prompts WHERE project_id = ?;
+SELECT * FROM scene_audio WHERE project_id = ?;
 ```
 
 ---
 
-## 11. i18n Keys V3
+### Phase 3: Prompt Builder Refinement (45 menit)
 
-Total ~60 keys. Namespace: `common.*` + `transition.*` + `voice.*` + `audio.*` + `imagePrompt.*`. ID+EN paralel 100% sinkron.
+| # | Task | File | Lines | Detail |
+|---|------|------|-------|--------|
+| 3.1 | Transition rules | `prompt-builder.ts` | 267-273 | Tambah: mood_signifikan_change -> dissolve/fade BUKAN cut; aksi_cepat + fast_pacing -> match_cut (0-200ms); scene_berurutan_mood_sama -> cut/dissolve BUKAN wipe/match_cut; durasi minimum: cut=0ms, dissolve>=800ms, fade>=1200ms, wipe>=400ms, match_cut>=200ms |
+| 3.2 | Voice mapping table | `prompt-builder.ts` | 300-305 | Tambah: mood->emotion (cheerful->happy, dramatic->dramatic, tense->serious, peaceful->calm); pacing->speed (fast->1.1-1.2, normal->0.95-1.05, slow->0.8-0.95); pitch per age (child->high, teen->medium/high, adult_male->low/medium, adult_female->medium, elderly->low) |
+| 3.3 | 8-layer format | `prompt-builder.ts` | 327-335 | Perkuat: WAJIB semua 8 layer, contoh format eksplisit per layer (color_palette: "deep blue #1a365d, gold #d4a017, white #f5f5f5"; technical: "4K, cinematic depth of field, film grain") |
+| 3.4 | Audio spec examples | `prompt-builder.ts` | 377-384 | Tambah contoh per scene type (opening: orchestral + nature ambient; action: electronic + tense SFX; closing: fade-out music) |
 
-| Namespace | Keys | Jumlah |
-|---|---|---|
-| common.* | theme, themeToggle, lightMode, darkMode, systemMode | 5 |
-| transition.types.* | cut, dissolve, fade_to_black, fade_to_white, wipe, match_cut | 6 |
-| transition.* | durationLabel, easingLabel, directionLabel, flowLabel | 4 |
-| voice.types.* | child, teen, adult_male, adult_female, elderly_male, elderly_female, narrator | 7 |
-| voice.emotions.* | neutral, happy, sad, excited, calm, dramatic | 6 |
-| voice.pitch.* | low, medium, high, auto | 4 |
-| voice.* | speedLabel, selectLabel | 2 |
-| audio.types.* | background_music, sfx, ambient, music_cue, transition_audio | 5 |
-| audio.timing.* | start, throughout, end, specific_moment | 4 |
-| audio.fields.* | volume, fadeIn, fadeOut, description, addAudio, editAudio, deleteAudio | 7 |
-| imagePrompt.layers.* | subject, composition, camera, lighting, color, mood, style, technical | 8 |
-| imagePrompt.* | copyLayer, copyFull | 2 |
-| **Total** | | **~60** |
-
-**Label contoh:**
-
-| Key | ID | EN |
-|---|---|---|
-| common.theme | "Tema" | "Theme" |
-| common.lightMode | "Mode terang" | "Light mode" |
-| common.darkMode | "Mode gelap" | "Dark mode" |
-| common.systemMode | "Ikuti sistem" | "System" |
-| transition.types.cut | "Potong" | "Cut" |
-| transition.types.dissolve | "Larut" | "Dissolve" |
-| transition.types.fade_to_black | "Gelap total" | "Fade to black" |
-| transition.types.fade_to_white | "Terang total" | "Fade to white" |
-| transition.types.wipe | "Sapu" | "Wipe" |
-| transition.types.match_cut | "Potong cocok" | "Match cut" |
-| voice.types.child | "Anak" | "Child" |
-| voice.types.narrator | "Narator" | "Narrator" |
-| voice.types.adult_female | "Wanita dewasa" | "Adult female" |
-| voice.emotions.neutral | "Netral" | "Neutral" |
-| audio.types.background_music | "Musik latar" | "Background music" |
-| audio.types.sfx | "Efek suara" | "SFX" |
-| audio.types.ambient | "Suara lingkungan" | "Ambient" |
-| audio.types.music_cue | "Isyarat musik" | "Music cue" |
-| audio.types.transition_audio | "Audio transisi" | "Transition audio" |
-| imagePrompt.layers.subject | "Subjek" | "Subject" |
-| imagePrompt.layers.composition | "Komposisi" | "Composition" |
-| imagePrompt.layers.camera | "Kamera" | "Camera" |
-| imagePrompt.layers.lighting | "Pencahayaan" | "Lighting" |
-| imagePrompt.layers.color | "Warna" | "Color" |
-| imagePrompt.layers.mood | "Suasana" | "Mood" |
-| imagePrompt.layers.style | "Gaya" | "Style" |
-| imagePrompt.layers.teknis | "Teknis" | "Technical" |
+**VERIFIKASI:** Generate test project:
+- Scene 1: transition = fade_from_black/fade_to_white (BUKAN cut)
+- Scene terakhir: transition = fade_to_black
+- 70%+ scenes: transition != cut
+- Setiap scene: audio_specs.length >= 1
+- Setiap image_prompt: 8 layer terisi
 
 ---
 
-## 12. Tooling
+### Phase 4: Schema & UI Verification (30 menit)
 
-```bash
-# Install
-pnpm install
-pnpm add next-themes
+| # | Task | File | Detail |
+|---|------|------|--------|
+| 4.1 | Verify Zod schemas | `schemas.ts` | Pastikan `color_palette` dan `technical` sudah ada di `ImagePromptItemSchema`, `voiceover_speaker` di `SceneSchema`. TIDAK perlu ubah. |
+| 4.2 | Verify/fix image-prompt-display | `image-prompt-display.tsx` | Cek apakah color_palette + technical dirender. Jika tidak: tambah `ColorPaletteDisplay` (color chips 12x12px + hex) + `LayerRow` untuk technical |
+| 4.3 | Verify audio-panel | `audio-panel.tsx` | Sudah ada — verifikasi render data dari DB |
+| 4.4 | Verify voice-type-selector | `voice-type-selector.tsx` | Sudah ada — verifikasi voiceover_speaker tampil |
+| 4.5 | Verify theme landing page | `[locale]/layout.tsx` | Cek Providers wrap children. Pastikan landing components pakai CSS variables BUKAN hardcoded colors |
+| 4.6 | Verify scene-transition-card | `scene-transition-card.tsx` | Sudah ada — verifikasi flow patterns tampil |
 
-# Database
-pnpm drizzle-kit generate
-pnpm drizzle-kit push
-pnpm drizzle-kit studio
-
-# Migration V2 -> V3
-node scripts/migrate-v2-v3.ts --dry-run
-node scripts/migrate-v2-v3.ts
-
-# Dev
-pnpm dev
-
-# Build
-pnpm build
-pnpm lint
-pnpm lint --fix
-pnpm typecheck
-pnpm format
-
-# Test
-pnpm test
-pnpm test --coverage
-pnpm test:e2e
-pnpm test:e2e --ui
-
-# Deploy
-vercel:preview
-vercel:prod
-```
+**ColorPaletteDisplay spec (jika perlu buat):**
+- Parse comma-separated color entries
+- Each: inline chip (12x12px rounded-full, bg=hex) + name + hex
+- Horizontal flex-wrap, fallback plain text
+- `aria-label="Color palette: [full text]"`
 
 ---
 
-## 13. Definition of Done
+### Phase 5: Landing Page Update (30 menit)
 
-### 13.1 Functional DoD
-
-- [ ] F-V3-01 Light Theme: toggle light/dark/system berfungsi + persist + system preference
-- [ ] F-V3-01 Hardcoded className="dark" removed
-- [ ] F-V3-02 Scene Transition: 4 transition fields + scenePacing + sceneMood per scene
-- [ ] F-V3-03 Complex Image Prompts: 8-layer formula, min 6/8 layer per prompt
-- [ ] F-V3-04 Voiceover Voice Type: 7 types + emotion + speed + pitch per scene
-- [ ] F-V3-05 Supporting Audio: scene_audio table (19 fields), CRUD API, UI panel
-- [ ] Schema migration additive: +11 scenes + scene_audio + 5 image_prompts + 1 projects
-- [ ] Prompt builder enhanced 5 metadata instructions
-- [ ] Zod schema extended + validated
-- [ ] UI: 6 new components (ThemeToggle, SceneTransitionCard, VoiceTypeSelector, AudioPanel, ImagePromptDisplay, ChangelogBanner)
-- [ ] Export JSON + Markdown 4 V3 sections
-- [ ] i18n ID+EN ~60 keys 100% sinkron
-- [ ] V2 to V3 migration tested (dry-run + reversible, >= 95%)
-- [ ] In-app changelog banner
-- [ ] 5 analytics events V3 wired (no PII)
-- [ ] PATCH /theme endpoint (WARN-005 fix)
-
-### 13.2 Quality Gates
-
-- [ ] pnpm lint 0 error
-- [ ] pnpm typecheck 0 error
-- [ ] pnpm build pass
-- [ ] Lighthouse Performance mobile >= 85
-- [ ] LCP <= 2.5s, CLS <= 0.1
-- [ ] Bundle <= +20KB gzipped (actual ~2KB)
-- [ ] axe-core 0 critical a11y (light + dark)
-- [ ] WCAG 2.1 AA
-- [ ] prefers-reduced-motion respected
-- [ ] Unit test coverage >= 80%
-- [ ] Integration test coverage >= 60%
-- [ ] 205 test case V3 pass
-- [ ] V2 dry-run 100% retained
-- [ ] Token usage <= +50% baseline
-
-### 13.3 Git & Deploy DoD
-
-- [ ] 5 atomic commit feat(v3): per fitur
-- [ ] Conventional commit format
-- [ ] No direct push main via PR + review
-- [ ] PR template filled
-- [ ] Preview deploy Vercel sukses
-- [ ] No .env.local committed
-- [ ] No secret client-side
-
-### 13.4 Warning Fixes (Parallel)
-
-- [ ] WARN-005: PATCH /theme implemented
-- [ ] WARN-006: Note RAG-CONTEXT S5.3 morph/zoom = V4
-- [ ] INFO-003: Cleanup stale note DATABASE_SCHEMA S5.1
+| # | Task | File | Detail |
+|---|------|------|--------|
+| 5.1 | Update features.ts | `src/lib/landing/features.ts` | Tambah 5 fitur V3: (1) Scene Transitions — 6 jenis transisi, (2) Voice Type — 7 tipe suara + emosi, (3) Audio Specs — 5 jenis audio per scene, (4) Image Prompts — 8 lapis granular, (5) Theme Toggle — dark/light/system |
+| 5.2 | Tambah i18n keys (id) | `messages/id.json` | Keys untuk 5 features: `landing.features.transitions.title/desc`, `landing.features.voice.*`, `landing.features.audio.*`, `landing.features.imagePrompts.*`, `landing.features.theme.*` |
+| 5.3 | Tambah i18n keys (en) | `messages/en.json` | Sama dengan id — key HARUS sync |
+| 5.4 | Verify render | Browser test | Features section muncul di landing page |
 
 ---
 
-## 14. Document References
+### Phase 6: E2E Test Expansion (2 jam)
 
-Semua di `C:\laragon\www\PromptFlow\product-docs\`.
+| # | Test | File | Priority |
+|---|------|------|----------|
+| 1 | Login | `e2e/login.spec.ts` | Must (sudah ada) |
+| 2 | Register | `e2e/register.spec.ts` | Must |
+| 3 | Create project | `e2e/project-create.spec.ts` | Must |
+| 4 | Generate brief | `e2e/generate.spec.ts` | Must |
+| 5 | Project detail | `e2e/project-detail.spec.ts` | Must |
+| 6 | Scene transitions | `e2e/scene-transitions.spec.ts` | Should |
+| 7 | Audio specs | `e2e/audio-specs.spec.ts` | Should |
+| 8 | Export brief | `e2e/export.spec.ts` | Should |
+| 9 | Theme toggle | `e2e/theme-toggle.spec.ts` | Should |
+| 10 | Settings | `e2e/settings.spec.ts` | Should |
 
-| # | Dokumen | Path | Peran V3 |
-|---|---|---|---|
-| 1 | RAG-CONTEXT | product-docs/RAG-CONTEXT.md | Sumber fakta. Refresh 2026-06-21 |
-| 2 | BRD | product-docs/BRD.md (v2.0) | Why — konteks bisnis, KPI, scope |
-| 3 | MRD | product-docs/MRD.md (v2.0) | Who — pasar, persona, GTM |
-| 4 | PRD | product-docs/PRD.md (v2.0) | What — FR-V3, MoSCoW, AC, DoD |
-| 5 | SRS | product-docs/SRS.md (v2.0) | How — arsitektur, data model, 5 spec detail, T1-T8 |
-| 6 | DATABASE_SCHEMA | product-docs/DATABASE_SCHEMA.md (v2.0) | Skema 10 tabel, ERD, migration SQL, backfill, rollback |
-| 7 | PROJECT_ARCHITECTURE | product-docs/PROJECT_ARCHITECTURE.md (v2.0) | Arsitektur, container/component diagram, ADR-01..10 |
-| 8 | UIUX_SPEC | product-docs/UIUX_SPEC.md (v2.0) | Design tokens light+dark, 5 komponen baru, wireframes |
-| 9 | API_CONTRACT | product-docs/API_CONTRACT.md (v3.0) | API 5 baru + 4 extended, Zod schemas, error envelope |
-| 10 | CODING_RULES | product-docs/CODING_RULES.md (v2.0) | 35 larangan, naming, formatting, git, review |
-| 11 | TEST_PLAN | product-docs/TEST_PLAN.md (v2.0) | 205 test case V3 |
-| 12 | REVIEW_REPORT | product-docs/REVIEW_REPORT.md (v2.0) | Quality gate — PASS WITH WARNINGS |
-| 13 | AGENTS.md (this) | product-docs/AGENTS.md (v2.0) | Panduan build V3 (gantikan v1.0 landing) |
+**PENTING:** Generate test HARUS mock LLM response (hardcoded JSON) agar tidak flaky.
 
 ---
 
-> **Dokumen ini = panduan operasional V3 untuk agent eksekutor. Baca + seluruh product-docs/ sebelum coding. Mulai Fase 2, commit per fase feat(v3): scope. Verifikasi per task. Capai DoD. Fix WARN-005 + WARN-006 paralel.**
+### Phase 7: Unit Test Updates (30 menit)
 
-**Dibuat oleh:** docgen-agentsmd subagent
-**Tanggal:** 2026-06-21
-**Versi:** 2.0 (V3 Core Features)
-**Menggantikan:** AGENTS.md v1.0 (Landing Page Focus)
+| # | Task | File | Detail |
+|---|------|------|--------|
+| 7.1 | Schema test | `schemas.test.ts` | Test color_palette array/string handling, voiceover_speaker, audio_specs |
+| 7.2 | Generate route test | `generate.route.test.ts` | Mock LLM, verify DB inserts (audio, color_palette, technical, voiceover_speaker) |
+| 7.3 | Coverage check | Run `pnpm test:coverage` | Pastikan >= 80% |
+
+---
+
+## 9. File Change Manifest
+
+| # | File | Action | Phase |
+|---|------|--------|-------|
+| 1 | `drizzle/0002_v3_gap_closure.sql` | CREATE | 1 |
+| 2 | `drizzle/0002_v3_gap_closure_rollback.sql` | CREATE | 1 |
+| 3 | `src/lib/db/schema.ts` | MODIFY (+3 kolom) | 1 |
+| 4 | `src/app/api/v1/generate/route.ts` | MODIFY (+INSERT logic) | 2 |
+| 5 | `src/lib/db/repositories/*.repo.ts` | MODIFY (.returning()) | 2 |
+| 6 | `src/lib/ai/prompt-builder.ts` | MODIFY (perkuat rules) | 3 |
+| 7 | `src/components/generate/image-prompt-display.tsx` | MODIFY (+2 layers) | 4 |
+| 8 | `src/lib/landing/features.ts` | MODIFY (+5 features) | 5 |
+| 9 | `messages/id.json` | MODIFY (+V3 keys) | 5 |
+| 10 | `messages/en.json` | MODIFY (+V3 keys) | 5 |
+| 11 | `e2e/register.spec.ts` | CREATE | 6 |
+| 12 | `e2e/project-create.spec.ts` | CREATE | 6 |
+| 13 | `e2e/generate.spec.ts` | CREATE | 6 |
+| 14 | `e2e/project-detail.spec.ts` | CREATE | 6 |
+| 15 | `e2e/scene-transitions.spec.ts` | CREATE | 6 |
+| 16 | `e2e/audio-specs.spec.ts` | CREATE | 6 |
+| 17 | `e2e/export.spec.ts` | CREATE | 6 |
+| 18 | `e2e/theme-toggle.spec.ts` | CREATE | 6 |
+| 19 | `e2e/settings.spec.ts` | CREATE | 6 |
+
+---
+
+## 10. Tooling yang Disarankan
+
+| Kebutuhan | Tool | Command |
+|-----------|------|---------|
+| Install deps | pnpm | `pnpm install --frozen-lockfile` |
+| Dev server | Next.js | `pnpm dev` |
+| Build check | Next.js | `pnpm build` |
+| DB migration generate | Drizzle Kit | `npx drizzle-kit generate` |
+| DB migration apply | Drizzle Kit | `npx drizzle-kit migrate` |
+| DB push (dev) | Drizzle Kit | `npx drizzle-kit push` |
+| DB visual | Drizzle Kit | `npx drizzle-kit studio` |
+| Unit tests | Vitest | `pnpm test` |
+| Unit coverage | Vitest | `pnpm test:coverage` |
+| E2E tests | Playwright | `pnpm test:e2e` |
+| Lint check | ESLint/Next | `pnpm lint` |
+| Type check | tsc | `pnpm tsc --noEmit` |
+
+---
+
+## 11. Aturan Kualitas
+
+1. **Diagram/gambar:** Tidak ada diagram dalam kode. Diagram hanya di dokumen (Mermaid). Saat build, fokus pada kode.
+2. **Kode hanya di source files:** Jangan generate kode di dokumen product-docs.
+3. **CSS variables only:** SEMUA warna dari `globals.css` tokens. Hardcoded colors = REJECT.
+4. **Zod validation:** SEMPAI input/output via Zod. Jangan skip validation.
+5. **Error handling:** Graceful skip per field kosong, log warning, JANGAN crash entire generate.
+6. **i18n sync:** `messages/id.json` dan `messages/en.json` HARUS punya key yang sama.
+7. **TypeScript strict:** No `any`, explicit return types on exports, `as const` for literal arrays.
+8. **Repository pattern:** SEMUA DB queries via repository layer, JANGAN raw SQL di API routes.
+9. **Test coverage:** Unit >= 80%, E2E >= 10 critical path tests.
+
+---
+
+## 12. Definition of Done / Checklist Verifikasi
+
+| # | Kriteria | Verifikasi |
+|---|---------|------------|
+| D1 | Migration 0002 berhasil | `PRAGMA table_info(scenes)` -> voiceover_speaker ada |
+| D2 | Migration rollback berfungsi | Jalankan rollback, verify kolom hilang |
+| D3 | Generate simpan voiceover_speaker | Generate -> query scenes -> field terisi |
+| D4 | Generate simpan color_palette + technical | Generate -> query image_prompts -> kedua kolom terisi |
+| D5 | Generate simpan audio_specs | Generate -> query scene_audio -> records ada per scene |
+| D6 | image_prompts.scene_id ter-link | Generate -> query image_prompts -> scene_id BUKAN null |
+| D7 | TypeScript build | `pnpm build` tanpa error |
+| D8 | Unit tests passing | `pnpm test` — semua pass |
+| D9 | Coverage >= 80% | `pnpm test:coverage` — thresholds met |
+| D10 | E2E >= 10 passing | `pnpm test:e2e` — semua pass |
+| D11 | Landing page V3 features | Browser: features section terlihat |
+| D12 | Theme toggle landing page | Browser: toggle dark/light/system berfungsi |
+| D13 | Image prompt 8 layer | Browser: generate result -> 8 layer sections terlihat |
+| D14 | Export termasuk field baru | Export JSON -> color_palette, technical, audio_specs ada |
+
+---
+
+## 13. Larangan (JANGAN lakukan ini)
+
+1. **JANGAN ubah scope** — hanya 5 fitur V3 + gap closure + tests. Bukan rewrite.
+2. **JANGAN skip migration** — kolom baru HARUS ada di DB sebelum generate route update.
+3. **JANGAN hardcode colors** — semua dari CSS variables `globals.css`.
+4. **JANGAN skip `.returning()`** — `bulkCreateScenes` HARUS return rows untuk audio_specs INSERT.
+5. **JANGAN skip color_palette array handling** — `Array.isArray()` check WAJIB.
+6. **JANGAN skip graceful skip** — field kosong = skip + log warning, BUKAN crash.
+7. **JANGAN ubah Zod schema yang sudah ada** — schemas.ts sudah lengkap untuk V3.
+8. **JANGAN commit .env atau secrets** — API key, Turso token, encryption key di env only.
+9. **JANGAN buat component test (.test.tsx)** — lib layer unit test + E2E cukup.
+10. **JANGAN tambah fitur di luar scope V3** — no multi-tenant, no payment, no Redis, no PWA.
+
+---
+
+## 14. Gotchas & Anti-Patterns
+
+### Critical Gotchas
+
+| # | Gotcha | Detail | Solusi |
+|---|--------|--------|--------|
+| G1 | **bulkCreateScenes tidak return rows** | Repository mungkin pakai `db.insert().values()` tanpa `.returning()` | Modifikasi: `const rows = await db.insert(scenes).values(data).returning(); return rows;` |
+| G2 | **color_palette bisa array atau string** | Zod: `z.union([z.string(), z.array(z.string())])` | Generate route: `Array.isArray(x) ? x.join(', ') : (x ?? null)` |
+| G3 | **scene_audio INSERT butuh scene_id** | Tidak bisa INSERT audio tanpa scene_id dari created scene | Urutan: bulkCreateScenes (RETURNING) -> map scene_id -> INSERT audio |
+| G4 | **SQLite ALTER TABLE tidak support IF NOT EXISTS** | `ALTER TABLE ... ADD COLUMN` gagal jika kolom sudah ada | Cek dulu: `PRAGMA table_info(...)` sebelum migration |
+| G5 | **updated_at tidak auto-update** | SQLite/Drizzle tidak punya trigger auto-update | HARUS set `updatedAt: unixepoch()` secara eksplisit di UPDATE queries |
+| G6 | **Landing page mungkin tidak wrap Providers** | Root layout vs locale layout | Verifikasi: `[locale]/layout.tsx` wrap children dengan `<Providers>` |
+| G7 | **E2E generate test butuh mock LLM** | Real LLM call = flaky + slow | Gunakan hardcoded mock response JSON yang valid |
+
+### Anti-Patterns
+
+| Anti-Pattern | Correct Pattern |
+|-------------|-----------------|
+| Hardcoded colors: `className="bg-[#7C3AED]"` | CSS variable: `className="bg-primary"` |
+| Raw SQL di API route | Repository pattern: `scenesRepo.bulkCreate(...)` |
+| Skip Zod validation untuk LLM output | ALWAYS validate: `SceneSchema.parse(s)` |
+| `db.insert().values()` tanpa `.returning()` | `db.insert().values(...).returning()` |
+| INSERT audio tanpa check scene_id | Map scene_id dari bulkCreateScenes result |
+| `color_palette` langsung ke DB tanpa type check | `Array.isArray(x) ? x.join(', ') : x` |
+| Crash on null audio_specs | `if (scene.audio_specs?.length > 0) { ... }` else skip |
+| `any` type | Explicit types, `as const`, inference from Zod |
+| Test tanpa mock | Mock LLM response, hardcoded valid JSON |
+| New feature tanpa i18n key | Tambah key di BOTH `id.json` dan `en.json` |
+
+---
+
+## 15. Template Presets V3 (Referensi)
+
+| Preset | Transition | Voice | Audio |
+|--------|-----------|-------|-------|
+| Tutorial | dissolve 800ms | narrator/calm | lo-fi, classroom |
+| Sinematik | fade_to_black 1500ms | adult_male/dramatic | orchestral, cinematic |
+| Anak-anak | wipe 400ms | child/excited | children, playground |
+| Dokumenter | cut 0ms | narrator/neutral | ambient, nature |
+| Aksi | match_cut 200ms | adult_male/excited | electronic, tense |
+
+---
+
+*Dokumen ini berdiri sendiri. Eksekutor cukup baca AGENTS.md + 4 dokumen inti (BRD/MRD/PRD/SRS) + dokumen teknis terkait. Seluruh claim teknis bersumber dari RAG-CONTEXT.md (codebase evidence).*

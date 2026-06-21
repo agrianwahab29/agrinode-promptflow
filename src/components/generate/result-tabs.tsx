@@ -123,6 +123,8 @@ export function ResultTabs({
                         camera: p.camera,
                         moodAtmosphere: p.mood_atmosphere,
                         styleReferences: p.style_references,
+                        colorPalette: p.color_palette as string | null,
+                        technical: p.technical as string | null,
                         referenceFilename: p.reference_filename,
                       }}
                     />
@@ -143,6 +145,8 @@ export function ResultTabs({
                         camera: p.camera,
                         moodAtmosphere: p.mood_atmosphere,
                         styleReferences: p.style_references,
+                        colorPalette: p.color_palette as string | null,
+                        technical: p.technical as string | null,
                         referenceFilename: p.reference_filename,
                       }}
                     />
@@ -216,6 +220,8 @@ export function ResultTabs({
                   camera: p.camera,
                   moodAtmosphere: p.mood_atmosphere,
                   styleReferences: p.style_references,
+                  colorPalette: p.color_palette as string | null,
+                  technical: p.technical as string | null,
                   referenceFilename: p.reference_filename,
                 }}
               />
@@ -239,6 +245,8 @@ export function ResultTabs({
                   camera: p.camera,
                   moodAtmosphere: p.mood_atmosphere,
                   styleReferences: p.style_references,
+                  colorPalette: p.color_palette as string | null,
+                  technical: p.technical as string | null,
                   referenceFilename: p.reference_filename,
                 }}
               />

@@ -234,6 +234,7 @@
     "layers.camera": "Kamera",
     "layers.lighting": "Pencahayaan",
     "layers.color": "Warna",
+    "layers.colorPalette": "Palet Warna",
     "layers.mood": "Suasana",
     "layers.style": "Gaya",
     "layers.technical": "Teknis",

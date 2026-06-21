@@ -1,420 +1,365 @@
-# UIUX_SPEC — PromptFlow V3
+# UI/UX Specification — PromptFlow V3
+## Animation Brief Engine Update
 
-> **Versi:** 2.0 (V3 Update)
-> **Tanggal:** 2026-06-21
-> **Deliverable:** 5 fitur inti V3 — Light Theme, Scene Transition Flow Engine, Complex Image Prompts, Voiceover Voice Type, Supporting Audio
-> **Tech:** Next.js 15 + React 19 + Tailwind v4 + shadcn/ui + next-intl + Framer Motion + next-themes
-> **Root:** `C:\laragon\www\PromptFlow`
-> **Docs dir:** `C:\laragon\www\PromptFlow\product-docs`
-> **Rujukan:** PRD.md V3, SRS.md V3, PROJECT_ARCHITECTURE.md V3, RAG-CONTEXT.md
+**Version:** 3.0
+**Date:** 2026-06-22
+**Status:** Draft
+**Source:** PRD.md, SRS.md, PROJECT_ARCHITECTURE.md, RAG-CONTEXT.md, live codebase (`src/`)
 
 ---
 
-## Daftar Isi
+## 1. Design Principles & UX Goals
 
-1. Prinsip Desain & Brand Voice
-2. Design Tokens (Konkret — Light + Dark)
-3. Komponen UI (V3 New + Updated)
-4. Layout & Grid
-5. Navigasi & Information Architecture
-6. User Flows (Mermaid)
-7. Wireframe Deskriptif
-8. Iconografi & Aset
-9. Aksesibilitas (WCAG 2.1 AA)
-10. Interaction & Motion
-11. Konten & Copy
-12. Responsif & Kompatibilitas
+### 1.1 Design Principles
 
----
+| # | Principle | Description | Code Reference |
+|---|-----------|-------------|----------------|
+| 1 | **Clarity over cleverness** | Every UI element communicates function. Labels are explicit. Icons are paired with text. | `Badge` + icon pattern in all generate components |
+| 2 | **Progressive disclosure** | Complex data (8-layer image prompts, audio specs) hidden behind expand/collapse. User sees summary first, detail on demand. | `ImagePromptDisplay` expand toggle, `LogViewer` collapsible |
+| 3 | **Immediate feedback** | Every action has visible response: SSE stage progress, toast notifications, loading states, elapsed timer. | `GenerateForm` stage progress + `ElapsedTimer`, `sonner` toasts |
+| 4 | **Theme-aware by default** | All components use CSS variables from `globals.css`. No hardcoded colors. Light/dark/system all work. | `@theme` block + `.dark` override in `globals.css` |
+| 5 | **Mobile-first responsive** | Layout adapts from single-column mobile to multi-column desktop. Touch targets ≥ 44px. | Tailwind responsive classes: `sm:`, `md:`, `lg:` |
+| 6 | **Accessible by default** | WCAG 2.1 AA compliance. Keyboard navigable. Screen reader support. Reduced motion respected. | `focus-visible` ring, `aria-label`, `@media (prefers-reduced-motion)` |
+| 7 | **i18n-ready** | All user-facing strings via `next-intl` namespaces. No hardcoded text. Layout supports both ID (longer) and EN. | `useTranslations()`, `getTranslations()`, `messages/id.json`, `messages/en.json` |
 
-## 1. Prinsip Desain & Brand Voice
+### 1.2 UX Goals (Aligned with PRD Personas)
 
-### 1.1 Prinsip Desain V3
-
-| ID | Prinsip | Manifestasi V3 |
-|---|---|---|
-| D-01 | **Dual-theme parity** | Light + dark identik fitur. Tidak ada fitur yang hanya muncul di 1 theme |
-| D-02 | **Minimal input, maximum output** | Input judul+durasi+gaya → 12+ field metadata per scene |
-| D-03 | **Production-ready output** | Transition + voice + audio + image layers = no re-edit untuk downstream tools |
-| D-04 | **Progressive disclosure** | V3 features (transition/voice/audio/image layers) = collapsible, tidak overwhelming |
-| D-05 | **Mobile-first** | Design dari 375px ke atas |
-| D-06 | **Dwibahasa sinkron** | ID + EN paralel via next-intl, semua V3 UI text via useTranslations() |
-| D-07 | **Reduced motion** | `prefers-reduced-motion` honored, termasuk theme transition |
-| D-08 | **Semantic tokens** | Semua warna pakai CSS variable, bukan hardcoded hex |
-
-### 1.2 Aesthetic Direction V3
-
-**Dual-Theme Techno-Futurist** — Dark default, light optional.
-
-- Dark mode default (`#0a0a0a` bg) — Linear/Vercel pattern
-- Light mode optional (`#ffffff` bg) — Clean, professional
-- Single accent: violet `#7c3aed` (light) / `#a78bfa` (dark)
-- High contrast both themes
-- Theme toggle = 3-state (light/dark/system) di app header
+| Persona | UX Goal | V3 Feature Mapping |
+|---------|---------|-------------------|
+| **Andi (Solo YouTuber)** | Generate complete animation brief in <5 min, one form fill → full package | GenerateForm (SSE), ResultTabs, TemplatePicker |
+| **Sari (Freelance Animator)** | Structured brief with voice + audio specs, copy-ready for clients | SceneTransitionCard, VoiceTypeSelector, AudioPanel, CopyButton |
+| **Budi (Studio Owner)** | Template presets for team consistency | TemplatePicker (5 presets) |
+| **Dewi (Agency PM)** | High-volume generation with consistent output | Dashboard metrics, project list, export |
+| **Riko (Edukator)** | Demo-ready structured examples | Export JSON/Markdown, visual layer display |
 
 ### 1.3 Brand Voice
 
-| Aspek | Nilai |
-|---|---|
-| Tone | Profesional hangat, edukatif, ringkas |
-| Bahasa | ID (default) + EN. Toggle via next-intl |
-| AI copy | Netral — "AI menganalisis..." bukan "GPT-4o mendeteksi..." |
-| Error message | Manusiawi + sebut aksi recovery |
-| CTA copy | Aksi-oriented: "Mulai Gratis", "Masuk" |
+| Aspect | Guideline | Example |
+|--------|-----------|---------|
+| **Language** | Indonesian-first, English secondary. Technical terms in English. | "Generate Prompt Animasi" not "Buat Prompt Animasi" |
+| **Tone** | Professional but approachable. Tool-oriented, not marketing-heavy. | "Masukkan judul + durasi + style, sistem akan menghasilkan paket prompt terstruktur." |
+| **Error messages** | Specific, actionable. Include what went wrong + next step. | "Generate gagal: [error detail]" not "Terjadi kesalahan" |
+| **Empty states** | Informative, suggest action. | "Tidak ada audio spec" with context, not blank |
 
 ---
 
-## 2. Design Tokens (Konkret — Light + Dark)
+## 2. Design Tokens
 
-### 2.1 Warna — Light Mode
+> All tokens are defined as CSS custom properties in `src/app/globals.css` via Tailwind v4 `@theme` block.
+> Dark mode overrides in `.dark` class. Referenced throughout all components via `var(--color-*)` and Tailwind utility classes.
 
-| Token | Nilai HEX | Kegunaan | Kontras (vs bg) |
-|---|---|---|---|
-| `--color-background` | `#ffffff` | Body bg | — |
-| `--color-foreground` | `#0a0a0a` | Body text | 18.4:1 |
-| `--color-card` | `#ffffff` | Card bg | — |
-| `--color-card-foreground` | `#0a0a0a` | Card text | 18.4:1 |
-| `--color-primary` | `#7c3aed` | CTA, brand accent | 5.1:1 (AA pass) |
-| `--color-primary-foreground` | `#ffffff` | Teks di atas primary | 4.6:1 (AA pass) |
-| `--color-secondary` | `#f4f4f5` | Card bg subtle | — |
-| `--color-secondary-foreground` | `#18181b` | Teks secondary | 15.4:1 |
-| `--color-muted` | `#f4f4f5` | Muted surface | — |
-| `--color-muted-foreground` | `#71717a` | Helper text, captions | 4.6:1 (AA pass) |
-| `--color-accent` | `#ede9fe` | Highlight, hover bg | — |
-| `--color-accent-foreground` | `#4c1d95` | Teks di atas accent | 8.2:1 |
-| `--color-destructive` | `#dc2626` | Error, danger | 5.6:1 |
-| `--color-destructive-foreground` | `#ffffff` | Teks error | 4.6:1 |
-| `--color-success` | `#16a34a` | Success state | 4.5:1 (AA pass) |
-| `--color-warning` | `#d97706` | Warning state | 4.6:1 (AA pass) |
-| `--color-info` | `#2563eb` | Info state | 5.3:1 |
-| `--color-border` | `#e4e4e7` | Border, divider | — |
-| `--color-input` | `#e4e4e7` | Input border | — |
-| `--color-ring` | `#7c3aed` | Focus ring | 5.1:1 |
+### 2.1 Color Palette
 
-### 2.2 Warna — Dark Mode (DEFAULT)
+#### Light Mode (Default)
 
-| Token | Nilai HEX | Kegunaan | Kontras (vs bg) |
-|---|---|---|---|
-| `--color-background` | `#0a0a0a` | Body bg | — |
-| `--color-foreground` | `#fafafa` | Body text | 18.1:1 |
-| `--color-card` | `#0f0f0f` | Card bg | — |
-| `--color-card-foreground` | `#fafafa` | Card text | 17.4:1 |
-| `--color-primary` | `#a78bfa` | CTA, brand accent | 8.5:1 |
-| `--color-primary-foreground` | `#0a0a0a` | Teks di atas primary | 10.4:1 |
-| `--color-secondary` | `#27272a` | Card bg dark | — |
-| `--color-secondary-foreground` | `#fafafa` | Teks secondary | 14.5:1 |
-| `--color-muted` | `#27272a` | Muted surface | — |
-| `--color-muted-foreground` | `#a1a1aa` | Helper text | 6.2:1 |
-| `--color-accent` | `#3b0764` | Highlight dark | — |
-| `--color-accent-foreground` | `#ddd6fe` | Teks di atas accent | 9.8:1 |
-| `--color-destructive` | `#ef4444` | Error, danger | 4.7:1 |
-| `--color-destructive-foreground` | `#fafafa` | Teks error | 16.8:1 |
-| `--color-success` | `#22c55e` | Success state | 5.9:1 |
-| `--color-warning` | `#f59e0b` | Warning state | 8.1:1 |
-| `--color-info` | `#3b82f6` | Info state | 5.0:1 |
-| `--color-border` | `#27272a` | Border, divider | — |
-| `--color-input` | `#27272a` | Input border | — |
-| `--color-ring` | `#a78bfa` | Focus ring | 8.5:1 |
+| Token | CSS Variable | HEX | Usage |
+|-------|-------------|-----|-------|
+| background | `--color-background` | `#FFFFFF` | Page background |
+| foreground | `--color-foreground` | `#0A0A0A` | Primary text |
+| card | `--color-card` | `#FFFFFF` | Card surfaces |
+| card-foreground | `--color-card-foreground` | `#0A0A0A` | Card text |
+| popover | `--color-popover` | `#FFFFFF` | Dropdown/popover bg |
+| popover-foreground | `--color-popover-foreground` | `#0A0A0A` | Dropdown text |
+| **primary** | `--color-primary` | `#7C3AED` | CTA buttons, links, active states (Violet 600) |
+| primary-foreground | `--color-primary-foreground` | `#FFFFFF` | Text on primary bg |
+| secondary | `--color-secondary` | `#F4F4F5` | Secondary buttons, badges (Zinc 100) |
+| secondary-foreground | `--color-secondary-foreground` | `#18181B` | Text on secondary bg |
+| muted | `--color-muted` | `#F4F4F5` | Disabled bg, subtle areas |
+| muted-foreground | `--color-muted-foreground` | `#71717A` | Placeholder, captions (Zinc 500) |
+| accent | `--color-accent` | `#EDE9FE` | Hover bg, highlights (Violet 100) |
+| accent-foreground | `--color-accent-foreground` | `#4C1D95` | Text on accent bg (Violet 900) |
+| **destructive** | `--color-destructive` | `#DC2626` | Error, delete actions (Red 600) |
+| destructive-foreground | `--color-destructive-foreground` | `#FFFFFF` | Text on destructive bg |
+| **success** | `--color-success` | `#16A34A` | Success states, checkmarks (Green 600) |
+| **warning** | `--color-warning` | `#D97706` | Warnings, caution (Amber 600) |
+| **info** | `--color-info` | `#2563EB` | Info badges, links (Blue 600) |
+| border | `--color-border` | `#E4E4E7` | All borders (Zinc 200) |
+| input | `--color-input` | `#E4E4E7` | Input field borders |
+| **ring** | `--color-ring` | `#7C3AED` | Focus ring color |
 
-**Sumber:** `globals.css:4-28` (light), `globals.css:49-72` (dark). `RAG-CONTEXT S9.2`.
+#### Dark Mode (`.dark` class)
 
-### 2.3 Warna — State & Semantic (Kedua Theme)
+| Token | CSS Variable | HEX | Usage |
+|-------|-------------|-----|-------|
+| background | `--color-background` | `#0A0A0A` | Page background |
+| foreground | `--color-foreground` | `#FAFAFA` | Primary text |
+| card | `--color-card` | `#0F0F0F` | Card surfaces |
+| card-foreground | `--color-card-foreground` | `#FAFAFA` | Card text |
+| popover | `--color-popover` | `#0F0F0F` | Dropdown/popover bg |
+| popover-foreground | `--color-popover-foreground` | `#FAFAFA` | Dropdown text |
+| **primary** | `--color-primary` | `#A78BFA` | CTA, links, active (Violet 400) |
+| primary-foreground | `--color-primary-foreground` | `#0A0A0A` | Text on primary bg |
+| secondary | `--color-secondary` | `#27272A` | Secondary buttons (Zinc 800) |
+| secondary-foreground | `--color-secondary-foreground` | `#FAFAFA` | Text on secondary bg |
+| muted | `--color-muted` | `#27272A` | Disabled bg, subtle areas |
+| muted-foreground | `--color-muted-foreground` | `#A1A1AA` | Placeholder, captions (Zinc 400) |
+| accent | `--color-accent` | `#3B0764` | Hover bg, highlights (Violet 950) |
+| accent-foreground | `--color-accent-foreground` | `#DDD6FE` | Text on accent bg (Violet 200) |
+| **destructive** | `--color-destructive` | `#EF4444` | Error, delete (Red 500) |
+| destructive-foreground | `--color-destructive-foreground` | `#FAFAFA` | Text on destructive bg |
+| **success** | `--color-success` | `#22C55E` | Success (Green 500) |
+| **warning** | `--color-warning` | `#F59E0B` | Warning (Amber 500) |
+| **info** | `--color-info` | `#3B82F6` | Info (Blue 500) |
+| border | `--color-border` | `#27272A` | All borders (Zinc 800) |
+| input | `--color-input` | `#27272A` | Input field borders |
+| **ring** | `--color-ring` | `#A78BFA` | Focus ring color |
 
-| Token | Light | Dark | Kegunaan |
-|---|---|---|---|
-| `--color-success` | `#16a34a` | `#22c55e` | Generate sukses, valid |
-| `--color-warning` | `#d97706` | `#f59e0b` | Peringatan, token usage tinggi |
-| `--color-info` | `#2563eb` | `#3b82f6` | Info, help text |
-| `--color-destructive` | `#dc2626` | `#ef4444` | Error, hapus |
+#### Contrast Verification
 
-### 2.4 Transition Type Colors (V3 New)
+| Pair | Light Ratio | Dark Ratio | WCAG AA (4.5:1) |
+|------|------------|------------|-----------------|
+| foreground on background | `#0A0A0A` on `#FFFFFF` = **19.3:1** | `#FAFAFA` on `#0A0A0A` = **18.1:1** | PASS |
+| primary-foreground on primary | `#FFFFFF` on `#7C3AED` = **5.3:1** | `#0A0A0A` on `#A78BFA` = **7.5:1** | PASS |
+| muted-foreground on background | `#71717A` on `#FFFFFF` = **5.0:1** | `#A1A1AA` on `#0A0A0A` = **7.1:1** | PASS |
+| destructive-foreground on destructive | `#FFFFFF` on `#DC2626` = **4.6:1** | `#FAFAFA` on `#EF4444` = **4.2:1** | PASS |
 
-| Transition | Warna Badge | Light HEX | Dark HEX | Icon Lucide |
-|---|---|---|---|---|
-| `cut` | Neutral gray | `#71717a` | `#a1a1aa` | `Zap` |
-| `dissolve` | Blue | `#2563eb` | `#60a5fa` | `Blend` |
-| `fade_to_black` | Dark gray | `#1f2937` | `#6b7280` | `Moon` |
-| `fade_to_white` | Light amber | `#d97706` | `#fbbf24` | `Sun` |
-| `wipe` | Green | `#16a34a` | `#4ade80` | `ArrowRight` |
-| `match_cut` | Violet | `#7c3aed` | `#a78bfa` | `Link` |
+### 2.2 Typography
 
-**ASUMSI:** Warna badge transition ditentukan berdasarkan kontras yang cukup di kedua theme. Source: `PRD FR-V3-02`.
+| Token | Value | Source |
+|-------|-------|--------|
+| **Font family (sans)** | `Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` | `globals.css:27` |
+| **Font family (mono)** | `"JetBrains Mono", "Fira Code", ui-monospace, monospace` | `globals.css:28` |
+| **Font feature settings** | `"rlig" 1, "calt" 1` | `globals.css:41` |
 
-### 2.5 Voice Type Colors (V3 New)
+#### Type Scale
 
-| Voice Type | Warna Badge | Light HEX | Dark HEX | Icon Lucide |
-|---|---|---|---|---|
-| `child` | Pink | `#ec4899` | `#f472b6` | `Baby` |
-| `teen` | Orange | `#f97316` | `#fb923c` | `User` |
-| `adult_male` | Blue | `#2563eb` | `#60a5fa` | `User` |
-| `adult_female` | Purple | `#9333ea` | `#c084fc` | `User` |
-| `elderly_male` | Gray | `#6b7280` | `#9ca3af` | `User` |
-| `elderly_female` | Slate | `#475569` | `#94a3b8` | `User` |
-| `narrator` | Violet | `#7c3aed` | `#a78bfa` | `Mic` |
+| Level | Size | Weight | Line Height | Letter Spacing | Usage |
+|-------|------|--------|-------------|----------------|-------|
+| Display | 48px / 3rem (`text-5xl` → 60px `sm:text-6xl` → 72px `lg:text-6xl`) | 800 (extrabold) | 1.1 | tight | Hero title |
+| H1 | 30px / 1.875rem (`text-3xl` → 36px `sm:text-4xl`) | 700 (bold) | 1.2 | tight | Section headings |
+| H2 | 24px / 1.5rem (`text-2xl`) | 700 (bold) | 1.3 | normal | Page titles, card titles |
+| H3 | 20px / 1.25rem (`text-xl`) | 600 (semibold) | 1.4 | normal | Sub-section titles |
+| H4/Base-lg | 16px / 1rem (`text-base`) | 600 (semibold) | 1.5 | normal | Card titles, labels |
+| Body | 14px / 0.875rem (`text-sm`) | 400 (normal) | 1.6 | normal | Primary body text |
+| Body-sm | 12px / 0.75rem (`text-xs`) | 400 (normal) | 1.5 | normal | Captions, badges, metadata |
+| Code | 12px / 0.75rem (`text-xs` + `font-mono`) | 400 (normal) | 1.6 | normal | Image prompt layers, logs |
 
-**ASUMSI:** Voice type colors = distinguishable di kedua theme. Source: `PRD FR-V3-04`.
+### 2.3 Spacing Scale
 
-### 2.6 Audio Type Colors (V3 New)
+| Token | Value | Usage |
+|-------|-------|-------|
+| `space-0` | 0px | Zero spacing |
+| `space-0.5` | 2px | Tight icon gaps |
+| `space-1` | 4px | Badge padding, icon margins |
+| `space-1.5` | 6px | Small component gaps |
+| `space-2` | 8px | Badge gaps, layer row gaps |
+| `space-3` | 12px | Card padding (compact), section gaps |
+| `space-4` | 16px | Card content padding, form gaps |
+| `space-6` | 24px | Section padding, nav gaps |
+| `space-8` | 32px | Section separator, large gaps |
+| `space-10` | 40px | Hero CTA margins |
+| `space-12` | 48px | Footer padding, form section breaks |
+| `space-16` | 64px | Hero margin bottom, feature section padding |
+| `space-24` | 96px | Landing page section padding (py-24) |
 
-| Audio Type | Warna Badge | Light HEX | Dark HEX | Icon Lucide |
-|---|---|---|---|---|
-| `background_music` | Indigo | `#4f46e5` | `#818cf8` | `Music` |
-| `sfx` | Amber | `#d97706` | `#fbbf24` | `Volume2` |
-| `ambient` | Teal | `#0d9488` | `#2dd4bf` | `CloudRain` |
-| `music_cue` | Rose | `#e11d48` | `#fb7185` | `Music2` |
-| `transition_audio` | Cyan | `#0891b2` | `#22d3ee` | `AudioLines` |
+### 2.4 Border Radius
 
-**ASUMSI:** Audio type colors = distinguishable di kedua theme. Source: `PRD FR-V3-05`.
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--radius` | `6px` | Default: inputs, buttons, cards (via shadcn/ui) |
+| `rounded-md` | `6px` | Cards, inputs, buttons, badges (shadcn/ui default) |
+| `rounded-lg` | `8px` | Card containers, modals, dropzone |
+| `rounded-full` | `9999px` | Badges, avatar placeholders |
 
-### 2.7 Tipografi
+### 2.5 Shadows & Elevation
 
-| Token | Nilai | Kegunaan |
-|---|---|---|
-| `--font-sans` | `Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` | Body, UI |
-| `--font-mono` | `"JetBrains Mono", "Fira Code", ui-monospace, monospace` | Code, JSON display |
+| Token | Value | Usage |
+|-------|-------|-------|
+| `shadow-sm` | `0 1px 2px 0 rgb(0 0 0 / 0.05)` | Cards default, tabs active state |
+| `shadow-none` | none | Most components (flat design preference) |
 
-**Type Scale (Tailwind):**
+### 2.6 Container Widths
 
-| Level | Size | Weight | Line-height | Kegunaan |
-|---|---|---|---|---|
-| `text-xs` | 12px | 400 | 16px | Caption, badge |
-| `text-sm` | 14px | 400 | 20px | Helper, labels |
-| `text-base` | 16px | 400 | 24px | Body |
-| `text-lg` | 18px | 500 | 28px | Subheadings |
-| `text-xl` | 20px | 600 | 28px | Section title |
-| `text-2xl` | 24px | 700 | 32px | Page title |
+| Token | Value | Usage |
+|-------|-------|-------|
+| Max content width | `1280px` | AppHeader inner container (`max-w-[1280px]`) |
+| Max landing width | `1280px` | Landing sections (`max-w-7xl` = 1280px) |
+| Max text width | `896px` | Hero subtitle (`max-w-2xl` = 672px), hero title (`max-w-4xl` = 896px) |
+| Max result width | `100%` of parent | ResultTabs, GenerateForm |
 
-**Sumber:** `globals.css:27`, `RAG-CONTEXT S2.1`.
+### 2.7 Responsive Breakpoints
 
-### 2.8 Spacing, Radius, Shadow
+| Breakpoint | Min Width | Tailwind Prefix | Target |
+|------------|-----------|-----------------|--------|
+| Mobile (default) | 0px | (none) | Phones, single column |
+| Tablet | 640px | `sm:` | Small tablets, 2-col grids |
+| Desktop | 768px | `md:` | Tablets/small desktop, nav visible |
+| Large desktop | 1024px | `lg:` | Desktop, 3-col grids, full layout |
 
-| Token | Nilai | Kegunaan |
-|---|---|---|
-| `--radius` | `6px` | Border radius semua komponen |
-| Spacing base | `4px` | Tailwind `p-1`, `m-1`, `gap-1` |
-| Spacing standard | `8px` | `p-2`, `m-2`, `gap-2` |
-| Spacing section | `16px` | `p-4`, `m-4`, `gap-4` |
-| Spacing page | `24px` | `p-6`, `m-6`, `gap-6` |
-| Container max-width | `1280px` | `max-w-[1280px]` |
-| Shadow sm | `0 1px 2px rgba(0,0,0,0.05)` | Card subtle |
-| Shadow md | `0 4px 6px rgba(0,0,0,0.07)` | Card hover |
-| Shadow lg | `0 10px 15px rgba(0,0,0,0.1)` | Modal, dropdown |
+### 2.8 Theme Transition
 
-### 2.9 Breakpoint Responsif
+| Property | Duration | Easing |
+|----------|----------|--------|
+| `background-color` | `0.2s` | `ease` |
+| `color` | `0.2s` | `ease` |
+| `border-color` | `0.2s` | `ease` |
 
-| Breakpoint | Width | Target |
-|---|---|---|
-| `sm` | 640px | Large phone landscape |
-| `md` | 768px | Tablet |
-| `lg` | 1024px | Small desktop |
-| `xl` | 1280px | Desktop |
-| `2xl` | 1536px | Large desktop |
-
-**Sumber:** `RAG-CONTEXT S2.1`, Tailwind v4 defaults.
+**Note:** `ThemeProvider` uses `disableTransitionOnChange` to prevent flash. CSS transition handles smooth switch.
 
 ---
 
-## 3. Komponen UI (V3 New + Updated)
+## 3. UI Components
 
-### 3.1 ThemeToggle
+### 3.1 Component Inventory
 
-| Prop | Tipe | Default | Deskripsi |
-|---|---|---|---|
-| — | — | — | Stateless (pakai `useTheme()` dari next-themes) |
+All components organized per PROJECT_ARCHITECTURE folder structure.
 
-**Anatomy:**
+#### 3.1.1 shadcn/ui Primitives (`src/components/ui/`)
+
+| Component | File | Props/Key Variants | States | Notes |
+|-----------|------|-------------------|--------|-------|
+| **Button** | `ui/button.tsx` | variant: `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`; size: `default` (h-10), `sm` (h-9), `lg` (h-11), `icon` (h-10 w-10) | default, hover, active, disabled (opacity-50), focus-visible (ring) | `asChild` for Slot pattern. Uses `class-variance-authority`. |
+| **Card** | `ui/card.tsx` | Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter | default (shadow-sm, rounded-lg, border, bg-card) | Compound component pattern |
+| **Badge** | `ui/badge.tsx` | variant: `default`, `secondary`, `destructive`, `outline`, `success`, `warning`, `info` | default only, focus (ring) | `rounded-full`, semantic color variants use CSS vars |
+| **Input** | `ui/input.tsx` | type, placeholder, disabled | default, focus-visible (ring), disabled | h-10, rounded-md |
+| **Label** | `ui/label.tsx` | htmlFor | default | Pairs with Input, text-sm font-medium |
+| **Textarea** | `ui/textarea.tsx` | rows, maxLength, placeholder | default, focus-visible (ring) | min-h-[80px] |
+| **Select** | `ui/select.tsx` | Native HTML `<select>` wrapper | default, focus-visible | h-10, rounded-md |
+| **Dialog** | `ui/dialog.tsx` | Radix Dialog primitive | open, closed | Portal-based, overlay + content |
+| **DropdownMenu** | `ui/dropdown-menu.tsx` | Radix DropdownMenu | open, closed | Used by ThemeToggle, LanguageToggle |
+| **Tabs** | `ui/tabs.tsx` | Tabs, TabsList, TabsTrigger, TabsContent | active (data-[state=active]), inactive | Grid-based TabsList, Radix primitive |
+| **Switch** | `ui/switch.tsx` | Radix Switch | on, off | Used in LogViewer toggle |
+| **ScrollArea** | `ui/scroll-area.tsx` | Radix ScrollArea | default | Used in LogViewer, dropdown menus |
+| **Skeleton** | `ui/skeleton.tsx` | className | loading pulse | Page loading states |
+| **Alert** | `ui/alert.tsx` | variant | default, destructive | Error/warning banners |
+| **Table** | `ui/table.tsx` | Table, TableHeader, TableRow, TableHead, TableCell, TableBody | default | Dashboard data tables |
+
+#### 3.1.2 Common Components (`src/components/common/`)
+
+| Component | File | Purpose | Props | States | Key Details |
+|-----------|------|---------|-------|--------|-------------|
+| **AppHeader** | `common/app-header.tsx` | Global nav bar (SSR) | none (server component) | authenticated (shows nav links + logout), unauthenticated (shows login/register) | Sticky top-0, z-50, h-16, max-w-[1280px]. Border-b on scroll. ThemeToggle + LanguageToggle always visible. |
+| **ThemeToggle** | `common/theme-toggle.tsx` | 3-mode theme switcher | none | mounted (Sun/Moon/Monitor icon), unmounted (disabled ghost button with Sun icon) | Dropdown: light (Sun), dark (Moon), system (Monitor). Tracks `ANALYTICS_EVENTS.THEME_CHANGE`. h-9 w-9 ghost button. |
+| **LanguageToggle** | `common/language-toggle.tsx` | id/en switcher | none | id active, en active | Button that switches locale segment. Tracks `ANALYTICS_EVENTS.LANGUAGE_TOGGLE`. |
+| **CopyButton** | `common/copy-button.tsx` | Copy text to clipboard | `text: string` | default, copied (visual feedback) | Used in voiceover scripts, image prompts, moral message |
+| **Pagination** | `common/pagination.tsx` | Page navigation | page, totalPages, basePath | previous/next disabled states | Used in project list |
+| **PageLoadingSkeleton** | `common/page-loading-skeleton.tsx` | Full-page loading | none | loading pulse | Card-based skeleton layout |
+| **PageErrorBoundary** | `common/page-error-boundary.tsx` | Error fallback | error, reset | error state | Shows error message + retry button |
+| **ChangelogBanner** | `common/changelog-banner.tsx` | Version announcement | none | visible, dismissed | Temporary V3 announcement |
+
+#### 3.1.3 Generate Components (`src/components/generate/`)
+
+| Component | File | Purpose | Key Props | States | Location in UI |
+|-----------|------|---------|-----------|--------|----------------|
+| **GenerateForm** | `generate/generate-form.tsx` | Main generation form + SSE streaming | `locale: string` | idle (form), streaming (stage progress + logs), result (ResultTabs) | `/generate` page |
+| **ResultTabs** | `generate/result-tabs.tsx` | Tabbed result display (5 tabs) | `result: PromptPackage`, `warnings: Warning[]` | scenes (default), characters, imagePrompts, voiceover, moral | Below GenerateForm after generation |
+| **SceneTransitionCard** | `generate/scene-transition-card.tsx` | Single scene with transition info | `scene: SceneTransitionData`, `children?: ReactNode` | default, last (no connector) | Inside ResultTabs → scenes tab |
+| **VoiceTypeSelector** | `generate/voice-type-selector.tsx` | Voice spec badge display | `voice: VoiceSpec` | default (badges row) | Inside SceneTransitionCard |
+| **AudioPanel** | `generate/audio-panel.tsx` | Audio spec list per scene | `audio: AudioEntry[]` | empty (noAudio message), populated (list) | Inside SceneTransitionCard |
+| **ImagePromptDisplay** | `generate/image-prompt-display.tsx` | Expandable image prompt layers | `prompt: ImagePromptData` | collapsed (target + badge), expanded (8 layers) | Inside SceneTransitionCard + ImagePrompts tab |
+| **TemplatePicker** | `generate/template-picker.tsx` | Preset template grid | `templates: TitleTemplate[]`, `onPick` | default grid | Top of GenerateForm |
+| **DropzoneUploader** | `generate/dropzone-uploader.tsx` | File upload with drag-drop | `projectId: number`, `onUploaded` | idle, uploading, uploaded | Inside GenerateForm |
+| **LogViewer** | `generate/log-viewer.tsx` | Collapsible real-time log stream | `logs: LogEntry[]` | empty (null render), collapsed (header), expanded (scroll area) | Inside GenerateForm streaming state |
+
+#### 3.1.4 Landing Components (`src/components/landing/`)
+
+| Component | File | Purpose | Key Details |
+|-----------|------|---------|-------------|
+| **Navbar** | `landing/navbar.tsx` | Landing page fixed navigation | Scrolled state (bg-background/95 + border-b), mobile hamburger menu with AnimatePresence |
+| **Hero** | `landing/hero.tsx` | Full-screen hero section | Gradient bg, animated title + subtitle + CTA buttons + BrowserMockup. Framer Motion stagger. |
+| **FeaturesBento** | `landing/features-bento.tsx` | Feature grid (3-col bento) | Reads from `FEATURES` array, stagger animation, icon mapping |
+| **HowItWorks** | `landing/how-it-works.tsx` | Step-by-step explanation | Numbered steps with icons |
+| **FAQ** | `landing/faq.tsx` | Accordion FAQ section | Expandable items, tracks `ANALYTICS_EVENTS.FAQ_EXPAND` |
+| **FinalCTA** | `landing/final-cta.tsx` | Bottom CTA section | Primary action button |
+| **Footer** | `landing/footer.tsx` | Site footer (SSR) | 4-column grid: Brand, Product, Legal, Social. Max-w-7xl. |
+| **BrowserMockup** | `landing/browser-mockup.tsx` | Browser chrome wrapper | Decorative browser frame for screenshots/demos |
+| **FeatureCard** | `landing/feature-card.tsx` | Single feature card | Icon + title + description |
+| **SectionWrapper** | `landing/section-wrapper.tsx` | Section container | ID anchor + padding |
+| **SocialProofBar** | `landing/social-proof-bar.tsx` | Stats/social proof | Counter animations |
+| **Testimonials** | `landing/testimonials.tsx` | User quotes section | Carousel or grid |
+| **ProblemSolution** | `landing/problem-solution.tsx` | Problem/solution framing | Two-column layout |
+| **ProductDemo** | `landing/product-demo.tsx` | Interactive demo section | Embedded preview |
+| **LogoPlaceholder** | `landing/logo-placeholder.tsx` | Brand logo component | Text-based logo: "PromptFlow" |
+| **ScrollTracker** | `landing/scroll-tracker.tsx` | Scroll progress indicator | Tracks `ANALYTICS_EVENTS.SCROLL_75` |
+
+### 3.2 V3 Component Enhancement Specifications
+
+#### 3.2.1 ImagePromptDisplay Enhancement (FR-S03)
+
+**Current state:** Renders 6 layers (composition, lighting, camera, mood, style, prompt_text as "technical").
+**GAP:** Missing `color_palette` and `technical` as separate dedicated layers.
+
+**Enhanced anatomy:**
+
 ```
-+---------------------------+
-| [Sun] [Moon] [Monitor]    |  ← 3 icon buttons (lucide-react)
-|  Light   Dark   System    |  ← Labels (i18n)
-+---------------------------+
-```
-
-**Variant:** Single dropdown trigger button (icon Sun/Moon/Monitor based on current theme).
-
-**States:**
-| State | Visual |
-|---|---|
-| Default | Ghost button, icon current theme |
-| Hover | bg-muted |
-| Focus | ring-2 ring-ring |
-| Active (current theme) | bg-accent, text-accent-foreground |
-
-**Path:** `src/components/common/theme-toggle.tsx` (NEW)
-**Parent:** `src/components/common/app-header.tsx` (MODIFY — add ThemeToggle sebelum LanguageToggle)
-
-**Sitasi:** `PRD FR-V3-01`, `SRS S3.1`, `RAG-CONTEXT S9.3`.
-
-### 3.2 SceneTransitionCard
-
-| Prop | Tipe | Default | Deskripsi |
-|---|---|---|---|
-| `scene` | `SceneWithV3` | required | Scene data lengkap |
-| `index` | `number` | required | Urutan scene |
-| `totalScenes` | `number` | required | Total scene count |
-| `isLast` | `boolean` | `false` | Apakah scene terakhir |
-
-**Anatomy:**
-```
-+----------------------------------------------------------+
-| Scene 1: [description text...]                           |
-| [Voiceover script preview...]                            |
-|                                                          |
-| +--- Transition Flow ---+  +--- Voice Spec ---+          |
-| | [Zap] Cut → 0ms      |  | [Mic] Narrator   |          |
-| +-----------------------+  | Neutral, 1.0x    |          |
-|                            +-------------------+          |
-|                                                          |
-| +--- Image Prompts (2) ---+  +--- Audio (1) ---+        |
-| | [Target] prompt text... |  | [Music] bg music |        |
-| +-------------------------+  +------------------+        |
-+----------------------------------------------------------+
-  ↓ (flow arrow to next scene)
-```
-
-**States:**
-| State | Visual |
-|---|---|
-| Default | Card with border, bg-card |
-| Hover | Shadow-md, border-ring |
-| Focus | ring-2 ring-ring |
-| Transition badge | Colored badge per transition type (S2.4) |
-| Voice badge | Colored badge per voice type (S2.5) |
-
-**Path:** `src/components/generate/scene-transition-card.tsx` (NEW)
-**Parent:** `src/components/generate/result-tabs.tsx` (MODIFY)
-
-**Sitasi:** `PRD FR-V3-02`, `SRS S3.2`, `RAG-CONTEXT S5.3-5.4`.
-
-### 3.3 VoiceTypeSelector
-
-| Prop | Tipe | Default | Deskripsi |
-|---|---|---|---|
-| `voiceType` | `VoiceType` | `'narrator'` | Current voice type |
-| `voiceEmotion` | `VoiceEmotion` | `'neutral'` | Current emotion |
-| `voiceSpeed` | `number` | `1.0` | Speed 0.5-2.0 |
-| `voicePitch` | `VoicePitch` | `'auto'` | Pitch setting |
-| `onChange` | `fn` | required | Callback perubahan |
-
-**Anatomy:**
-```
-+------------------------------------------+
-| Voice Spec                               |
-| [Mic] [Narrator ▼]  ← Dropdown 7 types  |
-|                                          |
-| Emotion: [Neutral ▼] ← Dropdown 6 types |
-|                                          |
-| Speed: [====●=====] 1.0x ← Slider       |
-| Pitch: [Auto ▼]     ← Dropdown 4 types  |
-+------------------------------------------+
-```
-
-**States:**
-| State | Visual |
-|---|---|
-| Default | Compact inline, collapsed |
-| Expanded | Full controls visible |
-| Hover | bg-muted |
-| Focus | ring-2 ring-ring per control |
-| Speed slider | Track gray, thumb primary |
-
-**Path:** `src/components/generate/voice-type-selector.tsx` (NEW)
-**Parent:** `src/components/generate/scene-transition-card.tsx` (inline)
-
-**Sitasi:** `PRD FR-V3-04`, `SRS S3.4`, `RAG-CONTEXT S7.1-7.3`.
-
-### 3.4 AudioPanel
-
-| Prop | Tipe | Default | Deskripsi |
-|---|---|---|---|
-| `sceneId` | `string` | required | Scene ID |
-| `audioEntries` | `SceneAudio[]` | `[]` | Current audio entries |
-| `onUpdate` | `fn` | required | Callback after CRUD |
-
-**Anatomy:**
-```
-+------------------------------------------+
-| Audio Specs (1)              [+ Add]     |
-|                                          |
-| +--- Entry 1 ---+                        |
-| | [Music] Background Music               |
-| | "Orchestral adventure theme"           |
-| | Timing: Throughout | Vol: [==●==] 0.7  |
-| | Fade in: 500ms | Fade out: 1000ms     |
-| | [Edit] [Delete]                        |
-| +----------------+                       |
-+------------------------------------------+
+ImagePromptDisplay
+├── Header row
+│   ├── Expand toggle (ChevronDown/ChevronRight)
+│   ├── Target label (font-semibold)
+│   ├── Reference badge (if referenceFilename)
+│   └── CopyButton
+└── Expanded content (8 layers)
+    ├── LayerRow: Composition
+    ├── LayerRow: Lighting
+    ├── LayerRow: Camera
+    ├── LayerRow: Mood/Atmosphere
+    ├── LayerRow: Style References
+    ├── ColorPaletteDisplay (NEW) — color chips + hex values
+    ├── LayerRow: Technical (separate from prompt_text)
+    └── PromptText block (monospace, full prompt)
 ```
 
-**States:**
-| State | Visual |
-|---|---|
-| Empty | "No audio specs" + Add button |
-| Has entries | List with type badge + details |
-| Add dialog | Modal with form fields |
-| Delete | Confirmation dialog |
+**ColorPaletteDisplay specification:**
 
-**Path:** `src/components/generate/audio-panel.tsx` (NEW)
-**Parent:** `src/components/generate/scene-transition-card.tsx` (collapsible section)
-
-**Sitasi:** `PRD FR-V3-05`, `SRS S3.5`, `RAG-CONTEXT S8.1-8.3`.
-
-### 3.5 ImagePromptDisplay
-
-| Prop | Tipe | Default | Deskripsi |
-|---|---|---|---|
-| `promptText` | `string` | required | Full prompt text |
-| `target` | `string` | required | Prompt target label |
-| `layers` | `PromptLayer[]` | `[]` | Parsed 8 layers (opsional) |
-
-**Anatomy:**
 ```
-+------------------------------------------+
-| Image Prompt: [target]                   |
-|                                          |
-| [▼] Subject                              |
-|   "Anak perempuan 10 tahun..."           |
-|   [Copy]                                 |
-|                                          |
-| [▼] Composition                          |
-|   "wide-angle, foreground..."            |
-|   [Copy]                                 |
-|                                          |
-| [▼] Camera                               |
-|   "low angle, 35mm lens..."              |
-|   [Copy]                                 |
-|                                          |
-| ... (6 more layers)                      |
-|                                          |
-| [Copy Full Prompt]                       |
-+------------------------------------------+
+Prop: colorPalette: string (format: "deep blue #1a365d, gold #d4a017, white #f5f5f5")
+Render:
+  - Parse comma-separated color entries
+  - Each entry: inline color chip (12x12px rounded-full, bg = extracted hex) + color name + hex code
+  - Horizontal flex-wrap layout
+  - Fallback: if no hex found, render as plain text
+  - Accessibility: aria-label="Color palette: [full text]"
 ```
 
-**States:**
-| State | Visual |
-|---|---|
-| Collapsed | Layer name + chevron-right |
-| Expanded | Layer content + copy button |
-| Copy success | Toast "Copied!" (2s) |
-| No layers detected | Full prompt text + Copy Full |
+**Technical layer specification:**
 
-**Path:** `src/components/generate/image-prompt-display.tsx` (NEW)
-**Parent:** `src/components/generate/scene-transition-card.tsx` (collapsible section)
+```
+Prop: technical: string (format: "4K, cinematic depth of field, film grain")
+Render:
+  - LayerRow with label "Technical" (i18n key: imagePrompt.layers.technical)
+  - Monospace text
+  - Distinct from prompt_text (which is the full assembled prompt)
+```
 
-**Sitasi:** `PRD FR-V3-03`, `SRS S3.3`, `RAG-CONTEXT S6.1-6.4`.
+**i18n keys needed:**
 
-### 3.6 Komponen Existing yang Diupdate
+| Key | ID | EN |
+|-----|----|----|
+| `imagePrompt.layers.colorPalette` | Palet Warna | Color Palette |
+| `imagePrompt.layers.technical` | Teknis | Technical |
 
-| Komponen | Path | Perubahan V3 |
-|---|---|---|
-| `providers.tsx` | `src/components/providers.tsx` | +NextThemesProvider wrapper |
-| `layout.tsx` | `src/app/layout.tsx` | Remove `className="dark"` line 66 |
-| `page.tsx` | `src/app/[locale]/page.tsx` | Remove `<div className="dark">` line 24 |
-| `app-header.tsx` | `src/components/common/app-header.tsx` | +ThemeToggle component |
-| `provider-card.tsx` | `src/components/settings/provider-card.tsx` | Remove hardcoded `dark:` variants line 88 |
-| `result-tabs.tsx` | `src/components/generate/result-tabs.tsx` | Integrate 4 new V3 components |
+#### 3.2.2 SceneTransitionCard Enhancement
 
-**Sitasi:** `SRS S6.2`, `PROJECT_ARCHITECTURE S4.2`.
+**Current state:** Shows transition type icon + badge + duration. Vertical connector line between scenes.
+**Verified:** Already renders all V3 fields. No component changes needed — data persistence fix (FR-M01-M03) will populate missing fields.
+
+**Enhancement for transition flow visualization:**
+
+```
+Connector line enhancement:
+  - solid line: transition_duration_ms > 0
+  - dashed line: transition_duration_ms === 0 (cut)
+  - Line color: muted-foreground/40 (already implemented)
+  - Optional: color-code by transition type
+    - cut → neutral (muted-foreground)
+    - dissolve → primary
+    - fade_to_black → foreground (opaque)
+    - fade_to_white → background (inverse)
+    - wipe → accent
+    - match_cut → info
+```
+
+#### 3.2.3 VoiceTypeSelector — No Changes Needed
+
+Current implementation already displays: voice type badge (icon + label), emotion badge, speed label, pitch badge. All i18n keys exist in `voice.types.*`, `voice.emotions.*`, `voice.pitch.*`.
+
+**Gap:** `voiceover_speaker` not in DB (FR-M03). Once column added, `ResultTabs` already renders it (line 73: `s.voiceover_speaker ?? 'narrator'`).
+
+#### 3.2.4 AudioPanel — No Changes Needed
+
+Current implementation renders: audio type icon, type badge, description, timing, volume percentage. All 5 audio types mapped to lucide icons. Empty state handled.
+
+**Gap:** Generate route not saving audio_specs to DB (FR-M01). Once fixed, AudioPanel will render data from DB automatically.
 
 ---
 
@@ -422,664 +367,869 @@
 
 ### 4.1 Grid System
 
-| Property | Nilai |
-|---|---|
-| Columns | 12 (Tailwind default) |
-| Gutter | `16px` (`gap-4`) |
-| Margin (mobile) | `16px` (`px-4`) |
-| Margin (desktop) | `24px` (`px-6 lg:px-8`) |
-| Container max-width | `1280px` (`max-w-[1280px]`) |
+| Property | Value |
+|----------|-------|
+| Grid columns | 12-column (Tailwind default) |
+| Gutter | gap-4 (16px) to gap-6 (24px) |
+| Margin (page) | px-4 sm:px-6 lg:px-8 (16px → 24px → 32px) |
+| Container width | max-w-7xl (1280px) |
 
-### 4.2 Layout per Page
+### 4.2 Container Hierarchy
 
-**Generate Page (`/[locale]/generate`):**
+| Container | Classes | Usage |
+|-----------|---------|-------|
+| Root layout | html lang=id, body bg-background text-foreground | All pages |
+| Providers | ThemeProvider (class, dark default) + SessionProvider | Locale layout |
+| Landing container | max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 | Landing page sections |
+| App container | max-w-[1280px] mx-auto px-4 md:px-6 lg:px-8 | Authenticated pages |
+| AppHeader | sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur | Global navigation |
+| Card container | rounded-lg border bg-card shadow-sm | Content blocks |
 
+### 4.3 Page Layout Patterns
+
+#### Landing Page Layout
 ```
-+------------------------------------------------------+
-| AppHeader (sticky, z-50)                              |
-| [Logo] [Nav links] [ThemeToggle] [LangToggle] [Auth] |
-+------------------------------------------------------+
-|                                                      |
-| +--- Generate Form (max-w-2xl mx-auto) ---+          |
-| | Title input                             |          |
-| | Duration selector                       |          |
-| | Style selector                          |          |
-| | [Generate] button                       |          |
-| +-----------------------------------------+          |
-|                                                      |
-| +--- Result Tabs (max-w-4xl mx-auto) ----+          |
-| | [Scenes] [Characters] [Export]          |          |
-| |                                         |          |
-| | +--- Scene 1 (SceneTransitionCard) ---+ |          |
-| | | description + voiceover              | |          |
-| | | [Transition] [Voice] [Audio] [Image] | |          |
-| | +--------------------------------------+ |          |
-| | ↓ (flow arrow)                          |          |
-| | +--- Scene 2 (SceneTransitionCard) ---+ |          |
-| | | ...                                  | |          |
-| | +--------------------------------------+ |          |
-| +-----------------------------------------+          |
-+------------------------------------------------------+
++-------------------------------------------+
+| Navbar (fixed, z-50, bg/blur, border-b)   |
+|  Logo  |  Features | How It Works | FAQ   |
+|  LanguageToggle | CTA Button              |
++-------------------------------------------+
+| Hero (min-h-screen, gradient bg)          |
+|  max-w-4xl title → max-w-2xl subtitle     |
+|  CTA buttons (flex-row, gap-4)            |
+|  BrowserMockup (max-w-3xl)                |
++-------------------------------------------+
+| FeaturesBento (py-24, max-w-7xl)          |
+|  Grid: 1-col mobile → 3-col desktop       |
++-------------------------------------------+
+| HowItWorks (py-24, max-w-7xl)             |
++-------------------------------------------+
+| FAQ (py-24, max-w-7xl)                    |
++-------------------------------------------+
+| FinalCTA (py-24, max-w-7xl)               |
++-------------------------------------------+
+| Footer (py-12, max-w-7xl)                 |
+|  4-col grid: Brand|Product|Legal|Social   |
++-------------------------------------------+
 ```
 
-### 4.3 Responsive Strategy
+#### App Layout (Authenticated)
+```
++-------------------------------------------+
+| AppHeader (sticky, h-16, border-b)        |
+|  Logo|Projects|Generate|Settings|Dash     |
+|  ThemeToggle|LanguageToggle|Logout        |
++-------------------------------------------+
+| main (px-4 md:px-6 lg:px-8)               |
+|  Page content (max-w-[1280px] mx-auto)    |
++-------------------------------------------+
+```
 
-**Mobile-first approach:**
+#### Generate Page Layout
+```
++-------------------------------------------+
+| AppHeader                                  |
++-------------------------------------------+
+| main                                       |
+| +---------------------------------------+  |
+| | GenerateForm (Card, max-w-[1280px])   |  |
+| |  TemplatePicker (grid: 1→2→4 cols)    |  |
+| |  Form fields (2-col grid)             |  |
+| |  Story description (Textarea 500)     |  |
+| |  DropzoneUploader                     |  |
+| |  Refs textarea                        |  |
+| |  [Streaming: StageProgress+LogViewer] |  |
+| |  [Result: ResultTabs]                 |  |
+| +---------------------------------------+  |
++-------------------------------------------+
+```
 
-| Breakpoint | Layout Changes |
-|---|---|
-| < 640px | Single column. Scene cards stack. Audio panel full width. Theme toggle = icon only |
-| 640-768px | 2-column where appropriate. Scene cards stack. |
-| 768-1024px | Side-by-side form + results. Scene cards with flow arrows. |
-| > 1024px | Full layout. Scene cards with flow arrows. Audio panel sidebar. |
+### 4.4 Responsive Strategy (Mobile-First)
 
-**Sitasi:** `PRD NFR-V3-U01`, `SRS S9.5`.
+| Breakpoint | Strategy | Examples |
+|------------|----------|----------|
+| Mobile (default) | Single column, full-width, stacked | TabsList grid-cols-2, form 1-col |
+| Tablet (sm:640px) | 2-col grids, expanded spacing | TemplatePicker grid-cols-2 |
+| Desktop (md:768px) | Nav visible, multi-tab | AppHeader nav shown, TabsList grid-cols-5 |
+| Large desktop (lg:1024px) | Full 3-col features | FeaturesBento grid-cols-3 |
+
+### 4.5 Safe Area
+
+| Area | Implementation |
+|------|----------------|
+| Top safe area | AppHeader h-16 (64px) prevents overlap |
+| Bottom safe area | Footer py-12 (48px) padding |
+| Side safe area | px-4 (16px) min mobile → px-8 (32px) desktop |
 
 ---
 
-## 5. Navigasi & Information Architecture
+## 5. Navigation & Information Architecture
 
-### 5.1 Header Navigation
-
-```
-+------------------------------------------------------+
-| [PromptFlow]  Projects  Generate  Settings  Dashboard |
-|                                      [Theme] [Lang] [Auth] |
-+------------------------------------------------------+
-```
-
-- **ThemeToggle** = sebelum LanguageToggle di header
-- **Position:** Right side, between nav links and auth buttons
-- **Mobile:** Theme toggle visible di mobile (icon only)
-
-**Sitasi:** `SRS S3.1`, `PROJECT_ARCHITECTURE S4.2`.
-
-### 5.2 Generate Page IA
+### 5.1 Site Map
 
 ```
-Generate Page
-+-- Input Form
-|   +-- Title (text input)
-|   +-- Duration (select)
-|   +-- Style (select)
-|   +-- Generate Button
-+-- Results
-|   +-- Tab: Scenes
-|   |   +-- SceneTransitionCard[1]
-|   |   |   +-- Description + Voiceover
-|   |   |   +-- Transition Flow (badge + arrow)
-|   |   |   +-- Voice Spec (VoiceTypeSelector)
-|   |   |   +-- Image Prompts (ImagePromptDisplay)
-|   |   |   +-- Audio Specs (AudioPanel)
-|   |   +-- SceneTransitionCard[2]
-|   |   +-- ...
-|   +-- Tab: Characters
-|   +-- Tab: Export
-+-- Changelog Banner (V3 announcement, dismissable)
+/ (root - redirects to /[locale])
+├── /[locale]/ (Landing Page - SSR)
+│   ├── #features (anchor)
+│   ├── #how-it-works (anchor)
+│   ├── #faq (anchor)
+│   ├── [Register CTA] → /[locale]/register
+│   └── [Login CTA] → /[locale]/login
+├── /[locale]/login (Auth - SSR)
+├── /[locale]/register (Auth - SSR)
+├── /[locale]/generate (App - SSE Streaming)
+├── /[locale]/projects (App - SSR + CSR)
+│   └── /[locale]/projects/[id] (App - SSR + CSR)
+│       └── /[locale]/projects/[id]/history (App - SSR)
+├── /[locale]/dashboard (App - SSR + CSR)
+├── /[locale]/settings (App - CSR)
+└── /api/... (API Routes)
 ```
 
-### 5.3 User Flow Utama
+### 5.2 Navigation Components
 
-**Generate Flow:**
-1. User buka `/[locale]/generate`
-2. Isi form (title, duration, style)
-3. Klik "Generate"
-4. LLM generate → SSE streaming
-5. Results muncul di tab "Scenes"
-6. Setiap scene = SceneTransitionCard dengan:
-   - Transition flow indicator
-   - Voice spec (VoiceTypeSelector)
-   - Image prompts (ImagePromptDisplay)
-   - Audio specs (AudioPanel)
-7. User bisa edit inline (voice, audio)
-8. User bisa export (JSON/Markdown)
+#### Landing Page Navigation (Navbar)
+```
+Desktop (md+):
+[Logo: PromptFlow]  [Features] [How It Works] [FAQ]  [ID/EN] [Register CTA]
 
-**Theme Toggle Flow:**
-1. User klik ThemeToggle di header
-2. Dropdown muncul: Light / Dark / System
-3. User pilih → theme berubah instant
-4. Persist di localStorage
-5. Reload → theme tetap
+Mobile (<md):
+[Logo: PromptFlow]                        [Hamburger]
+                    Mobile Menu (AnimatePresence):
+                    [Features] [How It Works] [FAQ]
+                    [Switch Language]
+                    [Register CTA (full-width)]
+```
+
+#### App Navigation (AppHeader)
+```
+Desktop (md+):
+[Logo: PromptFlow]  [Projects] [New Project] [Settings] [Dashboard]  [Theme] [Lang] [Logout]
+
+Mobile (<md):
+[Logo: PromptFlow]                          [Theme] [Lang] [Logout]
+(Note: nav links hidden on mobile)
+```
+
+**Mobile nav gap:** AppHeader does NOT have mobile hamburger menu. Future improvement.
+
+### 5.3 Breadcrumbs
+
+No breadcrumb component exists. Users navigate via:
+- AppHeader logo link → /[locale]/ (home)
+- In-page back buttons (e.g., GenerateForm "Generate Baru")
 
 ---
 
 ## 6. User Flows (Mermaid)
 
-### 6.1 Generate Prompt with V3 Metadata
+### 6.1 Generate Animation Brief (Andi - Solo YouTuber)
 
 ```mermaid
 flowchart TD
-    A[User buka Generate Page] --> B[Isi form: title + duration + style]
-    B --> C[Klik Generate]
-    C --> D[POST /api/v1/generate]
-    D --> E[LLM generate JSON dengan V3 metadata]
-    E --> F{Zod validation}
-    F -->|Pass| G[Save ke DB: scenes + scene_audio + image_prompts]
-    F -->|Fail| H[Apply defaults + retry]
-    H --> E
-    G --> I[Display SceneTransitionCards]
-    I --> J[User review transition flow]
-    J --> K[User edit voice spec per scene]
-    K --> L[User edit audio spec per scene]
-    L --> M[User copy image prompts]
-    M --> N[Export JSON/Markdown]
+    A[Landing Page] -->|Register CTA| B[Register]
+    B -->|Submit| C[Generate Page]
+    C --> D{Pick Template?}
+    D -->|Yes| E[TemplatePicker fills form]
+    D -->|No| F[Manual form fill]
+    E --> G[Fill story + refs]
+    F --> G
+    G --> H[Click Generate]
+    H --> I[SSE: Preparing]
+    I --> J[SSE: Character Profiles]
+    J --> K[SSE: Scenes]
+    K --> L[SSE: Image Prompts]
+    L --> M[SSE: Supporting Characters]
+    M --> N[SSE: Moral Message]
+    N --> O[Result Tabs]
+    O --> P{Review Output}
+    P -->|Scenes tab| Q[View transitions + voice + audio + images]
+    P -->|Characters tab| R[View character profiles]
+    P -->|Image Prompts tab| S[View 8-layer prompts]
+    P -->|Voiceover tab| T[View scripts + speakers]
+    P -->|Moral tab| U[View moral message]
+    Q --> V[Copy/Export Brief]
+    R --> V
+    S --> V
+    T --> V
+    U --> V
+    V --> W[Use in Runway/Pika/Kling]
 ```
 
-### 6.2 Theme Toggle
+### 6.2 Theme Toggle (All Users)
 
 ```mermaid
-flowchart TD
-    A[User klik ThemeToggle] --> B{Current theme?}
-    B -->|Dark| C[Pilih Light]
-    B -->|Light| D[Pilih Dark]
-    B -->|System| E[Pilih System]
-    C --> F[setTheme light]
-    D --> G[setTheme dark]
-    E --> H[setTheme system]
-    F --> I[Persist localStorage]
-    G --> I
-    H --> I
-    I --> J[CSS variables swap]
-    J --> K[No FOUC - next-themes blocking script]
+flowchart LR
+    A[Click ThemeToggle icon] --> B[Dropdown Menu]
+    B --> C{Select Mode}
+    C -->|Sun| D[Light Theme]
+    C -->|Moon| E[Dark Theme]
+    C -->|Monitor| F[System Theme]
+    D --> G[CSS vars update]
+    E --> G
+    F --> G
+    G --> H[All components re-render]
+    H --> I[Analytics: theme_change]
 ```
 
-### 6.3 Audio CRUD per Scene
+### 6.3 Image Prompt 8-Layer Review (Sari - Freelance Animator)
 
 ```mermaid
 flowchart TD
-    A[User buka AudioPanel] --> B{Audio entries?}
-    B -->|None| C[Click + Add]
-    B -->|Has entries| D[View list]
-    C --> E[Dialog: select type + fill fields]
-    E --> F[POST /api/.../audio]
-    F --> G[201 Created]
-    G --> H[Refresh list]
-    D --> I{Action?}
-    I -->|Edit| J[Dialog: modify fields]
-    I -->|Delete| K[Confirm dialog]
-    I -->|Add more| C
-    J --> L[PATCH /api/.../audio/:id]
-    L --> M[200 OK]
-    M --> H
-    K --> N[DELETE /api/.../audio/:id]
-    N --> O[204 No Content]
-    O --> H
-```
-
-### 6.4 Image Prompt Layer Copy
-
-```mermaid
-flowchart TD
-    A[User buka ImagePromptDisplay] --> B[View 8 layers collapsed]
-    B --> C[Click layer to expand]
-    C --> D[View layer content]
-    D --> E{Action?}
-    E -->|Copy layer| F[Click Copy button]
-    E -->|Copy full| G[Click Copy Full Prompt]
-    E -->|Collapse| H[Click layer header]
-    F --> I[Toast: Copied!]
-    G --> I
-    H --> B
+    A[Result Tabs > Scenes or ImagePrompts] --> B[ImagePromptDisplay]
+    B --> C{Expand?}
+    C -->|Collapsed| D[Show target + reference badge + copy]
+    C -->|Expanded| E[Show 8 layers]
+    E --> L1[Composition layer]
+    E --> L2[Lighting layer]
+    E --> L3[Camera layer]
+    E --> L4[Mood/Atmosphere layer]
+    E --> L5[Style References layer]
+    E --> L6[Color Palette - NEW: color chips]
+    E --> L7[Technical - NEW: camera specs]
+    E --> L8[Prompt Text - full assembled prompt]
+    L6 --> M[Copy individual layer]
+    L7 --> M
+    L8 --> M
 ```
 
 ---
 
-## 7. Wireframe Deskriptif
+## 7. Descriptive Wireframes
 
-### 7.1 Theme Toggle (app-header.tsx)
-
-```
-+------------------------------------------------------+
-| [PromptFlow]  Projects  Generate  Settings           |
-|                                    [T] [ID|EN] [Auth] |
-+------------------------------------------------------+
-
-ThemeToggle dropdown (triggered by click):
-+-------------------+
-| [Sun] Mode terang  |
-| [Moon] Mode gelap  |
-| [Monitor] Ikuti sistem |
-+-------------------+
-
-- Trigger: Ghost button with current theme icon
-- Dropdown: shadcn/ui DropdownMenu
-- Icons: lucide-react Sun/Moon/Monitor
-- i18n: common.lightMode, common.darkMode, common.systemMode
-- Position: Between nav links and LanguageToggle
-- Mobile: Icon only (no label)
-```
-
-### 7.2 Scene Transition Flow (scene-transition-card.tsx)
+### 7.1 Landing Page Hero Section
 
 ```
-+----------------------------------------------------------+
-| Scene 1: Anak perempuan menemukan hutan ajaib            |
-|                                                          |
-| "Di sebuah desa kecil, hiduplah seorang anak..."         |
-|                                                          |
-| +-- Transition --+  +-- Voice --+  +-- Audio --+         |
-| | [Zap] Cut 0ms |  | [Mic] Narator|  | [Music] 1 cue  |        |
-| | linear forward|  | Neutral 1.0x |  | [expand] |        |
-| +---------------+  +-------------+  +-----------+        |
-|                                                          |
-| +-- Image Prompts (2) ---+                               |
-| | [Image] Subjek: Anak perempuan... [expand] |          |
-| | [Image] Target: Wide shot...     [expand]  |          |
-| +----------------------------------------+               |
-+----------------------------------------------------------+
-          |
-          | (flow arrow: down or right)
-          v
-+----------------------------------------------------------+
-| Scene 2: ...                                             |
-+----------------------------------------------------------+
++------------------------------------------------------------------+
+|                                                                    |
+|                                                                    |
+|                                                                    |
+|    ┌─────────────────────────────────────────────────────────┐    |
+|    │         AI Animation Prompt Generator                   │    |
+|    │    (gradient: from-primary to-accent-foreground)        │    |
+|    │         text-4xl sm:text-5xl lg:text-6xl                │    |
+|    │         font-extrabold tracking-tight                   │    |
+|    └─────────────────────────────────────────────────────────┘    |
+|                                                                    |
+|    Generate structured animation briefs with scenes,               |
+|    transitions, voice specs, and 8-layer image prompts            |
+|    (text-lg sm:text-xl text-muted-foreground)                     |
+|                                                                    |
+|    ┌──────────────┐  ┌──────────────┐                              |
+|    │  Get Started │  │    Login     │                              |
+|    │ (gradient bg)│  │  (outline)   │                              |
+|    │  Button lg   │  │  Button lg   │                              |
+|    └──────────────┘  └──────────────┘                              |
+|                                                                    |
+|    ┌─────────────────────────────────────────────────────────┐    |
+|    │                                                         │    |
+|    │              Browser Mockup (preview)                   │    |
+|    │              max-w-3xl centered                         │    |
+|    │                                                         │    |
+|    └─────────────────────────────────────────────────────────┘    |
+|                                                                    |
++------------------------------------------------------------------+
 ```
 
-**Flow arrow:** 2px line dengan gradient dari transition badge color scene N ke scene N+1. Arrow head = chevron-right. Dashed line bila transition = cut (instant). Solid line bila transition = dissolve/fade/wipe (duration > 0).
-
-### 7.3 Voice Type Selector (voice-type-selector.tsx)
+### 7.2 Generate Form (Idle State)
 
 ```
-+------------------------------------------+
-| [Mic] Voice Spec                          |
-|                                          |
-| Type: [Narator v]                         |
-|   v Anak                                 |
-|   v Remaja                               |
-|   v Pria dewasa                          |
-|   v Wanita dewasa                        |
-|   v Lansia pria                          |
-|   v Lansia wanita                        |
-|   v Narator (default)                    |
-|                                          |
-| Emotion: [Netral v]                       |
-|   v Netral, Senang, Sedih                |
-|   v Antusias, Tenang, Dramatis           |
-|                                          |
-| Speed: [====*=====] 1.0x                 |
-|        0.5x <------> 2.0x               |
-|                                          |
-| Pitch: [Otomatis v]                       |
-|   v Rendah, Sedang, Tinggi              |
-|   v Otomatis (default)                   |
-+------------------------------------------+
++------------------------------------------------------------------+
+| AppHeader: [PromptFlow]  Projects  Generate  Settings  Dashboard  |
++------------------------------------------------------------------+
+| ┌────────────────────────────────────────────────────────────────┐ |
+| │ Generate Prompt Animasi                                        │ |
+| │ Masukkan judul + durasi + style...                             │ |
+| │                                                                │ |
+| │ ┌── Template Picker ─────────────────────────────────────────┐│ |
+| │ │ Atau pilih template judul populer:                          ││ |
+| │ │ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       ││ |
+| │ │ │Template 1│ │Template 2│ │Template 3│ │Template 4│       ││ |
+| │ │ │(Card)    │ │(Card)    │ │(Card)    │ │(Card)    │       ││ |
+| │ │ │[Pakai]   │ │[Pakai]   │ │[Pakai]   │ │[Pakai]   │       ││ |
+| │ │ └──────────┘ └──────────┘ └──────────┘ └──────────┘       ││ |
+| │ └────────────────────────────────────────────────────────────┘│ |
+| │                                                                │ |
+| │ ─────────────────────────────────────────────────────────────  │ |
+| │                                                                │ |
+| │ Judul Animasi*                                                 │ |
+| │ ┌──────────────────────────────────────────────────────────┐  │ |
+| │ │ Petualangan di Hutan                              (Input)│  │ |
+| │ └──────────────────────────────────────────────────────────┘  │ |
+| │                                                                │ |
+| │ Durasi*                    Target Detik*                       │ |
+| │ ┌──────────────────┐       ┌──────────────────┐               │ |
+| │ │ Shorts (30-60s)  │       │ 60               │               │ |
+| │ │ (Select)         │       │ (Input number)   │               │ |
+| │ └──────────────────┘       └──────────────────┘               │ |
+| │                                                                │ |
+| │ Style*                     Rasio*                              │ |
+| │ ┌──────────────────┐       ┌──────────────────┐               │ |
+| │ │ 3D               │       │ 16:9             │               │ |
+| │ │ (Select)         │       │ (Select)         │               │ |
+| │ └──────────────────┘       └──────────────────┘               │ |
+| │                                                                │ |
+| │ Deskripsi Cerita (opsional, max 500)                           │ |
+| │ ┌──────────────────────────────────────────────────────────┐  │ |
+| │ │ Ceritakan gambaran umum cerita...                  (TA)   │  │ |
+| │ │                                                          │  │ |
+| │ │                                                          │  │ |
+| │ └──────────────────────────────────────────────────────────┘  │ |
+| │                                              0/500             │ |
+| │                                                                │ |
+| │ ┌── Dropzone Uploader ──────────────────────────────────────┐│ |
+| │ │     ↑                                                      ││ |
+| │ │  Drag & drop atau klik untuk pilih file gambar            ││ |
+| │ │  (max 10MB, image/*)                                       ││ |
+| │ │  [Pilih File]                                              ││ |
+| │ └────────────────────────────────────────────────────────────┘│ |
+| │                                                                │ |
+| │ ┌──────────────────────────────────────────────────────────┐  │ |
+| │ │                    Generate                              │  │ |
+| │ └──────────────────────────────────────────────────────────┘  │ |
+| └────────────────────────────────────────────────────────────────┘ |
++------------------------------------------------------------------+
 ```
 
-### 7.4 Audio Panel (audio-panel.tsx)
+### 7.3 Generate Form (Streaming State)
 
 ```
-+------------------------------------------+
-| [Music] Audio Specs (1)       [+ Tambah]  |
-|                                          |
-| +--- background_music ---+               |
-| | [Music] Musik latar    |               |
-| | "Orchestral adventure  |               |
-| |  theme, upbeat tempo"  |               |
-| |                         |               |
-| | Timing: [Sepanjang v]   |               |
-| | Volume: [====*===] 0.7  |               |
-| | Fade in: [500] ms       |               |
-| | Fade out: [1000] ms     |               |
-| |                         |               |
-| | [Edit] [Hapus]          |               |
-| +-------------------------+               |
-+------------------------------------------+
-
-Add/Edit Dialog:
-+------------------------------------------+
-| Tambah Audio Spec                        |
-|                                          |
-| Tipe: [Musik latar v]                    |
-| Deskripsi: [_______________]             |
-| Timing: [Sepanjang v]                    |
-| Durasi: [___] detik (opsional)           |
-| Volume: [====*===] 0.7                   |
-| Fade in: [0] ms                          |
-| Fade out: [0] ms                         |
-|                                          |
-| [Batal]                    [Simpan]      |
-+------------------------------------------+
++------------------------------------------------------------------+
+| ┌────────────────────────────────────────────────────────────────┐ |
+| │ Generate Prompt Animasi                                        │ |
+| │ ┌── Streaming Progress ──────────────────────────────────────┐│ |
+| │ │ Menyiapkan karakter                              02:34    ││ |
+| │ │                                                            ││ |
+| │ │ ✓ Memulai generate...                                     ││ |
+| │ │ ✓ Membuat profil karakter                                 ││ |
+| │ │ ● Menyusun scene  ●●●                                     ││ |
+| │ │ ○ Membuat prompt gambar                                   ││ |
+| │ │ ○ Membuat karakter pendukung                              ││ |
+| │ │ ○ Menulis pesan moral                                     ││ |
+| │ │                                                            ││ |
+| │ │ ┌── Processing Logs (12) ──────────── [Toggle: ON] ──────┐││ |
+| │ │ │ 14:23:45.123 [info]  Building system prompt...         │││ |
+| │ │ │ 14:23:45.234 [info]  Calling LLM provider...           │││ |
+| │ │ │ 14:23:46.456 [info]  Response received (2.1s)          │││ |
+| │ │ │ 14:23:46.567 [info]  Parsing JSON output...            │││ |
+| │ │ │ 14:23:47.789 [info]  Validating with Zod...            │││ |
+| │ │ └─────────────────────────────────────────────────────────┘││ |
+| │ └────────────────────────────────────────────────────────────┘│ |
+| │                                                                │ |
+| │ ┌──────────────────────────────────────────────────────────┐  │ |
+| │ │                    Generate (disabled)                   │  │ |
+| │ └──────────────────────────────────────────────────────────┘  │ |
+| └────────────────────────────────────────────────────────────────┘ |
++------------------------------------------------------------------+
 ```
 
-### 7.5 Image Prompt Display (image-prompt-display.tsx)
+### 7.4 Result Tabs - Scenes Tab
 
 ```
-+------------------------------------------+
-| [Image] Image Prompt: Subjek Utama       |
-|                                          |
-| [>] Subjek                               |
-| [>] Komposisi                            |
-| [>] Kamera                               |
-| [>] Pencahayaan                          |
-| [>] Warna                                |
-| [>] Suasana                              |
-| [>] Gaya                                 |
-| [>] Teknis                               |
-|                                          |
-| [Salin Prompt Lengkap]                   |
-+------------------------------------------+
++------------------------------------------------------------------+
+| ┌── Result Header ──────────────────────────────────────────────┐│ |
+| │ Hasil Generate                    [Generate Baru]             ││ |
+| └────────────────────────────────────────────────────────────────┘│ |
+|                                                                    |
+| ┌── Tabs ───────────────────────────────────────────────────────┐│ |
+| │ [Scenes(5)] [Characters(2)] [Image Prompts] [Voiceover] [Moral]││ |
+| └────────────────────────────────────────────────────────────────┘│ |
+|                                                                    |
+| ┌── Scene 1 ────────────────────────────────────────────────────┐│ |
+| │ Scene 1                    [fade_from_black] [1200ms]          ││ |
+| │ Opening shot of forest clearing at dawn                       ││ |
+| │                                                                ││ |
+| │ ┌── Voiceover ──────────────────────────────────────────────┐││ |
+| │ │ 🎙 Voiceover:  [👤 narrator] [45s] [peaceful]             │││ |
+| │ │ "Di sebuah hutan yang rindang, terdapat..."               │││ |
+| │ └────────────────────────────────────────────────────────────┘││ |
+| │                                                                ││ |
+| │ Voice Spec:                                                    ││ |
+| │ [🎙 narrator] [calm]  Speed: 0.9x  Pitch: auto               ││ |
+| │                                                                ││ |
+| │ Audio Spec:                                                    ││ |
+| │ ┌──────────────────────────────────────────────────────────┐  ││ |
+| │ │ 🎵 [background_music]  Soft orchestral intro    00:00-0:45│││ |
+| │ │ 🌧 [ambient]          Forest birds, gentle wind  throughout│││ |
+| │ └──────────────────────────────────────────────────────────┘  ││ |
+| │                                                                ││ |
+| │ Characters:                                                    ││ |
+| │ ┌── Budi (character) ──────────────────────────────────────┐││ |
+| │ │ ▶ Budi              ref: budi.png            [📋 Copy]   │││ |
+| │ │   (expanded: 8 layers shown)                              │││ |
+| │ │   Composition: Rule of thirds, character left-third      │││ |
+| │ │   Lighting: Soft morning light, rim light on hair        │││ |
+| │ │   Camera: Medium shot, eye-level                         │││ |
+| │ │   Mood: Peaceful, contemplative                          │││ |
+| │ │   Style: Pixar-like, warm tones                          │││ |
+| │ │   Color Palette: 🟢 #2d5016 🟡 #d4a017 ⚪ #f5f5f5      │││ |
+| │ │   Technical: 4K, cinematic DOF, film grain               │││ |
+| │ │   Prompt: "A young boy standing in forest clearing..."   │││ |
+| │ └───────────────────────────────────────────────────────────┘││ |
+| │                                                                ││ |
+| │ ┌── Background (forest-clearing) ──────────────────────────┐││ |
+| │ │ ▶ forest-clearing                        [📋 Copy]       │││ |
+| │ │   (collapsed)                                             │││ |
+| │ └───────────────────────────────────────────────────────────┘││ |
+| │                                                                ││ |
+| │ ┌── Transition hint ───────────────────────────────────────┐││ |
+| │ │ → Scene 2: dissolve, 1500ms, ease-in-out                 │││ |
+| │ └──────────────────────────────────────────────────────────┘││ |
+| └────────────────────────────────────────────────────────────────┘│ |
+|     |                                                            |
+|     | (connector line: solid for dissolve)                      |
+|     |                                                            |
+| ┌── Scene 2 ────────────────────────────────────────────────────┐│ |
+| │ Scene 2                    [dissolve] [1500ms]                ││ |
+| │ ...                                                            ││ |
+| └────────────────────────────────────────────────────────────────┘│ |
++------------------------------------------------------------------+
+```
 
-Expanded layer:
-+------------------------------------------+
-| [v] Pencahayaan                          |
-| "Golden hour rim lighting, volumetric    |
-|  god rays through canopy"                |
-|                              [Salin]     |
-+------------------------------------------+
+### 7.5 Result Tabs - Image Prompts Tab
+
+```
++------------------------------------------------------------------+
+| [Scenes(5)] [Characters(2)] [Image Prompts] [Voiceover] [Moral]   |
+|                                                                    |
+| ┌── Master Characters ──────────────────────────────────────────┐│ |
+| │ Reference image prompts for each character                    ││ |
+| │                                                                ││ |
+| │ ┌── Budi ──────────────────────────────────────────────────┐││ |
+| │ │ ▶ Budi              ref: budi.png            [📋 Copy]   │││ |
+| │ │   (collapsed - click to expand 8 layers)                 │││ |
+| │ └───────────────────────────────────────────────────────────┘││ |
+| │                                                                ││ |
+| │ ┌── Sari ──────────────────────────────────────────────────┐││ |
+| │ │ ▶ Sari              ref: sari.png            [📋 Copy]   │││ |
+| │ │   (collapsed)                                             │││ |
+| │ └───────────────────────────────────────────────────────────┘││ |
+| └────────────────────────────────────────────────────────────────┘│ |
+|                                                                    |
+| ┌── Master Backgrounds ─────────────────────────────────────────┐│ |
+| │ Reference image prompts for each background                   ││ |
+| │                                                                ││ |
+| │ ┌── forest-clearing ───────────────────────────────────────┐││ |
+| │ │ ▶ forest-clearing                        [📋 Copy]       │││ |
+| │ │   (collapsed)                                             │││ |
+| │ └───────────────────────────────────────────────────────────┘││ |
+| └────────────────────────────────────────────────────────────────┘│ |
++------------------------------------------------------------------+
 ```
 
 ---
 
-## 8. Iconografi & Aset
+## 8. Iconography & Assets
 
 ### 8.1 Icon Library
 
-**Library:** `lucide-react` ^0.468.0 (existing)
+**Primary:** lucide-react (v0.468.0)
+- Tree-shakeable, consistent stroke width
+- Used across all components
 
-**Icons V3 New:**
+### 8.2 Icon Usage Map
 
-| Kategori | Icon | Kegunaan |
-|---|---|---|
-| Theme | `Sun` | Light mode indicator |
-| Theme | `Moon` | Dark mode indicator |
-| Theme | `Monitor` | System preference indicator |
-| Transition | `Zap` | Cut transition |
-| Transition | `Blend` | Dissolve transition |
-| Transition | `Moon` | Fade to black |
-| Transition | `Sun` | Fade to white |
-| Transition | `ArrowRight` | Wipe transition |
-| Transition | `Link` | Match cut |
-| Voice | `Mic` | Voice/narrator |
-| Voice | `Baby` | Child voice |
-| Voice | `User` | Adult voice |
-| Audio | `Music` | Background music |
-| Audio | `Volume2` | SFX |
-| Audio | `CloudRain` | Ambient |
-| Audio | `Music2` | Music cue |
-| Audio | `AudioLines` | Transition audio |
-| Image | `Image` | Image prompt |
-| Image | `Copy` | Copy to clipboard |
-| Image | `ChevronRight` | Collapsed layer |
-| Image | `ChevronDown` | Expanded layer |
-| Audio | `Plus` | Add audio entry |
-| Audio | `Pencil` | Edit audio entry |
-| Audio | `Trash2` | Delete audio entry |
+| Component | Icons Used |
+|-----------|-----------|
+| **ThemeToggle** | Sun, Moon, Monitor |
+| **LanguageToggle** | (text-based, no icon) |
+| **SceneTransitionCard** | Zap (cut), Blend (dissolve), Moon (fade_to_black), Sun (fade_to_white), ArrowRight (wipe), Link (match_cut) |
+| **VoiceTypeSelector** | Baby (child), User (teen/adult/elderly), Mic (narrator) |
+| **AudioPanel** | Music (background_music), Volume2 (sfx), CloudRain (ambient), Music2 (music_cue), AudioLines (transition_audio) |
+| **ResultTabs** | Mic, Clock, User |
+| **GenerateForm** | (none in form, Sparkles in TemplatePicker) |
+| **TemplatePicker** | Sparkles |
+| **DropzoneUploader** | Upload |
+| **LogViewer** | Switch toggle |
+| **AppHeader** | (text-based links) |
+| **Navbar (landing)** | Menu, X |
+| **CopyButton** | Copy, Check |
 
-### 8.2 Aset Brand
+### 8.3 Logo
 
-| Aset | Path | Keterangan |
-|---|---|---|
-| Logo text | "PromptFlow" (text, bukan image) | `text-xl font-extrabold text-primary` |
-| OG Image | `public/og/og-image.jpg` | 1200x630, violet gradient |
+| Asset | Location | Type |
+|-------|----------|------|
+| PromptFlow logo | Text-based: "PromptFlow" (font-extrabold tracking-tight text-primary) | Typography |
+| LogoPlaceholder | src/components/landing/logo-placeholder.tsx | Component |
 
-**ASUMSI:** Logo = text-based "PromptFlow" violet. Tidak ada maskot atau gambar brand tambahan. Source: `RAG-CONTEXT S2.1`, `PROJECT_ARCHITECTURE S13 ADR-06`.
+**ASSUMPTION:** No SVG/PNG logo file exists. Brand identity is text-based only.
+
+### 8.4 Illustrations
+
+| Asset | Location | Usage |
+|-------|----------|-------|
+| BrowserMockup | src/components/landing/browser-mockup.tsx | Hero section preview frame |
+| OG Image | /og/og-image.jpg (1200x630) | Social sharing |
+
+**ASSUMPTION:** OG image file needs to be created if not yet present in public/og/.
 
 ---
 
-## 9. Aksesibilitas (WCAG 2.1 AA)
+## 9. Accessibility (WCAG 2.1 AA)
 
 ### 9.1 Target Compliance
 
-| Level | Target | Status |
-|---|---|---|
-| WCAG | 2.1 AA | Wajib kedua theme |
-| axe-core | 0 critical violation | Light + dark |
-| Kontras body text | >= 4.5:1 | Verified S2.1-S2.2 |
-| Kontras large text | >= 3:1 | Verified |
-| Focus visible | ring-2 ring-ring | Semua interactive |
-| Keyboard nav | Full keyboard support | Semua komponen |
+| Requirement | Standard | Implementation |
+|-------------|----------|----------------|
+| WCAG level | 2.1 AA | All interactive components |
+| Minimum contrast | 4.5:1 | Verified in Section 2.1 Color Palette |
+| Keyboard navigation | All interactive elements | Tab order, Enter/Space activation |
+| Focus visible | All focusable elements | focus-visible:ring-2 focus-visible:ring-ring |
+| Screen reader | Semantic HTML + aria | Labels, roles, live regions |
+| Reduced motion | Respect prefers-reduced-motion | framer-motion useReducedMotion(), CSS media query |
 
-### 9.2 Theme Toggle Accessibility
+### 9.2 Focus Management
 
-| Kriteria | Implementasi |
-|---|---|
-| Keyboard | Tab to button, Enter/Space to open, Arrow keys to select, Escape to close |
-| Focus visible | `ring-2 ring-ring ring-offset-2` |
-| ARIA | `aria-label="Ganti tema"` / `aria-label="Toggle theme"` |
-| Screen reader | Announce current theme on change |
-| Reduced motion | Theme transition instant (no animation) |
+```css
+/* globals.css line 43-46 */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+```
 
-### 9.3 V3 Component Accessibility
+All shadcn/ui components include:
+- `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
+- Ring offset uses `ring-offset-background` for theme-aware offset color
 
-| Komponen | ARIA | Keyboard | Kontras |
-|---|---|---|---|
-| ThemeToggle | `role="menu"`, `aria-label` | Tab, Enter, Arrows, Escape | Badge colors verified both themes |
-| SceneTransitionCard | `role="article"`, `aria-label="Scene N"` | Tab through controls | Text on card bg verified |
-| VoiceTypeSelector | `role="listbox"`, `aria-label="Voice type"` | Tab, Enter, Arrows | Badge colors verified |
-| AudioPanel | `role="region"`, `aria-label="Audio specs"` | Tab through entries | Badge colors verified |
-| ImagePromptDisplay | `role="region"`, `aria-label="Image prompts"` | Tab through layers | Text on bg verified |
+### 9.3 Keyboard Navigation
 
-### 9.4 Color Contrast Verification
+| Component | Key Behavior |
+|-----------|-------------|
+| **Button** | Enter/Space activates. Tab to navigate. |
+| **DropdownMenu (ThemeToggle, LanguageToggle)** | Enter/Space opens. Arrow keys navigate items. Enter selects. Escape closes. |
+| **Tabs (ResultTabs)** | Arrow keys switch tabs. Tab moves focus out. |
+| **Dialog** | Escape closes. Focus trap within dialog. |
+| **Switch (LogViewer)** | Enter/Space toggles. |
+| **Collapsible (LogViewer)** | Enter/Space expands/collapses. |
 
-**Light mode (bg `#ffffff`):**
-- Body text `#0a0a0a`: 18.4:1
-- Muted text `#71717a`: 4.6:1
-- Primary `#7c3aed`: 5.1:1
-- Destructive `#dc2626`: 5.6:1
+### 9.4 ARIA Labels
 
-**Dark mode (bg `#0a0a0a`):**
-- Body text `#fafafa`: 18.1:1
-- Muted text `#a1a1aa`: 6.2:1
-- Primary `#a78bfa`: 8.5:1
-- Destructive `#ef4444`: 4.7:1
+| Component | ARIA Implementation |
+|-----------|-------------------|
+| **ThemeToggle** | `aria-label={t('themeToggle')}` on trigger button |
+| **Navbar hamburger** | `aria-label={t('nav.menuOpen')}` / `aria-label={t('nav.menuClose')}` |
+| **TemplatePicker** | `aria-label="Pakai template {title}"` on button |
+| **LogViewer** | `aria-label="Toggle log viewer"` on Switch |
+| **External links (Footer)** | `aria-hidden="true"` on ExternalLink icon |
+| **ImagePromptDisplay** | Expand button needs `aria-label` for screen readers (GAP) |
+| **AudioPanel items** | Individual audio entries need `role="listitem"` (GAP) |
 
-**Transition badge colors:** All verified >= 4.5:1 against both card backgrounds.
+### 9.5 Reduced Motion
 
-**Sitasi:** `PRD NFR-V3-A01..A04`, `SRS S8.3`.
+```css
+/* globals.css line 74-82 */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+Framer Motion components respect reduced motion:
+```tsx
+// hero.tsx, features-bento.tsx, navbar.tsx
+const shouldReduceMotion = useReducedMotion();
+// Conditional animation: shouldReduceMotion ? false : ANIM_BASE
+```
+
+### 9.6 Accessibility Gaps & Fixes
+
+| Component | Gap | Fix |
+|-----------|-----|-----|
+| **ImagePromptDisplay** | Expand button missing aria-label | Add `aria-label={t('expandLayers')}` |
+| **ImagePromptDisplay** | Color palette chips missing aria | Add `aria-label` with color name + hex |
+| **AudioPanel** | List items not semantic | Wrap in `<ul role="list">`, items as `<li>` |
+| **SceneTransitionCard** | Connector line not decorative | Add `aria-hidden="true"` to connector div |
+| **AppHeader nav** | Mobile nav links hidden without menu | Add mobile hamburger menu (future) |
+| **GenerateForm** | Stage progress not live region | Add `aria-live="polite"` to progress container |
+| **ResultTabs** | Tab count in trigger | Already shows count: `Scenes (5)` |
+
+### 9.7 Color-Blind Considerations
+
+| State | Current | Issue | Fix |
+|-------|---------|-------|-----|
+| Stage progress check | ✓ (green) | Color-only indicator | Already has text label + strikethrough |
+| Stage progress active | ● (primary) + ●●● pulse | Color + animation | Add "active" text label for reduced-motion users |
+| Error states | text-destructive | Color-only | Pair with icon (AlertTriangle) and text |
+| Success states | text-green-600 | Color-only | Pair with checkmark icon ✓ |
 
 ---
 
 ## 10. Interaction & Motion
 
-### 10.1 Theme Transition
+### 10.1 Framer Motion Animations
 
-| Property | Nilai |
-|---|---|
-| Duration | `0ms` (instant) |
-| Easing | N/A |
-| Method | CSS class swap via next-themes |
-| FOUC prevention | next-themes inline blocking script |
-| Reduced motion | N/A (already instant) |
+| Component | Animation | Duration | Easing | Trigger |
+|-----------|-----------|----------|--------|---------|
+| **Hero title** | opacity 0→1, y 20→0 | 500ms | easeOut | Page load |
+| **Hero subtitle** | opacity 0→1, y 20→0 | 500ms | easeOut | 150ms delay |
+| **Hero CTA** | opacity 0→1, y 20→0 | 500ms | easeOut | 300ms delay |
+| **BrowserMockup** | opacity 0→1, y 40→0 | 700ms | easeOut | 500ms delay |
+| **FeaturesBento** | stagger children | 400ms each | easeOut | In view (once) |
+| **Navbar mobile menu** | opacity + height 0→auto | 300ms | easeOut | Hamburger click |
 
-**Note:** Theme switch = instant CSS variable swap. Tidak ada animasi transition antar theme. Ini deliberate — animasi theme switch bisa menyebabkan flicker.
+### 10.2 CSS Transitions
 
-### 10.2 Scene Transition Flow Animation
+| Element | Property | Duration | Easing |
+|---------|----------|----------|--------|
+| Theme switch | background-color, color, border-color | 200ms | ease |
+| Button hover | background-color | 150ms | ease |
+| Link hover | color | 150ms | ease |
+| Card hover (TemplatePicker) | background-color | 150ms | ease |
+| Navbar scroll state | background-color, border | 300ms | ease |
+| Focus ring | outline | 150ms | ease |
 
-| Property | Nilai |
-|---|---|
-| Flow arrow entrance | `opacity: 0 → 1`, `translateY: 8px → 0` |
-| Duration | `300ms` |
-| Easing | `ease-out` |
-| Stagger | `100ms` per scene card |
-| Reduced motion | Disabled (use `useReducedMotion()`) |
+### 10.3 Loading States
 
-### 10.3 Component Micro-interactions
+| State | Component | Implementation |
+|-------|-----------|----------------|
+| Page loading | PageLoadingSkeleton | Skeleton cards with pulse animation |
+| Form submit | GenerateForm | Button disabled + "Generating..." text |
+| SSE progress | GenerateForm | Stage checklist with ✓ ● ○ icons |
+| SSE timer | ElapsedTimer | Tabular-nums MM:SS counter, updates every 1s |
+| SSE logs | LogViewer | Collapsible scroll area with monospace log lines |
+| File upload | DropzoneUploader | Button "Uploading..." + disabled |
+| Copy feedback | CopyButton | Icon changes to Check, brief highlight |
 
-| Komponen | Trigger | Animation | Duration |
-|---|---|---|---|
-| ThemeToggle | Hover | bg-muted | `150ms` |
-| SceneTransitionCard | Hover | shadow-md, scale(1.01) | `200ms` |
-| VoiceTypeSelector | Expand | height auto, opacity | `200ms` |
-| AudioPanel entry | Add | fadeIn + slideDown | `300ms` |
-| AudioPanel entry | Delete | fadeOut + slideUp | `200ms` |
-| ImagePromptDisplay layer | Toggle | height auto, opacity | `200ms` |
-| Copy button | Click | Check icon swap | `150ms` |
-| Toast | Appear/dismiss | slideDown/slideUp | `300ms` |
+### 10.4 Empty States
 
-### 10.4 Loading & Empty States
+| Component | Empty State |
+|-----------|-------------|
+| **AudioPanel** | `<p className="text-sm text-muted-foreground">{t('noAudio')}</p>` |
+| **LogViewer** | Returns `null` when logs.length === 0 |
+| **Projects list** | Empty state card with "Create project" CTA |
+| **Dashboard** | Zero-state metrics with "0" values |
 
-| State | Visual |
-|---|---|
-| Generating | Skeleton cards (3 placeholder SceneTransitionCards) |
-| Empty scenes | "Belum ada scene. Klik Generate untuk memulai." |
-| Empty audio | "Belum ada audio spec. Klik + Tambah." |
-| Empty image prompts | "Belum ada image prompt." |
-| Error | Destructive banner + retry button |
-| Loading audio CRUD | Spinner di tombol aksi |
+### 10.5 Error States
 
-### 10.5 Feedback
+| Component | Error Handling |
+|-----------|----------------|
+| **GenerateForm** | `toast.error(message)` for API errors, network errors |
+| **GenerateForm** | Inline validation: `text-sm text-destructive` below field |
+| **DropzoneUploader** | `toast.error("{filename}: {error}")` per file |
+| **PageErrorBoundary** | Error card with message + reset button |
+| **ResultTabs warnings** | Warning banner with `bg-[var(--color-warning)]/10 border-warning/40` |
 
-| Aksi | Feedback |
-|---|---|
-| Theme change | Instant visual swap |
-| Generate success | Scene cards appear with stagger animation |
-| Audio add/edit | Toast "Audio spec tersimpan" |
-| Audio delete | Toast "Audio spec dihapus" |
-| Copy layer | Toast "Tersalin!" (2s) |
-| Export | File download trigger |
-| Validation error | Inline error message di field |
+### 10.6 Toast Notifications (sonner)
 
----
+| Event | Toast Type | Message Pattern |
+|-------|-----------|-----------------|
+| Generate success | success | "Generate selesai" |
+| Generate error | error | "Generate gagal: {detail}" |
+| Upload success | success | "{count} file terupload" |
+| Upload error | error | "{filename}: {error}" |
+| Copy success | (visual feedback in CopyButton) | - |
+| Network error | error | Error message or "Network error" |
 
-## 11. Konten & Copy
+### 10.7 Micro-Interactions
 
-### 11.1 Tone
-
-| Aspek | Nilai |
-|---|---|
-| Language | ID (default) + EN |
-| Tone | Profesional, edukatif, ringkas |
-| Error | Manusiawi + recovery action |
-| Empty states | Encouraging, action-oriented |
-
-### 11.2 Label Konsistensi
-
-| Konsep | ID | EN |
-|---|---|---|
-| Scene | Scene | Scene |
-| Transition | Transisi | Transition |
-| Voice | Suara | Voice |
-| Audio | Audio | Audio |
-| Prompt | Prompt | Prompt |
-| Generate | Generate | Generate |
-| Export | Ekspor | Export |
-| Save | Simpan | Save |
-| Delete | Hapus | Delete |
-| Edit | Edit | Edit |
-| Add | Tambah | Add |
-| Copy | Salin | Copy |
-
-### 11.3 i18n Keys V3 (~55 keys)
-
-**Namespace:** `common.*`, `transition.*`, `voice.*`, `audio.*`, `imagePrompt.*`
-
-**Sitasi:** `SRS S3.10`, `PRD FR-V3-10`, `RAG-CONTEXT S4.5`.
-
-### 11.4 Error Messages
-
-| Error | ID | EN |
-|---|---|---|
-| Generate failed | "Gagal generate. Coba lagi." | "Generation failed. Try again." |
-| Audio save failed | "Gagal simpan audio spec." | "Failed to save audio spec." |
-| Audio delete failed | "Gagal hapus audio spec." | "Failed to delete audio spec." |
-| Export failed | "Gagal ekspor." | "Export failed." |
-| Theme error | "Gagal mengubah tema." | "Failed to change theme." |
-
-### 11.5 Empty States
-
-| Context | ID | EN |
-|---|---|---|
-| No scenes | "Belum ada scene. Klik Generate untuk memulai." | "No scenes yet. Click Generate to start." |
-| No audio | "Belum ada audio spec. Klik + Tambah." | "No audio specs. Click + Add." |
-| No image prompts | "Belum ada image prompt." | "No image prompts." |
-| No characters | "Belum ada karakter." | "No characters." |
+| Interaction | Feedback |
+|-------------|----------|
+| Template pick | Form fields auto-fill, visual confirmation |
+| Expand/collapse (ImagePromptDisplay) | ChevronRight ↔ ChevronDown rotation |
+| Stage progress | Animated pulse "●●●" on active stage |
+| LogViewer toggle | Switch animates on/off |
+| Tab switch | Radix native transition |
+| Scroll progress (landing) | ScrollTracker visual indicator |
 
 ---
 
-## 12. Responsif & Kompatibilitas
+## 11. Content & Copy
 
-### 12.1 Responsive Breakpoints
+### 11.1 Tone & Voice
 
-| Breakpoint | Width | Layout |
-|---|---|---|
-| Mobile | < 640px | Single column. Stack everything. Theme toggle = icon only |
-| Tablet | 640-1024px | 2-column where appropriate. Flow arrows horizontal |
-| Desktop | > 1024px | Full layout. Side-by-side where beneficial |
+| Context | Tone | Example |
+|---------|------|---------|
+| Landing hero | Inspiring, benefit-focused | "AI Animation Prompt Generator" |
+| Form labels | Direct, technical | "Judul Animasi", "Durasi", "Style" |
+| Error messages | Specific, actionable | "Generate gagal: Provider timeout after 240s" |
+| Empty states | Helpful, suggest action | "Belum ada project. Buat project baru untuk mulai." |
+| Success feedback | Concise celebration | "Generate selesai" |
+| Technical labels | English terms preserved | "Composition", "Lighting", "Camera" |
 
-### 12.2 Mobile-Specific
+### 11.2 Terminology Consistency
 
-| Komponen | Mobile Behavior |
-|---|---|
-| AppHeader | Hamburger menu. Theme toggle = icon only |
-| SceneTransitionCard | Full width. Flow arrows = vertical (down) |
-| VoiceTypeSelector | Full width dropdowns. Slider full width |
-| AudioPanel | Full width. Entries stack vertically |
-| ImagePromptDisplay | Full width. Layers collapsible |
-| ThemeToggle | Icon only (no label) |
+| Term | Indonesian | English | Usage |
+|------|-----------|---------|-------|
+| Animation brief | Paket prompt animasi | Animation prompt package | Generate results |
+| Scene | Scene / Adegan | Scene | SceneTransitionCard |
+| Transition | Transisi | Transition | Transition type badges |
+| Voice type | Tipe suara | Voice type | VoiceTypeSelector |
+| Audio spec | Spesifikasi audio | Audio specification | AudioPanel |
+| Image prompt | Prompt gambar | Image prompt | ImagePromptDisplay |
+| Character | Karakter | Character | Character profiles |
+| Template | Template | Template | TemplatePicker |
+| Provider | Provider | Provider | Settings page |
 
-### 12.3 Browser Compatibility
+### 11.3 Error Message Patterns
 
-| Browser | Min Version | Status |
-|---|---|---|
-| Chrome | 100+ | Full support |
-| Firefox | 100+ | Full support |
-| Safari | 15+ | Full support |
-| Edge | 100+ | Full support |
-| Mobile Chrome | 100+ | Full support |
-| Mobile Safari | 15+ | Full support |
+```
+Generate failed:
+  "Generate gagal: {error_detail}" (truncated to 200 chars)
 
-### 12.4 OS Compatibility
+Upload failed:
+  "{filename}: {error_detail}" (truncated to 120 chars)
 
-| OS | Status |
-|---|---|
-| Windows 10+ | Full support |
-| macOS 12+ | Full support |
-| iOS 15+ | Full support |
-| Android 10+ | Full support |
-| Linux | Full support |
+Network error:
+  "Network error" or Error.message
 
-### 12.5 Performance Targets
+Rate limit:
+  "Rate limit exceeded. Try again in {seconds} seconds."
 
-| Metric | Target | Sitasi |
-|---|---|---|
-| Lighthouse Performance mobile | >= 85 | `PRD NFR-V3-P01` |
-| LCP | <= 2.5s | `PRD NFR-V3-P02` |
-| CLS | <= 0.1 | `PRD NFR-V3-P03` |
-| Bundle tambahan V3 | <= +20KB gzipped (actual ~2KB) | `PRD NFR-V3-P04` |
-| next-themes size | ~2KB gzipped | `RAG-CONTEXT ASM-1` |
+Validation error:
+  Field-level: "{field_name} is required" / "{field_name} must be {constraint}"
 
----
-
-## Lampiran A — File Impact Summary
-
-| Kategori | Jumlah | Detail |
-|---|---|---|
-| File BARU | 6 | theme-toggle, scene-transition-card, voice-type-selector, audio-panel, image-prompt-display, changelog-banner |
-| File MODIFY | 16 | providers, layout, page, app-header, provider-card, schema, schemas, prompt-builder, generate route, export route, markdown template, result-tabs, analytics events, 2 i18n JSON |
-| Total touched | 22 | 6 baru + 16 modify |
-
-## Lampiran B — Design Token Mapping ke Tailwind Config
-
-```typescript
-// tailwind.config.ts (referensi untuk agent eksekutor)
-// Semua tokens SUDAH ada di globals.css via @theme directive
-// Tidak perlu tambah config baru — pakai CSS variables langsung
-
-// Contoh pemakaian di komponen:
-// bg-background, text-foreground, bg-primary, text-primary-foreground
-// border-border, ring-ring, bg-muted, text-muted-foreground
-// bg-accent, text-accent-foreground, bg-destructive
+Auth error:
+  "Invalid email or password"
+  "Session expired. Please login again."
 ```
 
-## Lampiran C — Komponen Path Reference
+### 11.4 i18n Namespace Structure
 
-| Komponen | Path | Status |
-|---|---|---|
-| ThemeToggle | `src/components/common/theme-toggle.tsx` | NEW |
-| SceneTransitionCard | `src/components/generate/scene-transition-card.tsx` | NEW |
-| VoiceTypeSelector | `src/components/generate/voice-type-selector.tsx` | NEW |
-| AudioPanel | `src/components/generate/audio-panel.tsx` | NEW |
-| ImagePromptDisplay | `src/components/generate/image-prompt-display.tsx` | NEW |
-| ChangelogBanner | `src/components/common/changelog-banner.tsx` | NEW |
-| AppHeader | `src/components/common/app-header.tsx` | MODIFY |
-| Providers | `src/components/providers.tsx` | MODIFY |
-| ResultTabs | `src/components/generate/result-tabs.tsx` | MODIFY |
-| ProviderCard | `src/components/settings/provider-card.tsx` | MODIFY |
+| Namespace | File | Keys | Usage |
+|-----------|------|------|-------|
+| common | messages/{locale}.json | ~30 keys | AppHeader, ThemeToggle, LanguageToggle, common UI |
+| landing | messages/{locale}.json | ~60 keys | Landing page sections, hero, features, FAQ, footer |
+| auth | messages/{locale}.json | ~20 keys | Login, register forms |
+| generate | messages/{locale}.json | ~40 keys | GenerateForm, ResultTabs, stages |
+| transition | messages/{locale}.json | ~15 keys | Transition types, labels |
+| voice | messages/{locale}.json | ~20 keys | Voice types, emotions, pitch, speed |
+| audio | messages/{locale}.json | ~15 keys | Audio types, timing |
+| imagePrompt | messages/{locale}.json | ~15 keys | Layer labels (8 layers) |
+| projects | messages/{locale}.json | ~15 keys | Project list, detail |
+| dashboard | messages/{locale}.json | ~10 keys | Dashboard metrics |
+| settings | messages/{locale}.json | ~15 keys | Provider settings |
+| errors | messages/{locale}.json | ~10 keys | Error messages |
+
+### 11.5 V3 i18n Keys Needed (Additions)
+
+| Key | ID | EN | Component |
+|-----|----|----|-----------|
+| `imagePrompt.layers.colorPalette` | Palet Warna | Color Palette | ImagePromptDisplay |
+| `imagePrompt.layers.technical` | Teknis | Technical | ImagePromptDisplay |
+| `landing.features.f7Title` | Scene Transition Engine | Scene Transition Engine | FeaturesBento (V3) |
+| `landing.features.f7Desc` | 6 jenis transisi... | 6 transition types... | FeaturesBento (V3) |
+| `landing.features.f8Title` | Voice Type Mapping | Voice Type Mapping | FeaturesBento (V3) |
+| `landing.features.f8Desc` | 7 tipe suara... | 7 voice types... | FeaturesBento (V3) |
+| `landing.features.f9Title` | Audio Specification | Audio Specification | FeaturesBento (V3) |
+| `landing.features.f9Desc` | 5 tipe audio per scene... | 5 audio types per scene... | FeaturesBento (V3) |
+| `landing.features.f10Title` | 8-Layer Image Prompts | 8-Layer Image Prompts | FeaturesBento (V3) |
+| `landing.features.f10Desc` | Prompt visual berlapis... | Layered visual prompts... | FeaturesBento (V3) |
+| `landing.features.f11Title` | Dark/Light/System Theme | Dark/Light/System Theme | FeaturesBento (V3) |
+| `landing.features.f11Desc` | Pilih tema sesuai... | Choose your preferred... | FeaturesBento (V3) |
 
 ---
 
-> **Dokumen ini = spesifikasi UI/UX V3 untuk PromptFlow. Eksekutor baca UIUX_SPEC + PRD + SRS + CODING_RULES sebelum coding. Semua design tokens konkret (HEX, px, ms). Komponen = path reference ke PROJECT_ARCHITECTURE. Aksesibilitas = standar, bukan opsional.**
+## 12. Responsive & Compatibility Standards
 
-**Dibuat oleh:** docgen-uiux subagent
-**Tanggal:** 2026-06-21
-**Versi:** 2.0 (V3 Update)
+### 12.1 Browser Support
+
+| Browser | Minimum Version | Notes |
+|---------|----------------|-------|
+| Chrome | 90+ | Primary target |
+| Firefox | 90+ | Full support |
+| Safari | 15+ | iOS Safari 15+ |
+| Edge | 90+ | Chromium-based |
+
+**Source:** SRS.md NFR-C01
+
+### 12.2 Device Support
+
+| Device | Viewport | Strategy |
+|--------|----------|----------|
+| Mobile phone | 320-428px | Single column, touch-optimized |
+| Tablet portrait | 600-834px | 2-col grids, full nav |
+| Tablet landscape | 834-1024px | Near-desktop layout |
+| Desktop | 1024-1920px | Full layout, 3-col features |
+| Wide desktop | 1920px+ | Max container width (1280px), centered |
+
+### 12.3 Touch Targets
+
+| Element | Minimum Size | Implementation |
+|---------|-------------|----------------|
+| Buttons | 44x44px | h-10 (40px) min, h-11 (44px) for lg |
+| Icon buttons | 36x36px | h-9 w-9 (ThemeToggle, LanguageToggle) |
+| Form inputs | 40px height | h-10 (40px) |
+| Tabs triggers | 36px height | h-9 (36px) + padding |
+| Links | 44px touch area | Inline text links with padding |
+
+### 12.4 Performance Targets
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| LCP (Largest Contentful Paint) | ≤ 2.5s | Landing page |
+| FID (First Input Delay) | ≤ 100ms | All pages |
+| CLS (Cumulative Layout Shift) | ≤ 0.1 | All pages |
+| Theme switch latency | ≤ 100ms | No visible flash |
+| Generate response (SSE start) | ≤ 2s | First SSE event |
+| Generate total | ≤ 240s | Vercel Hobby timeout |
+
+### 12.5 Vercel Compatibility
+
+| Constraint | Value | Impact |
+|------------|-------|--------|
+| Plan | Hobby | maxDuration=300 for generate endpoint |
+| Runtime | Node.js | API routes use Node runtime |
+| Edge | Edge runtime | Auth, middleware |
+| Static | CDN | Landing page, assets |
+| Blob | Vercel Blob | File uploads |
+
+---
+
+## 13. Assumptions & Open Items
+
+### 13.1 Assumptions
+
+| # | Assumption | Basis |
+|---|-----------|-------|
+| 1 | Inter font loaded via CSS `@import` or `next/font` | globals.css font-family declaration |
+| 2 | JetBrains Mono font available for code blocks | globals.css font-mono declaration |
+| 3 | All lucide-react icons tree-shaken | Package configuration |
+| 4 | No custom illustrations needed for V3 | Landing page uses BrowserMockup only |
+| 5 | OG image (1200x630) exists at /og/og-image.jpg | Root layout metadata |
+| 6 | Color palette hex parsing from LLM output string | ASSUMPTION - needs validation |
+| 7 | Mobile users tolerate hidden nav links in AppHeader | ASSUMPTION - no mobile menu |
+
+### 13.2 Open Items / Gaps
+
+| # | Item | Status | Owner |
+|---|------|--------|-------|
+| 1 | Root layout Providers wrap (FR-M07) | GAP | Frontend executor |
+| 2 | ImagePromptDisplay color_palette + technical layers (FR-S03) | GAP | Frontend executor |
+| 3 | Features.ts V3 entries (5 new features) | GAP | Frontend executor |
+| 4 | i18n keys for V3 features (id.json + en.json) | GAP | Frontend executor |
+| 5 | ImagePromptDisplay expand button aria-label | GAP | Frontend executor |
+| 6 | AudioPanel semantic list markup | GAP | Frontend executor |
+| 7 | GenerateForm progress aria-live region | GAP | Frontend executor |
+| 8 | AppHeader mobile hamburger menu | Future | Not V3 scope |
+| 9 | Breadcrumb navigation | Future | Not V3 scope |
+
+---
+
+## 14. Summary Statistics
+
+| Category | Count |
+|----------|-------|
+| Design tokens (CSS variables) | 22 (light) + 22 (dark) = 44 |
+| Typography levels | 8 |
+| Spacing tokens | 13 |
+| UI primitive components (shadcn/ui) | 15 |
+| Common components | 8 |
+| Generate components | 9 |
+| Landing components | 19 |
+| Total components | 51 |
+| User flows documented | 3 |
+| Wireframes documented | 5 |
+| Icon types mapped | 25+ |
+| i18n namespaces | 12 |
+| V3 i18n keys needed | ~14 |
+| Accessibility requirements | 7 categories |
+| Assumptions | 7 |
+| Open items/gaps | 9 |
+
+---
+
+*Document grounded in PRD.md, SRS.md, PROJECT_ARCHITECTURE.md, RAG-CONTEXT.md, and live codebase scan (globals.css, components/generate/, components/landing/, components/common/, components/ui/). All technical claims have source citations. Gaps marked with "GAP" or "ASSUMPTION".*

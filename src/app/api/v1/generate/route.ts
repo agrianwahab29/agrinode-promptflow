@@ -10,6 +10,7 @@ import { bulkCreateImagePrompts, deleteImagePromptsByProject } from '@/lib/db/re
 import { bulkCreateSupportingCharacters, deleteSupportingCharactersByProject } from '@/lib/db/repositories/supporting-character.repo';
 import { createGenerationLog } from '@/lib/db/repositories/generation-log.repo';
 import { attachOrphanedRefs } from '@/lib/db/repositories/asset-reference.repo';
+import { createSceneAudio } from '@/lib/db/repositories/scene-audio.repository';
 import { generatePromptPackage } from '@/lib/ai/llm-client';
 import { buildSystemPrompt, buildUserMessage } from '@/lib/ai/prompt-builder';
 import { checkConsistency } from '@/lib/ai/consistency-checker';
@@ -155,11 +156,12 @@ export async function POST(req: NextRequest) {
         }
         if (validated.scenes.length > 0) {
           emitLog('info', `Menyimpan ${validated.scenes.length} scene...`);
-          await bulkCreateScenes(validated.scenes.map((s) => ({
+          const savedScenes = await bulkCreateScenes(validated.scenes.map((s) => ({
             projectId: finalProjectId,
             orderNo: s.order,
             description: s.description,
             voiceoverScript: s.voiceover_script,
+            voiceoverSpeaker: s.voiceover_speaker ?? 'narrator',
             transitionType: s.transition_type,
             transitionDurationMs: s.transition_duration_ms,
             transitionEasing: s.transition_easing,
@@ -172,13 +174,104 @@ export async function POST(req: NextRequest) {
             scenePacing: s.scene_pacing,
             sceneMood: s.scene_mood ?? null,
           })));
+
+          // V3: Save audio_specs to scene_audio table
+          let audioCount = 0;
+          for (let si = 0; si < validated.scenes.length; si++) {
+            const sceneData = validated.scenes[si];
+            const savedScene = savedScenes[si];
+            if (!sceneData?.audio_specs?.length || !savedScene) continue;
+            for (const audio of sceneData.audio_specs) {
+              await createSceneAudio({
+                projectId: finalProjectId,
+                sceneId: savedScene.id,
+                audioType: audio.audio_type,
+                description: audio.description,
+                timing: audio.timing,
+                durationSeconds: audio.duration_seconds ?? null,
+                volume: audio.volume,
+                fadeInMs: audio.fade_in_ms,
+                fadeOutMs: audio.fade_out_ms,
+                musicGenre: audio.music_genre ?? null,
+                musicMood: audio.music_mood ?? null,
+                musicTempoBpm: audio.music_tempo_bpm ?? null,
+                musicInstruments: audio.music_instruments ?? null,
+                musicVolume: audio.music_volume ?? null,
+                sfxList: audio.sfx_list ?? null,
+                ambientType: audio.ambient_type ?? null,
+                ambientVolume: audio.ambient_volume ?? null,
+              });
+              audioCount++;
+            }
+          }
+          if (audioCount > 0) emitLog('info', `Menyimpan ${audioCount} audio spec...`);
+
+          // V3: Save scene-level image prompts with proper sceneId linkage
+          const allSceneImagePrompts: Array<Parameters<typeof bulkCreateImagePrompts>[0][number]> = [];
+          for (let si = 0; si < validated.scenes.length; si++) {
+            const sceneData = validated.scenes[si];
+            const savedScene = savedScenes[si];
+            if (!sceneData?.image_prompts || !savedScene) continue;
+            for (const ch of sceneData.image_prompts.characters) {
+              allSceneImagePrompts.push({
+                projectId: finalProjectId,
+                sceneId: savedScene.id,
+                tipe: 'tokoh',
+                target: ch.target,
+                promptText: ch.prompt_text,
+                referenceFilename: ch.reference_filename,
+                composition: ch.composition ?? null,
+                lighting: ch.lighting ?? null,
+                camera: ch.camera ?? null,
+                moodAtmosphere: ch.mood_atmosphere ?? null,
+                styleReferences: ch.style_references ?? null,
+                colorPalette: Array.isArray(ch.color_palette) ? JSON.stringify(ch.color_palette) : (ch.color_palette ?? null),
+                technical: ch.technical ?? null,
+              });
+            }
+            for (const bg of sceneData.image_prompts.backgrounds) {
+              allSceneImagePrompts.push({
+                projectId: finalProjectId,
+                sceneId: savedScene.id,
+                tipe: 'background',
+                target: bg.target,
+                promptText: bg.prompt_text,
+                referenceFilename: bg.reference_filename,
+                composition: bg.composition ?? null,
+                lighting: bg.lighting ?? null,
+                camera: bg.camera ?? null,
+                moodAtmosphere: bg.mood_atmosphere ?? null,
+                styleReferences: bg.style_references ?? null,
+                colorPalette: Array.isArray(bg.color_palette) ? JSON.stringify(bg.color_palette) : (bg.color_palette ?? null),
+                technical: bg.technical ?? null,
+              });
+            }
+          }
+          if (allSceneImagePrompts.length > 0) {
+            await bulkCreateImagePrompts(allSceneImagePrompts);
+            emitLog('info', `Menyimpan ${allSceneImagePrompts.length} prompt gambar scene (dengan sceneId)...`);
+          }
         }
         if (validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length > 0) {
           const total = validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length;
-          emitLog('info', `Menyimpan ${total} prompt gambar...`);
+          emitLog('info', `Menyimpan ${total} prompt gambar master...`);
           await bulkCreateImagePrompts([
-            ...validated.image_prompts.characters.map((p) => ({ projectId: finalProjectId, sceneId: null, tipe: 'tokoh', target: p.target, promptText: p.prompt_text, referenceFilename: p.reference_filename })),
-            ...validated.image_prompts.backgrounds.map((p) => ({ projectId: finalProjectId, sceneId: null, tipe: 'background', target: p.target, promptText: p.prompt_text, referenceFilename: p.reference_filename })),
+            ...validated.image_prompts.characters.map((p) => ({
+              projectId: finalProjectId, sceneId: null, tipe: 'tokoh', target: p.target,
+              promptText: p.prompt_text, referenceFilename: p.reference_filename,
+              composition: p.composition ?? null, lighting: p.lighting ?? null, camera: p.camera ?? null,
+              moodAtmosphere: p.mood_atmosphere ?? null, styleReferences: p.style_references ?? null,
+              colorPalette: Array.isArray(p.color_palette) ? JSON.stringify(p.color_palette) : (p.color_palette ?? null),
+              technical: p.technical ?? null,
+            })),
+            ...validated.image_prompts.backgrounds.map((p) => ({
+              projectId: finalProjectId, sceneId: null, tipe: 'background', target: p.target,
+              promptText: p.prompt_text, referenceFilename: p.reference_filename,
+              composition: p.composition ?? null, lighting: p.lighting ?? null, camera: p.camera ?? null,
+              moodAtmosphere: p.mood_atmosphere ?? null, styleReferences: p.style_references ?? null,
+              colorPalette: Array.isArray(p.color_palette) ? JSON.stringify(p.color_palette) : (p.color_palette ?? null),
+              technical: p.technical ?? null,
+            })),
           ]);
         }
         if (validated.supporting_characters.length > 0) {
