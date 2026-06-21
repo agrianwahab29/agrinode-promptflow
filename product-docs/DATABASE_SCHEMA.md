@@ -379,7 +379,7 @@ Semua tabel pakai `INTEGER` auto-increment PK (konsisten V1/V2).
 | supporting_characters | `id` | INTEGER | YES |
 | scene_audio | `id` | INTEGER | YES |
 
-> **ASUMSI:** SRS S4.3 mendefinisikan `scene_audio.id` sebagai `TEXT (UUID)`. Dipilih INTEGER untuk konsistensi dengan semua tabel existing. Jika UUID diperlukan, ubah ke `text('id').$defaultFn(() => crypto.randomUUID())`.
+> **INFO-003 RESOLVED:** Stale ASUMSI note cleaned up 2026-06-21. SRS S4.3 was misread — V3 implementation uses INTEGER `id` (consistent with all 9 existing tables) for `scene_audio`. Implemented in `src/lib/db/schema.ts`. If UUID required in future, switch to `text('id').$defaultFn(() => crypto.randomUUID())`.
 
 ### 5.2 Foreign Key
 
