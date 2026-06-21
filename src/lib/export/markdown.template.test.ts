@@ -14,6 +14,7 @@ const sample: PromptPackage = {
       order: 1,
       description: 'Hero jalan',
       voiceover_script: 'Mulai!',
+      voiceover_speaker: 'narrator',
       image_prompts: { characters: [{ target: 'Hero', prompt_text: '3D Hero jalan', reference_filename: null }], backgrounds: [{ target: 'Hutan', prompt_text: '3D forest', reference_filename: null }] },
       transition_type: 'cut',
       transition_duration_ms: 0,
