@@ -85,7 +85,7 @@ export function ProviderCard({ p }: { p: ProviderDTO }) {
       </div>
 
       {result && (
-        <div className={`mt-2 rounded p-2 text-xs font-mono ${result.ok ? 'bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200' : 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200'}`}>
+        <div className={`mt-2 rounded p-2 text-xs font-mono ${result.ok ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
           {result.ok ? (
             <>
               <div>OK — {result.latencyMs}ms</div>

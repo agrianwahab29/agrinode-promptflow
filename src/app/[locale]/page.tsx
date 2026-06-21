@@ -21,7 +21,7 @@ export default async function LandingPage({
   setRequestLocale(locale);
 
   return (
-    <div className="dark">
+    <>
       <ScrollTracker />
       <Navbar />
       <main>
@@ -36,6 +36,6 @@ export default async function LandingPage({
         <FinalCta />
       </main>
       <Footer />
-    </div>
+    </>
   );
 }

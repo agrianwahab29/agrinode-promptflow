@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { auth, signOut } from '@/lib/auth/config';
 import { LanguageToggle } from './language-toggle';
+import { ThemeToggle } from './theme-toggle';
 import { Button } from '@/components/ui/button';
 
 export async function AppHeader() {
@@ -51,6 +52,7 @@ export async function AppHeader() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <LanguageToggle />
           {session?.user ? (
             <form action={handleSignOut}>
