@@ -36,6 +36,7 @@ describe('project.repo utilities', () => {
       resultJson: null,
       status: 'draft',
       storyDescription: null, // V2
+      themePreference: 'dark', // V3
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

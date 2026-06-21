@@ -17,6 +17,11 @@ export const ImagePromptItemSchema = z.object({
   target: z.string(),
   prompt_text: z.string(),
   reference_filename: z.string().nullable(),
+  composition: z.string().nullable().optional(),
+  lighting: z.string().nullable().optional(),
+  camera: z.string().nullable().optional(),
+  mood_atmosphere: z.string().nullable().optional(),
+  style_references: z.string().nullable().optional(),
 });
 
 export const SceneImagePromptsSchema = z.object({
@@ -29,6 +34,17 @@ export const SceneSchema = z.object({
   description: z.string(),
   voiceover_script: z.string(),
   image_prompts: SceneImagePromptsSchema,
+  transition_type: z.enum(['cut', 'dissolve', 'fade_to_black', 'fade_to_white', 'wipe', 'match_cut']).default('cut'),
+  transition_duration_ms: z.number().min(0).max(5000).default(0),
+  transition_easing: z.enum(['linear', 'ease_in', 'ease_out', 'ease_in_out']).default('linear'),
+  transition_direction: z.enum(['forward', 'backward', 'loop']).default('forward'),
+  voice_type: z.enum(['child', 'teen', 'adult_male', 'adult_female', 'elderly_male', 'elderly_female', 'narrator']).default('narrator'),
+  voice_emotion: z.enum(['neutral', 'happy', 'sad', 'excited', 'calm', 'dramatic']).default('neutral'),
+  voice_speed: z.number().min(0.5).max(2.0).default(1.0),
+  voice_pitch: z.enum(['low', 'medium', 'high', 'auto']).default('auto'),
+  duration_seconds: z.number().nullable().optional(),
+  scene_pacing: z.enum(['fast', 'normal', 'slow']).default('normal'),
+  scene_mood: z.enum(['cheerful', 'dramatic', 'tense', 'peaceful', 'mysterious']).nullable().optional(),
 });
 
 export const SupportingCharacterSchema = z.object({
@@ -36,6 +52,29 @@ export const SupportingCharacterSchema = z.object({
   tipe: z.enum(['pendukung', 'hewan']),
   aksi: z.string(),
 });
+
+export const SceneAudioSchema = z.object({
+  audio_type: z.enum(['background_music', 'sfx', 'ambient', 'music_cue', 'transition_audio']),
+  description: z.string().min(1),
+  timing: z.enum(['start', 'throughout', 'end', 'specific_moment']).default('throughout'),
+  duration_seconds: z.number().nullable().optional(),
+  volume: z.number().min(0).max(1).default(0.7),
+  fade_in_ms: z.number().min(0).default(0),
+  fade_out_ms: z.number().min(0).default(0),
+  music_genre: z.string().nullable().optional(),
+  music_mood: z.string().nullable().optional(),
+  music_tempo_bpm: z.number().min(60).max(200).nullable().optional(),
+  music_instruments: z.string().nullable().optional(),
+  music_volume: z.number().min(0).max(1).default(0.7),
+  sfx_list: z.string().nullable().optional(),
+  ambient_type: z.string().nullable().optional(),
+  ambient_volume: z.number().min(0).max(1).default(0.5),
+});
+
+export type SceneAudioType = z.infer<typeof SceneAudioSchema>;
+
+export const ThemePreferenceSchema = z.enum(['dark', 'light', 'system']).default('dark');
+export type ThemePreference = z.infer<typeof ThemePreferenceSchema>;
 
 export const PromptPackageSchema = z.object({
   title: z.string(),

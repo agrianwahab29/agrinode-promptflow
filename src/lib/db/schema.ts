@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, text, sqliteTable, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { integer, text, real, sqliteTable, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 // users
 export const users = sqliteTable('users', {
@@ -41,6 +41,7 @@ export const projects = sqliteTable('projects', {
   resultJson: text('result_json'),
   status: text('status').notNull().default('draft'),
   storyDescription: text('story_description'), // V2: optional story description (max 500 char)
+  themePreference: text('theme_preference').default('dark'), // V3: UI theme preference (dark/light/system)
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
   updatedAt: integer('updated_at').default(sql`(unixepoch())`).notNull(),
   deletedAt: integer('deleted_at'),
@@ -92,6 +93,21 @@ export const scenes = sqliteTable('scenes', {
   orderNo: integer('order_no').notNull(),
   description: text('description').notNull(),
   voiceoverScript: text('voiceover_script').notNull(),
+  // V3: Transition (F-V3-02)
+  transitionType: text('transition_type').notNull().default('cut'),
+  transitionDurationMs: integer('transition_duration_ms').notNull().default(0),
+  transitionEasing: text('transition_easing').notNull().default('linear'),
+  transitionDirection: text('transition_direction').notNull().default('forward'),
+  // V3: Voice (F-V3-04)
+  voiceType: text('voice_type').notNull().default('narrator'),
+  voiceEmotion: text('voice_emotion').notNull().default('neutral'),
+  voiceSpeed: real('voice_speed').notNull().default(1.0),
+  voicePitch: text('voice_pitch').notNull().default('auto'),
+  // V3: Duration (F-V3-05)
+  durationSeconds: integer('duration_seconds'),
+  // V3: Pacing & Mood (ASUMSI)
+  scenePacing: text('scene_pacing').notNull().default('normal'),
+  sceneMood: text('scene_mood'),
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_scenes_project_id').on(t.projectId),
@@ -107,6 +123,13 @@ export const imagePrompts = sqliteTable('image_prompts', {
   target: text('target').notNull(),
   promptText: text('prompt_text').notNull(),
   referenceFilename: text('reference_filename'),
+  // V3: Structured Layers — ASUMSI
+  composition: text('composition'),
+  lighting: text('lighting'),
+  camera: text('camera'),
+  // V3: Metadata — SRS S4.4, PRD S7.2
+  moodAtmosphere: text('mood_atmosphere'),
+  styleReferences: text('style_references'),
   createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
 }, (t) => ({
   projectIdx: index('idx_image_prompts_project_id').on(t.projectId),
@@ -145,6 +168,33 @@ export const supportingCharacters = sqliteTable('supporting_characters', {
   sceneIdx: index('idx_supporting_chars_scene_id').on(t.sceneId),
 }));
 
+// scene_audio — V3 NEW table
+export const sceneAudio = sqliteTable('scene_audio', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  sceneId: integer('scene_id').notNull().references(() => scenes.id, { onDelete: 'cascade' }),
+  audioType: text('audio_type').notNull(),
+  description: text('description').notNull(),
+  timing: text('timing').notNull().default('throughout'),
+  durationSeconds: integer('duration_seconds'),
+  volume: real('volume').notNull().default(0.7),
+  fadeInMs: integer('fade_in_ms').notNull().default(0),
+  fadeOutMs: integer('fade_out_ms').notNull().default(0),
+  musicGenre: text('music_genre'),
+  musicMood: text('music_mood'),
+  musicTempoBpm: integer('music_tempo_bpm'),
+  musicInstruments: text('music_instruments'),
+  musicVolume: real('music_volume').default(0.7),
+  sfxList: text('sfx_list'),
+  ambientType: text('ambient_type'),
+  ambientVolume: real('ambient_volume').default(0.5),
+  createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
+}, (t) => ({
+  projectIdx: index('idx_scene_audio_project_id').on(t.projectId),
+  sceneIdx: index('idx_scene_audio_scene_id').on(t.sceneId),
+  projectSceneIdx: index('idx_scene_audio_project_scene').on(t.projectId, t.sceneId),
+}));
+
 // Inferred types — use everywhere instead of duplicating interfaces (CR §4.6)
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -164,3 +214,5 @@ export type GenerationLog = typeof generationLogs.$inferSelect;
 export type NewGenerationLog = typeof generationLogs.$inferInsert;
 export type SupportingCharacter = typeof supportingCharacters.$inferSelect;
 export type NewSupportingCharacter = typeof supportingCharacters.$inferInsert;
+export type SceneAudio = typeof sceneAudio.$inferSelect;
+export type NewSceneAudio = typeof sceneAudio.$inferInsert;

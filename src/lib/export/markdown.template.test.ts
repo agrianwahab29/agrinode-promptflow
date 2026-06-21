@@ -10,7 +10,21 @@ const sample: PromptPackage = {
     { nama: 'Hero', gayarambut: 'hitam', wajah_asal: 'ID', pakaian_atas: 'kaos', pakaian_bawah: 'celana', alas_kaki: 'sepatu', deskripsi_latar: 'desa', aksi: 'jalan', peran: 'utama' },
   ],
   scenes: [
-    { order: 1, description: 'Hero jalan', voiceover_script: 'Mulai!', image_prompts: { characters: [{ target: 'Hero', prompt_text: '3D Hero jalan', reference_filename: null }], backgrounds: [{ target: 'Hutan', prompt_text: '3D forest', reference_filename: null }] } },
+    {
+      order: 1,
+      description: 'Hero jalan',
+      voiceover_script: 'Mulai!',
+      image_prompts: { characters: [{ target: 'Hero', prompt_text: '3D Hero jalan', reference_filename: null }], backgrounds: [{ target: 'Hutan', prompt_text: '3D forest', reference_filename: null }] },
+      transition_type: 'cut',
+      transition_duration_ms: 0,
+      transition_easing: 'linear',
+      transition_direction: 'forward',
+      voice_type: 'narrator',
+      voice_emotion: 'neutral',
+      voice_speed: 1.0,
+      voice_pitch: 'auto',
+      scene_pacing: 'normal',
+    },
   ],
   image_prompts: {
     characters: [{ target: 'Hero', prompt_text: '3D Hero portrait', reference_filename: null }],
