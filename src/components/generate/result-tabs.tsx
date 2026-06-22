@@ -22,6 +22,7 @@ export function ResultTabs({
   warnings: Warning[];
 }) {
   const t = useTranslations('generate');
+  const tVoice = useTranslations('voice');
   const [tab, setTab] = useState('scenes');
 
   return (
@@ -179,7 +180,7 @@ export function ResultTabs({
                   {c.voice_type && (
                     <Badge variant="outline" className="text-xs">
                       <Mic className="mr-1 h-3 w-3" />
-                      {t(`voice.${c.voice_type}`)}
+                      {tVoice(`types.${c.voice_type}`)}
                     </Badge>
                   )}
                   <Badge variant={c.peran === 'utama' ? 'default' : 'secondary'}>{c.peran}</Badge>

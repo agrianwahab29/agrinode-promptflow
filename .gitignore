@@ -12,6 +12,12 @@ next-env.d.ts
 coverage/
 playwright-report/
 test-results/
+.playwright-mcp/
+
+# Screenshot artifacts
+*.png
+*.jpg
+*.jpeg
 .turbo
 .drizzle
 drizzle/meta/

@@ -51,7 +51,7 @@ function categorizeError(err: unknown, context?: string): { category: string; me
 }
 
 export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
-  const maxRetries = opts.maxRetries ?? 2;
+  const maxRetries = opts.maxRetries ?? 1; // 2→1: avoid Vercel 60s timeout
   let lastError: unknown = null;
   const totalStart = Date.now();
 
@@ -86,7 +86,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
   const requestBody = {
     model: opts.provider.model,
     messages: chatMessages,
-    max_tokens: 32768,
+    max_tokens: 16384, // 32768→16384: faster response, sufficient for shorts/tutorials
     temperature: 0.7,
     stream: false,
   };
@@ -108,7 +108,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
         method: 'POST',
         headers,
         body: requestJson,
-        signal: AbortSignal.timeout(240_000),
+        signal: AbortSignal.timeout(240_000), // 240s timeout for longer LLM generations
       });
 
       const attemptDuration = Date.now() - attemptStart;

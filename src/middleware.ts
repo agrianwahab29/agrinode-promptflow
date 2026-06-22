@@ -76,11 +76,14 @@ export default async function middleware(req: NextRequest) {
   }
 
   // Auth check — Edge-safe via getToken (jose-based)
-  // Vercel production = HTTPS → NextAuth v5 uses __Secure- prefixed cookies
+  // Dynamic secureCookie: Vercel production (HTTPS) → __Secure- prefix; local HTTP → no prefix
+  const proto = req.headers.get('x-forwarded-proto') ?? '';
+  const isLocalhost = req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1' || req.nextUrl.hostname === '[::1]';
+  const isSecure = proto === 'https' && !isLocalhost;
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
-    secureCookie: true,
+    secureCookie: isSecure,
   });
 
   if (!token) {

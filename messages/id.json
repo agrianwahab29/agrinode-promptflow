@@ -171,15 +171,23 @@
     "masterCharacters": "Karakter (master list)",
     "masterBackgrounds": "Background (master list)",
     "scene": "Scene",
-    "moralMessage": "Pesan Moral"
+    "moralMessage": "Pesan Moral",
+    "voiceSpec": "Spesifikasi Suara",
+    "audioSpec": "Spesifikasi Audio",
+    "ageRange": "Rentang Usia",
+    "masterDesc": "Referensi desain master untuk konsistensi.",
+    "transitionTo": "{type} ({duration}ms, {easing})"
   },
   "transition": {
-    "types.cut": "Potong",
-    "types.dissolve": "Larut",
-    "types.fade_to_black": "Gelap total",
-    "types.fade_to_white": "Terang total",
-    "types.wipe": "Sapu",
-    "types.match_cut": "Potong cocok",
+    "types": {
+      "cut": "Potong",
+      "dissolve": "Larut",
+      "fade_to_black": "Gelap total",
+      "fade_to_white": "Terang total",
+      "wipe": "Sapu",
+      "match_cut": "Potong cocok",
+      "fade_in": "Fade in"
+    },
     "durationLabel": "Durasi",
     "easingLabel": "Easing",
     "directionLabel": "Arah",
@@ -188,56 +196,70 @@
     "instant": "Instan"
   },
   "voice": {
-    "types.child": "Anak",
-    "types.teen": "Remaja",
-    "types.adult_male": "Pria dewasa",
-    "types.adult_female": "Wanita dewasa",
-    "types.elderly_male": "Lansia pria",
-    "types.elderly_female": "Lansia wanita",
-    "types.narrator": "Narator",
-    "emotions.neutral": "Netral",
-    "emotions.happy": "Senang",
-    "emotions.sad": "Sedih",
-    "emotions.excited": "Antusias",
-    "emotions.calm": "Tenang",
-    "emotions.dramatic": "Dramatis",
-    "pitch.low": "Rendah",
-    "pitch.medium": "Sedang",
-    "pitch.high": "Tinggi",
-    "pitch.auto": "Otomatis",
+    "types": {
+      "child": "Anak",
+      "teen": "Remaja",
+      "adult_male": "Pria dewasa",
+      "adult_female": "Wanita dewasa",
+      "elderly_male": "Lansia pria",
+      "elderly_female": "Lansia wanita",
+      "narrator": "Narator"
+    },
+    "emotions": {
+      "neutral": "Netral",
+      "happy": "Senang",
+      "sad": "Sedih",
+      "excited": "Antusias",
+      "calm": "Tenang",
+      "dramatic": "Dramatis"
+    },
+    "pitch": {
+      "low": "Rendah",
+      "medium": "Sedang",
+      "high": "Tinggi",
+      "auto": "Otomatis"
+    },
     "speedLabel": "Kecepatan",
     "selectLabel": "Pilih suara",
-    "pitch": "Pitch"
+    "pitchLabel": "Pitch"
   },
   "audio": {
-    "types.background_music": "Musik latar",
-    "types.sfx": "Efek suara",
-    "types.ambient": "Suara lingkungan",
-    "types.music_cue": "Isyarat musik",
-    "types.transition_audio": "Audio transisi",
-    "timing.start": "Awal",
-    "timing.throughout": "Sepanjang",
-    "timing.end": "Akhir",
-    "timing.specific_moment": "Momen tertentu",
-    "fields.volume": "Volume",
-    "fields.fadeIn": "Fade in",
-    "fields.fadeOut": "Fade out",
-    "fields.description": "Deskripsi",
-    "fields.addAudio": "Tambah audio",
-    "fields.editAudio": "Edit audio",
-    "fields.deleteAudio": "Hapus audio",
+    "types": {
+      "background_music": "Musik latar",
+      "sfx": "Efek suara",
+      "ambient": "Suara lingkungan",
+      "music_cue": "Isyarat musik",
+      "transition_audio": "Audio transisi"
+    },
+    "timing": {
+      "start": "Awal",
+      "throughout": "Sepanjang",
+      "end": "Akhir",
+      "specific_moment": "Momen tertentu"
+    },
+    "fields": {
+      "volume": "Volume",
+      "fadeIn": "Fade in",
+      "fadeOut": "Fade out",
+      "description": "Deskripsi",
+      "addAudio": "Tambah audio",
+      "editAudio": "Edit audio",
+      "deleteAudio": "Hapus audio"
+    },
     "noAudio": "Belum ada audio spec"
   },
   "imagePrompt": {
-    "layers.subject": "Subjek",
-    "layers.composition": "Komposisi",
-    "layers.camera": "Kamera",
-    "layers.lighting": "Pencahayaan",
-    "layers.color": "Warna",
-    "layers.colorPalette": "Palet Warna",
-    "layers.mood": "Suasana",
-    "layers.style": "Gaya",
-    "layers.technical": "Teknis",
+    "layers": {
+      "subject": "Subjek",
+      "composition": "Komposisi",
+      "camera": "Kamera",
+      "lighting": "Pencahayaan",
+      "color": "Warna",
+      "colorPalette": "Palet Warna",
+      "mood": "Suasana",
+      "style": "Gaya",
+      "technical": "Teknis"
+    },
     "copyLayer": "Salin layer",
     "copyFull": "Salin full prompt"
   },

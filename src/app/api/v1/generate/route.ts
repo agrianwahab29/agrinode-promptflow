@@ -17,11 +17,11 @@ import { checkConsistency } from '@/lib/ai/consistency-checker';
 import { createLogBuffer, type LogBuffer } from '@/lib/ai/log-buffer';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // Vercel Hobby plan max
+export const maxDuration = 300; // Vercel Pro=300, needed for longer LLM responses
 export const dynamic = 'force-dynamic';
 
 interface SseEvent {
-  event: 'progress' | 'stage' | 'done' | 'error' | 'log';
+  event: 'progress' | 'stage' | 'done' | 'error' | 'log' | 'heartbeat';
   data: Record<string, unknown>;
 }
 
@@ -208,19 +208,40 @@ export async function POST(req: NextRequest) {
         let pkg;
         try {
           const llmStart = Date.now();
-          pkg = await generatePromptPackage({
-            provider: { provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, apiKeyEncrypted: cfg.apiKeyEncrypted },
-            system: systemMessage,
-            messages: [{ role: 'user', content: userMessage }],
-          });
+          // Visible LLM stage + heartbeat so user knows system is alive
+          advance('llm_calling', { provider: cfg.name, model: cfg.model }, `Memanggil LLM: ${cfg.name} (${cfg.model})...`);
+          const heartbeatId = setInterval(() => {
+            const elapsedMs = Date.now() - llmStart;
+            const elapsedSec = Math.floor(elapsedMs / 1000);
+            send({ event: 'heartbeat', data: { elapsedMs, elapsedSec } });
+            if (elapsedSec % 10 === 0 && elapsedSec > 0) {
+              emitLog('info', `Menunggu respons LLM... ${elapsedSec}s`);
+            }
+          }, 2000);
+          try {
+            pkg = await generatePromptPackage({
+              provider: { provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, apiKeyEncrypted: cfg.apiKeyEncrypted },
+              system: systemMessage,
+              messages: [{ role: 'user', content: userMessage }],
+            });
+          } finally {
+            clearInterval(heartbeatId);
+          }
           const llmDuration = Date.now() - llmStart;
           console.log('[generate] LLM completed: project=%d scenes=%d chars=%d duration=%dms',
             finalProjectId, pkg.scenes?.length ?? 0, pkg.character_profiles?.length ?? 0, llmDuration
           );
+          emitLog('info', `LLM merespons dalam ${llmDuration}ms`);
         } catch (llmErr) {
           const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
           console.error('[generate] LLM call FAILED: project=%d error=%s', finalProjectId, errMsg);
           emitLog('error', `LLM provider gagal: ${errMsg}`);
+
+          // Mark project as failed (not stuck in 'draft')
+          try {
+            await updateProjectResult(finalProjectId, userId, '', 'failed');
+            emitLog('info', 'Project status → failed');
+          } catch { /* ignore */ }
 
           try {
             const logEntries = logBuffer.drain();
@@ -249,6 +270,12 @@ export async function POST(req: NextRequest) {
           const errMsg = valErr instanceof Error ? valErr.message : String(valErr);
           console.error('[generate] Prompt package validation FAILED: %s', errMsg);
           emitLog('error', `Validasi paket prompt gagal: ${errMsg}`);
+
+          // Mark project as failed (not stuck in 'draft')
+          try {
+            await updateProjectResult(finalProjectId, userId, '', 'failed');
+            emitLog('info', 'Project status → failed');
+          } catch { /* ignore */ }
 
           try {
             const logEntries = logBuffer.drain();
@@ -279,6 +306,7 @@ export async function POST(req: NextRequest) {
 
         // DB operations with individual error handling
         console.log('[generate] DB save starting: project=%d', finalProjectId);
+        advance('saving', {}, 'Menyimpan hasil ke database...');
         emitLog('info', 'Menyimpan hasil ke database...');
 
         await safeDbOp(
@@ -495,6 +523,12 @@ export async function POST(req: NextRequest) {
         console.error('[generate]   error: %s', errMsg);
         console.error('[generate]   stack: %s', errStack);
         emitLog('error', `Generate gagal: ${errMsg}`);
+
+        // Mark project as failed (not stuck in 'draft')
+        try {
+          await updateProjectResult(finalProjectId, userId, '', 'failed');
+          emitLog('info', 'Project status → failed');
+        } catch { /* ignore */ }
 
         try {
           const logEntries = logBuffer.drain();

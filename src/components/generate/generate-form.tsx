@@ -22,13 +22,15 @@ type FormValues = z.infer<typeof FormSchema>;
 
 const STAGE_LABELS: Record<string, string> = {
   starting: 'Mulai generate...',
-  character_profiles: 'Membuat profil karakter',
+  character_profiles: 'Mempersiapkan profil karakter',
+  llm_calling: 'Memanggil LLM (proses terberat)',
   scenes: 'Menyusun scene',
   image_prompts: 'Membuat prompt gambar',
   supporting_characters: 'Membuat karakter pendukung',
   moral_message: 'Menulis pesan moral',
+  saving: 'Menyimpan ke database',
 };
-const STAGE_ORDER = ['starting', 'character_profiles', 'scenes', 'image_prompts', 'supporting_characters', 'moral_message'];
+const STAGE_ORDER = ['starting', 'character_profiles', 'llm_calling', 'scenes', 'image_prompts', 'supporting_characters', 'moral_message', 'saving'];
 
 function ElapsedTimer() {
   const [sec, setSec] = useState(0);
@@ -52,6 +54,8 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
   const [refsText, setRefsText] = useState('');
   const [uploadedRefs, setUploadedRefs] = useState<AssetRef[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [llmElapsedMs, setLlmElapsedMs] = useState<number | null>(null);
+  const [savingStarted, setSavingStarted] = useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -80,6 +84,8 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
     setCurrentStage('starting');
     setStageMeta({});
     setLogs([]);
+    setLlmElapsedMs(null);
+    setSavingStarted(false);
     const refs = refsText
       .split('\n')
       .map((s) => s.trim())
@@ -123,6 +129,8 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+      let receivedDone = false;
+      let receivedError = false;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -143,15 +151,21 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             if (evType === 'stage' || evType === 'progress') {
               setCurrentStage(parsed.stage ?? evType);
               setStageMeta(parsed);
+              if (parsed.stage === 'llm_calling') setLlmElapsedMs(0);
+              if (parsed.stage === 'saving' && !savingStarted) setSavingStarted(true);
+            } else if (evType === 'heartbeat') {
+              setLlmElapsedMs(parsed.elapsedMs as number);
             } else if (evType === 'log') {
               // V2: append log entry
               setLogs((prev) => [...prev.slice(-499), parsed as LogEntry]);
             } else if (evType === 'done') {
+              receivedDone = true;
               setResult(parsed.result as PromptPackage);
               setWarnings(parsed.warnings ?? []);
               setCurrentStage(null);
               toast.success('Generate selesai');
             } else if (evType === 'error') {
+              receivedError = true;
               toast.error(parsed.message ?? 'Generate gagal');
               setCurrentStage(null);
             }
@@ -159,6 +173,11 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             // skip malformed event
           }
         }
+      }
+      // Stream ended without done/error = server killed (Vercel timeout) or network abort
+      if (!receivedDone && !receivedError) {
+        toast.error('Koneksi terputus sebelum generate selesai. Cek status project — mungkin timeout server (60s).');
+        setCurrentStage(null);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Network error');
@@ -293,6 +312,13 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
                 <span className="font-medium">{STAGE_LABELS[currentStage] ?? currentStage}</span>
                 <span className="text-muted-foreground text-xs"><ElapsedTimer /></span>
               </div>
+              {currentStage === 'llm_calling' && llmElapsedMs !== null && (
+                <div className="flex items-center gap-2 text-xs text-primary">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                  Menunggu respons LLM: {(llmElapsedMs / 1000).toFixed(0)}s
+                  {llmElapsedMs > 30000 && <span className="text-amber-600"> (biasanya 30-120s, mohon tunggu)</span>}
+                </div>
+              )}
               <div className="space-y-1.5">
                 {STAGE_ORDER.map((stage, i) => {
                   const done = STAGE_ORDER.indexOf(currentStage) > i;
@@ -313,12 +339,13 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
               {stageMeta.count !== undefined && (
                 <p className="text-xs text-muted-foreground">Ditemukan {String(stageMeta.count)} item...</p>
               )}
-              {/* V2: Real-time processing logs */}
-              {logs.length > 0 && (
-                <div className="mt-3 border-t pt-3">
-                  <LogViewer logs={logs} />
-                </div>
+              {stageMeta.provider != null && (
+                <p className="text-xs text-muted-foreground">
+                  Provider: {String(stageMeta.provider)}{stageMeta.model != null ? ` / ${String(stageMeta.model)}` : ''}
+                </p>
               )}
+              {/* V2: Real-time processing logs — auto-expanded during streaming */}
+              <LogViewer logs={logs} defaultOpen={true} streaming={streaming} />
             </div>
           )}
 

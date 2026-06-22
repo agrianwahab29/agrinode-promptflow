@@ -35,7 +35,7 @@ export function VoiceTypeSelector({ voice }: { voice: VoiceSpec }) {
         {t('speedLabel')}: {voice.voiceSpeed}x
       </span>
       <Badge variant="outline" className="text-xs">
-        {t('pitch')}: {t(`pitch.${voice.voicePitch}`)}
+        {t('pitchLabel')}: {t(`pitch.${voice.voicePitch}`)}
       </Badge>
     </div>
   );

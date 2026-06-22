@@ -171,15 +171,23 @@
     "masterCharacters": "Characters (master list)",
     "masterBackgrounds": "Backgrounds (master list)",
     "scene": "Scene",
-    "moralMessage": "Moral Message"
+    "moralMessage": "Moral Message",
+    "voiceSpec": "Voice Spec",
+    "audioSpec": "Audio Spec",
+    "ageRange": "Age Range",
+    "masterDesc": "Master design references for consistency.",
+    "transitionTo": "{type} ({duration}ms, {easing})"
   },
   "transition": {
-    "types.cut": "Cut",
-    "types.dissolve": "Dissolve",
-    "types.fade_to_black": "Fade to black",
-    "types.fade_to_white": "Fade to white",
-    "types.wipe": "Wipe",
-    "types.match_cut": "Match cut",
+    "types": {
+      "cut": "Cut",
+      "dissolve": "Dissolve",
+      "fade_to_black": "Fade to black",
+      "fade_to_white": "Fade to white",
+      "wipe": "Wipe",
+      "match_cut": "Match cut",
+      "fade_in": "Fade in"
+    },
     "durationLabel": "Duration",
     "easingLabel": "Easing",
     "directionLabel": "Direction",
@@ -188,56 +196,70 @@
     "instant": "Instant"
   },
   "voice": {
-    "types.child": "Child",
-    "types.teen": "Teen",
-    "types.adult_male": "Adult male",
-    "types.adult_female": "Adult female",
-    "types.elderly_male": "Elderly male",
-    "types.elderly_female": "Elderly female",
-    "types.narrator": "Narrator",
-    "emotions.neutral": "Neutral",
-    "emotions.happy": "Happy",
-    "emotions.sad": "Sad",
-    "emotions.excited": "Excited",
-    "emotions.calm": "Calm",
-    "emotions.dramatic": "Dramatic",
-    "pitch.low": "Low",
-    "pitch.medium": "Medium",
-    "pitch.high": "High",
-    "pitch.auto": "Auto",
+    "types": {
+      "child": "Child",
+      "teen": "Teen",
+      "adult_male": "Adult male",
+      "adult_female": "Adult female",
+      "elderly_male": "Elderly male",
+      "elderly_female": "Elderly female",
+      "narrator": "Narrator"
+    },
+    "emotions": {
+      "neutral": "Neutral",
+      "happy": "Happy",
+      "sad": "Sad",
+      "excited": "Excited",
+      "calm": "Calm",
+      "dramatic": "Dramatic"
+    },
+    "pitch": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "auto": "Auto"
+    },
     "speedLabel": "Speed",
     "selectLabel": "Select voice",
-    "pitch": "Pitch"
+    "pitchLabel": "Pitch"
   },
   "audio": {
-    "types.background_music": "Background music",
-    "types.sfx": "SFX",
-    "types.ambient": "Ambient",
-    "types.music_cue": "Music cue",
-    "types.transition_audio": "Transition audio",
-    "timing.start": "Start",
-    "timing.throughout": "Throughout",
-    "timing.end": "End",
-    "timing.specific_moment": "Specific moment",
-    "fields.volume": "Volume",
-    "fields.fadeIn": "Fade in",
-    "fields.fadeOut": "Fade out",
-    "fields.description": "Description",
-    "fields.addAudio": "Add audio",
-    "fields.editAudio": "Edit audio",
-    "fields.deleteAudio": "Delete audio",
+    "types": {
+      "background_music": "Background music",
+      "sfx": "SFX",
+      "ambient": "Ambient",
+      "music_cue": "Music cue",
+      "transition_audio": "Transition audio"
+    },
+    "timing": {
+      "start": "Start",
+      "throughout": "Throughout",
+      "end": "End",
+      "specific_moment": "Specific moment"
+    },
+    "fields": {
+      "volume": "Volume",
+      "fadeIn": "Fade in",
+      "fadeOut": "Fade out",
+      "description": "Description",
+      "addAudio": "Add audio",
+      "editAudio": "Edit audio",
+      "deleteAudio": "Delete audio"
+    },
     "noAudio": "No audio specs yet"
   },
   "imagePrompt": {
-    "layers.subject": "Subject",
-    "layers.composition": "Composition",
-    "layers.camera": "Camera",
-    "layers.lighting": "Lighting",
-    "layers.color": "Color",
-    "layers.colorPalette": "Color Palette",
-    "layers.mood": "Mood",
-    "layers.style": "Style",
-    "layers.technical": "Technical",
+    "layers": {
+      "subject": "Subject",
+      "composition": "Composition",
+      "camera": "Camera",
+      "lighting": "Lighting",
+      "color": "Color",
+      "colorPalette": "Color Palette",
+      "mood": "Mood",
+      "style": "Style",
+      "technical": "Technical"
+    },
     "copyLayer": "Copy layer",
     "copyFull": "Copy full prompt"
   },

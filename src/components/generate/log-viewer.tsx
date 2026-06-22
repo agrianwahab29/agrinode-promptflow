@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,10 +36,26 @@ function formatTime(ts: number): string {
     '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
-export function LogViewer({ logs }: { logs: LogEntry[] }) {
-  const [open, setOpen] = useState(false);
+export function LogViewer({ logs, defaultOpen = false, streaming = false }: { logs: LogEntry[]; defaultOpen?: boolean; streaming?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-open when streaming starts producing logs
+  useEffect(() => {
+    if (streaming && logs.length > 0 && !open) setOpen(true);
+  }, [streaming, logs.length, open]);
+
+  // Auto-scroll to bottom on new log
+  useEffect(() => {
+    if (open && bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [logs, open]);
 
   if (logs.length === 0) return null;
+
+  const latest = logs[logs.length - 1]!;
 
   return (
     <Collapsible.Root open={open} onOpenChange={setOpen}>
@@ -49,8 +65,16 @@ export function LogViewer({ logs }: { logs: LogEntry[] }) {
           <Switch checked={open} onCheckedChange={setOpen} aria-label="Toggle log viewer" />
         </Collapsible.Trigger>
       </div>
+      {/* Latest log always visible (even when collapsed) */}
+      {!open && (
+        <div className="mt-1 flex items-start gap-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">{formatTime(latest.timestamp)}</span>
+          <LevelBadge level={latest.level} />
+          <span className="break-all">{escapeHtml(latest.message).slice(0, 120)}{latest.message.length > 120 ? '…' : ''}</span>
+        </div>
+      )}
       <Collapsible.Content>
-        <ScrollArea className="mt-2 h-48 w-full rounded-md border bg-muted/30 p-2">
+        <div ref={scrollRef} className="mt-2 max-h-48 w-full overflow-y-auto rounded-md border bg-muted/30 p-2">
           <div className="space-y-0.5 font-mono text-xs">
             {logs.map((entry, i) => (
               <div key={i} className="flex items-start gap-2 py-0.5">
@@ -59,8 +83,9 @@ export function LogViewer({ logs }: { logs: LogEntry[] }) {
                 <span className="break-all">{escapeHtml(entry.message)}</span>
               </div>
             ))}
+            <div ref={bottomRef} />
           </div>
-        </ScrollArea>
+        </div>
       </Collapsible.Content>
     </Collapsible.Root>
   );
