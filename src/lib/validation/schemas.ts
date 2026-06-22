@@ -10,7 +10,7 @@ export const CharacterProfileSchema = z.object({
   alas_kaki: z.string(),
   deskripsi_latar: z.string(),
   aksi: z.string(),
-  peran: z.enum(['utama', 'lain', 'pendamping']),
+  peran: z.string(),
   // V3: voice assignment
   voice_type: z.enum(['child', 'teen', 'adult_male', 'adult_female', 'elderly_male', 'elderly_female', 'narrator']).optional(),
   age_range: z.string().optional(),
@@ -80,7 +80,7 @@ export const SceneSchema = z.object({
 
 export const SupportingCharacterSchema = z.object({
   nama: z.string(),
-  tipe: z.enum(['pendukung', 'hewan']),
+  tipe: z.string(),
   aksi: z.string(),
 });
 

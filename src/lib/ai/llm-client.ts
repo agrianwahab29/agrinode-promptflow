@@ -9,6 +9,7 @@ export interface GenerateOptions {
   system: string;
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   maxRetries?: number;
+  onStreamChunk?: (chunk: string) => void;
 }
 
 /**
@@ -20,7 +21,7 @@ function categorizeError(err: unknown, context?: string): { category: string; me
 
   // Network/Timeout errors
   if (name === 'AbortError' || msg.includes('timeout') || msg.includes('Timeout')) {
-    return { category: 'TIMEOUT', message: 'LLM request timeout (240s limit)', details: { context } };
+    return { category: 'TIMEOUT', message: 'LLM request timeout (600s limit)', details: { context } };
   }
   if (msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND') || msg.includes('fetch failed')) {
     return { category: 'NETWORK', message: 'Cannot connect to LLM provider', details: { context, error: msg } };
@@ -88,7 +89,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
     messages: chatMessages,
     max_tokens: 16384, // 32768→16384: faster response, sufficient for shorts/tutorials
     temperature: 0.7,
-    stream: false,
+    stream: true, // We want streaming for realtime feedback
   };
   const requestJson = JSON.stringify(requestBody);
   console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
@@ -108,42 +109,71 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
         method: 'POST',
         headers,
         body: requestJson,
-        signal: AbortSignal.timeout(240_000), // 240s timeout for longer LLM generations
+        signal: AbortSignal.timeout(600_000), // 600s timeout for streaming
       });
 
       const attemptDuration = Date.now() - attemptStart;
-      const contentLength = res.headers.get('content-length');
-      console.log('[llm] Response received: status=%d contentLength=%s duration=%dms',
-        res.status, contentLength ?? 'unknown', attemptDuration
+      console.log('[llm] Response headers received: status=%d duration=%dms',
+        res.status, attemptDuration
       );
 
-      const responseText = await res.text();
-      console.log('[llm] Response body length: %d bytes', responseText.length);
-
       if (!res.ok) {
+        const responseText = await res.text();
         console.error('[llm] HTTP error %d: %s', res.status, responseText.slice(0, 500));
         throw new Error(`Provider HTTP ${res.status}: ${responseText.slice(0, 500)}`);
       }
 
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(responseText);
-      } catch (parseErr) {
-        console.error('[llm] JSON parse failed. Body preview: %s', responseText.slice(0, 500));
-        throw new Error(`Provider response bukan JSON valid: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+      let content = '';
+      const contentType = res.headers.get('content-type') || '';
+      
+      if (contentType.includes('event-stream') && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? ''; // keep the last incomplete line
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.slice(6).trim();
+              if (dataStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(dataStr);
+                const deltaContent = parsed.choices?.[0]?.delta?.content || '';
+                if (deltaContent) {
+                  content += deltaContent;
+                  opts.onStreamChunk?.(deltaContent);
+                }
+              } catch (e) {
+                // ignore parse error for partial data
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback if provider ignores stream: true
+        const responseText = await res.text();
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(responseText);
+        } catch (parseErr) {
+          throw new Error(`Provider response bukan JSON valid: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+        }
+        const choices = parsed?.choices as Array<{ message?: { content?: string } }> | undefined;
+        content = choices?.[0]?.message?.content || '';
+        if (content) {
+          opts.onStreamChunk?.(content);
+        }
       }
 
-      const choices = parsed?.choices as Array<{ message?: { content?: string } }> | undefined;
-      const content = choices?.[0]?.message?.content;
       if (!content) {
-        const keys = Object.keys(parsed ?? {});
-        console.error('[llm] Empty content. Response keys: %s', keys.join(', '));
         throw new Error('Provider response kosong / format tidak dikenal');
       }
-      console.log('[llm] Content received: length=%d preview=%s',
-        content.length,
-        content.slice(0, 200).replace(/\n/g, '\\n')
-      );
+      console.log('[llm] Content received: length=%d', content.length);
 
       // Multi-strategy JSON extraction:
       // 1. Strip  antml tags / thinking blocks (model reasoning mode)
@@ -151,13 +181,14 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
       cleaned = cleaned.replace(/<antml:[^>]*>[\s\S]*?<\/antml:[^>]*>/g, '');
       cleaned = cleaned.replace(/<antml:thinking>[\s\S]*?<\/antml:thinking>/g, '');
       cleaned = cleaned.replace(/<antml:[^>]*\/>/g, '');
+      cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/g, '');
       cleaned = cleaned.trim();
 
       // 2. Cari JSON code block
       let jsonStr = cleaned;
-      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch?.[1]) {
-        jsonStr = jsonMatch[1].trim();
+      const jsonMatches = [...jsonStr.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)];
+      if (jsonMatches.length > 0) {
+        jsonStr = jsonMatches[jsonMatches.length - 1][1].trim();
         console.log('[llm] Extracted JSON from code block: length=%d', jsonStr.length);
       } else {
         // 3. Cari raw JSON object/array (first { atau [ sampai akhir)

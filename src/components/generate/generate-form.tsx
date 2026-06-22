@@ -58,6 +58,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
   const [streaming, setStreaming] = useState(false);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [stageMeta, setStageMeta] = useState<Record<string, unknown>>({});
+  const [streamedContent, setStreamedContent] = useState('');
   const [storyDescription, setStoryDescription] = useState('');
   const [refsText, setRefsText] = useState('');
   const [uploadedRefs, setUploadedRefs] = useState<AssetRef[]>([]);
@@ -91,6 +92,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
     setWarnings([]);
     setCurrentStage('starting');
     setStageMeta({});
+    setStreamedContent('');
     setLogs([]);
     setLlmElapsedMs(null);
     setSavingStarted(false);
@@ -166,6 +168,8 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             } else if (evType === 'log') {
               // V2: append log entry
               setLogs((prev) => [...prev.slice(-499), parsed as LogEntry]);
+            } else if (evType === 'stream_chunk') {
+              setStreamedContent((prev) => prev + String(parsed.chunk ?? ''));
             } else if (evType === 'done') {
               receivedDone = true;
               setResult(parsed.result as PromptPackage);
@@ -368,6 +372,12 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
                 <p className="text-xs text-muted-foreground">
                   Provider: {String(stageMeta.provider)}{stageMeta.model != null ? ` / ${String(stageMeta.model)}` : ''}
                 </p>
+              )}
+              {/* LLM Streaming Viewer */}
+              {currentStage === 'llm_calling' && streamedContent && (
+                <div className="mt-2 p-2 bg-black text-green-400 text-[10px] font-mono h-48 overflow-y-auto rounded whitespace-pre-wrap flex flex-col-reverse" style={{ overflowAnchor: 'auto' }}>
+                  {streamedContent}
+                </div>
               )}
               {/* V2: Real-time processing logs — auto-expanded during streaming */}
               <LogViewer logs={logs} defaultOpen={true} streaming={streaming} />

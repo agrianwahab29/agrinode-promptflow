@@ -223,6 +223,9 @@ export async function POST(req: NextRequest) {
               provider: { provider: cfg.provider, baseUrl: cfg.baseUrl, model: cfg.model, apiKeyEncrypted: cfg.apiKeyEncrypted },
               system: systemMessage,
               messages: [{ role: 'user', content: userMessage }],
+              onStreamChunk: (chunk) => {
+                send({ event: 'stream_chunk', data: { chunk } });
+              }
             });
           } finally {
             clearInterval(heartbeatId);
