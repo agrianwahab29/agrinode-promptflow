@@ -21,7 +21,7 @@ export const maxDuration = 300; // Vercel Pro=300, needed for longer LLM respons
 export const dynamic = 'force-dynamic';
 
 interface SseEvent {
-  event: 'progress' | 'stage' | 'done' | 'error' | 'log' | 'heartbeat';
+  event: 'progress' | 'stage' | 'done' | 'error' | 'log' | 'heartbeat' | 'stream_chunk';
   data: Record<string, unknown>;
 }
 
