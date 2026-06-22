@@ -19,7 +19,19 @@ interface ProjectDTO {
   createdAt: string;
 }
 
-export function ProjectCard({ p, locale }: { p: ProjectDTO; locale: string }) {
+export function ProjectCard({
+  p,
+  locale,
+  selectable = false,
+  selected = false,
+  onToggle,
+}: {
+  p: ProjectDTO;
+  locale: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -51,13 +63,37 @@ export function ProjectCard({ p, locale }: { p: ProjectDTO; locale: string }) {
     setDialogOpen(true);
   }
 
+  function handleCheckboxClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggle?.();
+  }
+
   return (
     <>
       <Link href={`/${locale}/projects/${p.id}`}>
-        <Card className="relative transition-colors hover:bg-accent">
+        <Card className={`relative transition-colors hover:bg-accent ${selected ? 'ring-2 ring-primary bg-primary/5' : ''}`}>
           <CardHeader>
             <div className="flex items-start justify-between gap-2">
-              <CardTitle className="line-clamp-1 text-base">{p.title}</CardTitle>
+              <div className="flex items-center gap-2 min-w-0">
+                {selectable && (
+                  <div
+                    onClick={handleCheckboxClick}
+                    className={`flex-shrink-0 h-5 w-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
+                      selected
+                        ? 'bg-primary border-primary text-primary-foreground'
+                        : 'border-muted-foreground/40 hover:border-primary'
+                    }`}
+                  >
+                    {selected && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                )}
+                <CardTitle className="line-clamp-1 text-base">{p.title}</CardTitle>
+              </div>
               <div className="flex items-center gap-1 shrink-0">
                 <Badge variant={statusVariant}>{p.status}</Badge>
                 <Button

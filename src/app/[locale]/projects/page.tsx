@@ -4,7 +4,7 @@ import { requireSession } from '@/lib/auth/middleware';
 import { listActiveProjects, toProjectDTO } from '@/lib/db/repositories/project.repo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ProjectCard } from '@/components/projects/project-card';
+import { ProjectsListClient } from '@/components/projects/projects-list-client';
 import { Pagination } from '@/components/common/pagination';
 
 export default async function ProjectsPage({
@@ -40,11 +40,11 @@ export default async function ProjectsPage({
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {data.map((p) => (
-              <ProjectCard key={p.id} locale={locale} p={toProjectDTO(p)} />
-            ))}
-          </div>
+          <ProjectsListClient
+            projects={data.map((p) => toProjectDTO(p))}
+            locale={locale}
+            total={total}
+          />
           <div className="text-xs text-muted-foreground text-center">
             Menampilkan {data.length} dari {total} proyek
           </div>
