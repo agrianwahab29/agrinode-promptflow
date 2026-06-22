@@ -19,15 +19,12 @@ function categorizeError(err: unknown, context?: string): { category: string; me
   const msg = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : 'UnknownError';
 
-  // Network/Timeout errors
   if (name === 'AbortError' || msg.includes('timeout') || msg.includes('Timeout')) {
     return { category: 'TIMEOUT', message: 'LLM request timeout (600s limit)', details: { context } };
   }
   if (msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND') || msg.includes('fetch failed')) {
     return { category: 'NETWORK', message: 'Cannot connect to LLM provider', details: { context, error: msg } };
   }
-
-  // Zod validation errors
   if (name === 'ZodError' || (err as { issues?: unknown })?.issues) {
     const zodErr = err as z.ZodError;
     const issueSummary = zodErr.issues?.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
@@ -37,22 +34,208 @@ function categorizeError(err: unknown, context?: string): { category: string; me
       details: { issueCount: zodErr.issues?.length ?? 0, issues: issueSummary },
     };
   }
-
-  // HTTP errors
   if (msg.startsWith('Provider HTTP')) {
     return { category: 'HTTP', message: msg, details: { context } };
   }
-
-  // JSON parse errors
   if (msg.includes('JSON') || msg.includes('parse')) {
     return { category: 'JSON_PARSE', message: 'Failed to parse LLM response as JSON', details: { context, error: msg } };
   }
-
   return { category: 'UNKNOWN', message: msg, details: { context, errorName: name } };
 }
 
+/**
+ * Attempt to repair truncated JSON from LLM output.
+ * Handles: unterminated strings, missing closing brackets/braces, trailing commas.
+ */
+function repairTruncatedJson(jsonStr: string): string {
+  let s = jsonStr.trim();
+
+  // Remove trailing incomplete key-value (e.g. `"key": ` with no value)
+  s = s.replace(/,\s*"[^"]*"\s*:\s*$/, '');
+
+  // Close any unterminated string: count unescaped quotes
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; }
+  }
+  if (inString) {
+    // Truncated inside a string — close it
+    s += '"';
+  }
+
+  // Remove trailing comma before we close brackets
+  s = s.replace(/,\s*$/, '');
+
+  // Count open vs close brackets/braces and close missing ones
+  const stack: string[] = [];
+  inString = false;
+  escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if (c === '}' || c === ']') {
+      if (stack.length > 0 && stack[stack.length - 1] === c) {
+        stack.pop();
+      }
+    }
+  }
+
+  // Close all unclosed brackets/braces in reverse order
+  while (stack.length > 0) {
+    // Remove trailing comma before closing
+    s = s.replace(/,\s*$/, '');
+    s += stack.pop();
+  }
+
+  return s;
+}
+
+/**
+ * Extract the best JSON candidate from LLM output.
+ * Strategy: strip thinking blocks, find all JSON candidates, pick the largest valid one.
+ */
+function extractJsonFromContent(content: string): string {
+  let cleaned = content;
+
+  // 1. Strip <think>...</think> blocks (greedy — handles nested content)
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // Fallback: if <think> exists without closing tag, strip from <think> to end of thinking
+  // by looking for the start of actual JSON after <think>
+  if (/<think>/i.test(cleaned)) {
+    // Find the last occurrence of </think> or strip everything before the first {
+    const thinkStart = cleaned.search(/<think>/i);
+    const jsonStart = cleaned.indexOf('{', thinkStart);
+    // Check if there's a </think> between thinkStart and jsonStart
+    const thinkEnd = cleaned.indexOf('</think>', thinkStart);
+    if (thinkEnd > 0 && thinkEnd < jsonStart) {
+      // Normal case: strip the think block
+      cleaned = cleaned.slice(0, thinkStart) + cleaned.slice(thinkEnd + 8);
+    } else if (thinkEnd < 0) {
+      // No closing tag — the model just started thinking and never closed
+      // Strip everything from <think> to just before what looks like real JSON
+      // Find real JSON by looking for a large { block
+      const realJsonIdx = findLargestJsonStart(cleaned);
+      if (realJsonIdx >= 0) {
+        cleaned = cleaned.slice(realJsonIdx);
+      }
+    }
+  }
+
+  // Strip antml tags
+  cleaned = cleaned.replace(/<[^>]*>[\s\S]*?<\/antml:[^>]*>/g, '');
+  cleaned = cleaned.replace(/<[^>]*\/>/g, '');
+  cleaned = cleaned.trim();
+
+  // 2. Find ALL JSON code blocks and raw JSON objects
+  const candidates: string[] = [];
+
+  // From code blocks
+  const codeBlockMatches = [...cleaned.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)];
+  for (const m of codeBlockMatches) {
+    if (m[1]?.trim()) candidates.push(m[1].trim());
+  }
+
+  // Raw JSON extraction — find all top-level { } blocks using depth tracking
+  const rawCandidates = extractAllJsonObjects(cleaned);
+  candidates.push(...rawCandidates);
+
+  // If no candidates found, try the entire cleaned string
+  if (candidates.length === 0) {
+    candidates.push(cleaned);
+  }
+
+  // 3. Pick the LARGEST candidate (most likely the full response)
+  candidates.sort((a, b) => b.length - a.length);
+
+  console.log('[llm] JSON candidates found: %d, sizes: %s',
+    candidates.length,
+    candidates.slice(0, 5).map(c => c.length).join(', ')
+  );
+
+  return candidates[0] ?? cleaned;
+}
+
+/**
+ * Find the start index of the largest JSON object in a string.
+ */
+function findLargestJsonStart(s: string): number {
+  let bestStart = -1;
+  let bestLen = 0;
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === '{') {
+      const end = findMatchingBrace(s, i);
+      const len = end >= 0 ? (end - i + 1) : (s.length - i);
+      if (len > bestLen) {
+        bestLen = len;
+        bestStart = i;
+      }
+      if (end >= 0) i = end + 1; else break;
+    } else {
+      i++;
+    }
+  }
+  return bestStart;
+}
+
+/**
+ * Extract all top-level JSON objects from a string.
+ */
+function extractAllJsonObjects(s: string): string[] {
+  const results: string[] = [];
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === '{') {
+      const end = findMatchingBrace(s, i);
+      if (end >= 0) {
+        results.push(s.slice(i, end + 1));
+        i = end + 1;
+      } else {
+        // Unclosed — take everything from here to end (will be repaired later)
+        results.push(s.slice(i));
+        break;
+      }
+    } else {
+      i++;
+    }
+  }
+  return results;
+}
+
+/**
+ * Find the matching closing brace for an opening brace at position `start`.
+ * Returns -1 if not found (truncated JSON).
+ */
+function findMatchingBrace(s: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"' && !escape) { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{' || c === '[') depth++;
+    else if (c === '}' || c === ']') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1; // unclosed
+}
+
 export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
-  const maxRetries = opts.maxRetries ?? 1; // 2→1: avoid Vercel 60s timeout
+  const maxRetries = opts.maxRetries ?? 2;
   let lastError: unknown = null;
   const totalStart = Date.now();
 
@@ -73,31 +256,24 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
   const baseUrl = opts.provider.baseUrl.replace(/\/+$/, '');
   const endpoint = `${baseUrl}/chat/completions`;
 
-  // Headers
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-  // Build messages array from system + messages
   const chatMessages: Array<{ role: string; content: string }> = [
     { role: 'system', content: opts.system },
     ...opts.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  // Log request details
   const requestBody = {
     model: opts.provider.model,
     messages: chatMessages,
-    max_tokens: 16384, // 32768→16384: faster response, sufficient for shorts/tutorials
+    max_tokens: 32768,
     temperature: 0.7,
-    stream: true, // We want streaming for realtime feedback
+    stream: true,
   };
   const requestJson = JSON.stringify(requestBody);
   console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
-    endpoint,
-    opts.provider.model,
-    requestJson.length,
-    chatMessages.length,
-    opts.system.length
+    endpoint, opts.provider.model, requestJson.length, chatMessages.length, opts.system.length
   );
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -109,13 +285,11 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
         method: 'POST',
         headers,
         body: requestJson,
-        signal: AbortSignal.timeout(600_000), // 600s timeout for streaming
+        signal: AbortSignal.timeout(600_000),
       });
 
       const attemptDuration = Date.now() - attemptStart;
-      console.log('[llm] Response headers received: status=%d duration=%dms',
-        res.status, attemptDuration
-      );
+      console.log('[llm] Response headers received: status=%d duration=%dms', res.status, attemptDuration);
 
       if (!res.ok) {
         const responseText = await res.text();
@@ -125,7 +299,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
 
       let content = '';
       const contentType = res.headers.get('content-type') || '';
-      
+
       if (contentType.includes('event-stream') && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -135,7 +309,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
-          buffer = lines.pop() ?? ''; // keep the last incomplete line
+          buffer = lines.pop() ?? '';
           for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed.startsWith('data: ')) {
@@ -148,14 +322,14 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
                   content += deltaContent;
                   opts.onStreamChunk?.(deltaContent);
                 }
-              } catch (e) {
-                // ignore parse error for partial data
+              } catch {
+                // ignore partial SSE data parse errors
               }
             }
           }
         }
       } else {
-        // Fallback if provider ignores stream: true
+        // Fallback: non-streaming response
         const responseText = await res.text();
         let parsed: Record<string, unknown>;
         try {
@@ -175,60 +349,32 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
       }
       console.log('[llm] Content received: length=%d', content.length);
 
-      // Multi-strategy JSON extraction:
-      // 1. Strip  antml tags / thinking blocks (model reasoning mode)
-      let cleaned = content;
-      cleaned = cleaned.replace(/<antml:[^>]*>[\s\S]*?<\/antml:[^>]*>/g, '');
-      cleaned = cleaned.replace(/<antml:thinking>[\s\S]*?<\/antml:thinking>/g, '');
-      cleaned = cleaned.replace(/<antml:[^>]*\/>/g, '');
-      cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/g, '');
-      cleaned = cleaned.trim();
+      // === Multi-strategy JSON extraction ===
+      const jsonStr = extractJsonFromContent(content);
+      console.log('[llm] Best JSON candidate: length=%d', jsonStr.length);
 
-      // 2. Cari JSON code block
-      let jsonStr = cleaned;
-      const jsonMatches = [...jsonStr.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)];
-      if (jsonMatches.length > 0) {
-        jsonStr = jsonMatches[jsonMatches.length - 1][1].trim();
-        console.log('[llm] Extracted JSON from code block: length=%d', jsonStr.length);
-      } else {
-        // 3. Cari raw JSON object/array (first { atau [ sampai akhir)
-        const firstBrace = cleaned.search(/[\[{]/);
-        if (firstBrace >= 0) {
-          // Cari closing brace/bracket yang match
-          let depth = 0;
-          let inString = false;
-          let escape = false;
-          let endIdx = -1;
-          for (let i = firstBrace; i < cleaned.length; i++) {
-            const c = cleaned[i];
-            if (escape) { escape = false; continue; }
-            if (c === '\\') { escape = true; continue; }
-            if (c === '"' && !escape) { inString = !inString; continue; }
-            if (inString) continue;
-            if (c === '{' || c === '[') depth++;
-            else if (c === '}' || c === ']') {
-              depth--;
-              if (depth === 0) { endIdx = i; break; }
-            }
-          }
-          if (endIdx > 0) {
-            jsonStr = cleaned.slice(firstBrace, endIdx + 1);
-            console.log('[llm] Extracted raw JSON: length=%d', jsonStr.length);
-          }
-        }
-      }
-
+      // Try parsing — with auto-repair fallback
       let parsedJson: unknown;
       try {
         parsedJson = JSON.parse(jsonStr);
-      } catch (parseErr) {
-        console.error('[llm] JSON parse gagal:');
-        console.error('[llm]   cleaned preview: %s', cleaned.slice(0, 500).replace(/\n/g, '\\n'));
-        console.error('[llm]   jsonStr preview: %s', jsonStr.slice(0, 500).replace(/\n/g, '\\n'));
-        throw new Error(`Response bukan JSON valid: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+        console.log('[llm] JSON parse OK (first try)');
+      } catch (firstParseErr) {
+        console.warn('[llm] JSON parse failed, attempting auto-repair...');
+        console.warn('[llm]   Error: %s', firstParseErr instanceof Error ? firstParseErr.message : String(firstParseErr));
+        try {
+          const repaired = repairTruncatedJson(jsonStr);
+          console.log('[llm] Repaired JSON length: %d (original: %d)', repaired.length, jsonStr.length);
+          parsedJson = JSON.parse(repaired);
+          console.log('[llm] JSON parse OK after repair');
+        } catch (repairErr) {
+          console.error('[llm] JSON repair also failed:');
+          console.error('[llm]   jsonStr preview (first 500): %s', jsonStr.slice(0, 500).replace(/\n/g, '\\n'));
+          console.error('[llm]   jsonStr preview (last 200): %s', jsonStr.slice(-200).replace(/\n/g, '\\n'));
+          throw new Error(`Response bukan JSON valid: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`);
+        }
       }
 
-      // Validate with Zod - catch and format errors
+      // Validate with Zod
       try {
         const validated = PromptPackageSchema.parse(parsedJson);
         const totalDuration = Date.now() - totalStart;
@@ -273,7 +419,6 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
   console.error('[llm]   Final category: %s', finalCategorized.category);
   console.error('[llm]   Final error: %s', finalCategorized.message);
 
-  // Enhance error message with category
   const enhancedMessage = `[${finalCategorized.category}] ${finalCategorized.message}`;
   throw new Error(enhancedMessage);
 }
