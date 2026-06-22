@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { CreateProjectInputSchema, type PromptPackage } from '@/lib/validation/schemas';
@@ -19,6 +20,13 @@ import { LogViewer, type LogEntry } from './log-viewer';
 
 const FormSchema = CreateProjectInputSchema;
 type FormValues = z.infer<typeof FormSchema>;
+
+const STORY_SUGGESTIONS = [
+  "Bisu: Tokoh tidak berbicara, tambahkan 'mouth closed, not speaking' di setiap Image Prompt.",
+  "Sinematik: Gunakan angle kamera dinamis (Dutch angle/low angle) dengan lighting dramatis.",
+  "Balita: Target penonton balita (2-5 thn), palet warna cerah pastel, pacing lambat, aman.",
+  "Fantasi Gelap: Dark fantasy, palet warna gelap (navy/ungu), high-contrast lighting."
+];
 
 const STAGE_LABELS: Record<string, string> = {
   starting: 'Mulai generate...',
@@ -273,6 +281,23 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
               value={storyDescription}
               onChange={(e) => setStoryDescription(e.target.value)}
             />
+            <div className="flex flex-wrap gap-2 mt-1">
+              {STORY_SUGGESTIONS.map((sug, i) => (
+                <Badge
+                  key={i}
+                  variant="outline"
+                  className="cursor-pointer font-normal hover:bg-secondary text-[10px]"
+                  onClick={() => {
+                    setStoryDescription((prev) => {
+                      const newText = prev ? prev + '\n' + sug : sug;
+                      return newText.slice(0, 500);
+                    });
+                  }}
+                >
+                  + {sug.split(':')[0]}
+                </Badge>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground text-right">{storyDescription.length}/500</p>
           </div>
 

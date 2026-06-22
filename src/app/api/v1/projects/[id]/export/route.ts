@@ -19,21 +19,26 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!row) return errorResponse('NOT_FOUND', 404);
   if (!row.resultJson) return errorResponse('CONFLICT', 409, 'Project belum di-generate');
   let pkg;
+  let rawJsonObj;
   try {
-    pkg = PromptPackageSchema.parse(JSON.parse(row.resultJson));
+    rawJsonObj = JSON.parse(row.resultJson);
+    pkg = PromptPackageSchema.parse(rawJsonObj);
   } catch {
     return errorResponse('INTERNAL', 500, 'result_json tidak valid');
   }
   const filename = `${row.title.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 80) || 'project'}`;
   if (format === 'json') {
-    return new Response(JSON.stringify(pkg, null, 2), {
+    if (row.storyDescription) {
+      rawJsonObj._storyDescription = row.storyDescription;
+    }
+    return new Response(JSON.stringify(rawJsonObj, null, 2), {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}.json"`,
       },
     });
   }
-  const md = renderMarkdown(pkg);
+  const md = renderMarkdown(pkg, row.storyDescription);
   return new Response(md, {
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',

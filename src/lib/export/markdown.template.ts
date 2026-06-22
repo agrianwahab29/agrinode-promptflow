@@ -1,10 +1,15 @@
 import 'server-only';
 import type { PromptPackage } from '@/lib/validation/schemas';
 
-export function renderMarkdown(pkg: PromptPackage): string {
+export function renderMarkdown(pkg: PromptPackage, storyDesc?: string | null): string {
   const lines: string[] = [];
   lines.push(`# ${pkg.title}`);
   lines.push('');
+  if (storyDesc) {
+    lines.push(`**Deskripsi Cerita (Konteks):**`);
+    lines.push(`> ${storyDesc}`);
+    lines.push('');
+  }
   lines.push(`> **Durasi:** ${pkg.duration_target.type} (${pkg.duration_target.seconds}s)`);
   lines.push(`> **Style:** ${pkg.style.type}, rasio ${pkg.style.aspect_ratio}`);
   lines.push('');
@@ -83,11 +88,36 @@ export function renderMarkdown(pkg: PromptPackage): string {
   }
   lines.push('');
 
-  // V3: Audio Specifications (from scene-level hints or empty)
+  // V3: Audio Specifications
   lines.push('## Audio Specifications');
   lines.push('');
-  lines.push('_Audio specifications are managed via the audio panel UI._');
-  lines.push('');
+  let hasAudio = false;
+  for (const s of pkg.scenes) {
+    if (s.audio_specs && s.audio_specs.length > 0) {
+      hasAudio = true;
+      lines.push(`### Scene ${s.order}`);
+      for (const a of s.audio_specs) {
+        lines.push(`- **Type:** ${a.audio_type}`);
+        lines.push(`  - **Description:** ${a.description}`);
+        lines.push(`  - **Timing:** ${a.timing}`);
+        if (a.duration_seconds != null) lines.push(`  - **Duration:** ${a.duration_seconds}s`);
+        lines.push(`  - **Volume:** ${a.volume}`);
+        if (a.fade_in_ms) lines.push(`  - **Fade In:** ${a.fade_in_ms}ms`);
+        if (a.fade_out_ms) lines.push(`  - **Fade Out:** ${a.fade_out_ms}ms`);
+        if (a.music_genre) lines.push(`  - **Genre:** ${a.music_genre}`);
+        if (a.music_mood) lines.push(`  - **Mood:** ${a.music_mood}`);
+        if (a.music_tempo_bpm) lines.push(`  - **Tempo:** ${a.music_tempo_bpm} BPM`);
+        if (a.music_instruments) lines.push(`  - **Instruments:** ${a.music_instruments}`);
+        if (a.ambient_type) lines.push(`  - **Ambient Type:** ${a.ambient_type}`);
+        if (a.sfx_list) lines.push(`  - **SFX List:** ${a.sfx_list}`);
+      }
+      lines.push('');
+    }
+  }
+  if (!hasAudio) {
+    lines.push('_Tidak ada audio specifications._');
+    lines.push('');
+  }
 
   // V3: Image Prompt Layers
   lines.push('## Image Prompt Layers');
@@ -101,6 +131,12 @@ export function renderMarkdown(pkg: PromptPackage): string {
       if (p.camera) layers.push(`Camera: ${p.camera}`);
       if (p.mood_atmosphere) layers.push(`Mood: ${p.mood_atmosphere}`);
       if (p.style_references) layers.push(`Style: ${p.style_references}`);
+      if (p.color_palette) {
+        const cp = Array.isArray(p.color_palette) ? JSON.stringify(p.color_palette) : p.color_palette;
+        layers.push(`Color Palette: ${cp}`);
+      }
+      if (p.technical) layers.push(`Technical: ${p.technical}`);
+
       if (layers.length > 0) {
         lines.push(`- **Scene ${s.order} — ${p.target}:**`);
         for (const l of layers) {
