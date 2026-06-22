@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { PromptPackageSchema, type PromptPackage } from '@/lib/validation/schemas';
 import { decryptFromString } from '@/lib/crypto/aes';
 import type { ProviderConfigInput } from './provider-registry';
@@ -10,17 +11,66 @@ export interface GenerateOptions {
   maxRetries?: number;
 }
 
+/**
+ * Categorize error for better debugging
+ */
+function categorizeError(err: unknown, context?: string): { category: string; message: string; details?: Record<string, unknown> } {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : 'UnknownError';
+
+  // Network/Timeout errors
+  if (name === 'AbortError' || msg.includes('timeout') || msg.includes('Timeout')) {
+    return { category: 'TIMEOUT', message: 'LLM request timeout (240s limit)', details: { context } };
+  }
+  if (msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND') || msg.includes('fetch failed')) {
+    return { category: 'NETWORK', message: 'Cannot connect to LLM provider', details: { context, error: msg } };
+  }
+
+  // Zod validation errors
+  if (name === 'ZodError' || (err as { issues?: unknown })?.issues) {
+    const zodErr = err as z.ZodError;
+    const issueSummary = zodErr.issues?.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+    return {
+      category: 'VALIDATION',
+      message: 'LLM response does not match expected schema',
+      details: { issueCount: zodErr.issues?.length ?? 0, issues: issueSummary },
+    };
+  }
+
+  // HTTP errors
+  if (msg.startsWith('Provider HTTP')) {
+    return { category: 'HTTP', message: msg, details: { context } };
+  }
+
+  // JSON parse errors
+  if (msg.includes('JSON') || msg.includes('parse')) {
+    return { category: 'JSON_PARSE', message: 'Failed to parse LLM response as JSON', details: { context, error: msg } };
+  }
+
+  return { category: 'UNKNOWN', message: msg, details: { context, errorName: name } };
+}
+
 export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
   const maxRetries = opts.maxRetries ?? 2;
   let lastError: unknown = null;
+  const totalStart = Date.now();
 
   // Decrypt API key
   let apiKey = '';
   if (opts.provider.apiKeyEncrypted) {
-    try { apiKey = decryptFromString(opts.provider.apiKeyEncrypted); } catch { apiKey = ''; }
+    try {
+      apiKey = decryptFromString(opts.provider.apiKeyEncrypted);
+      console.log('[llm] API key decrypted successfully (length=%d)', apiKey.length);
+    } catch (decryptErr) {
+      console.error('[llm] API key decryption FAILED:', decryptErr instanceof Error ? decryptErr.message : String(decryptErr));
+      apiKey = '';
+    }
+  } else {
+    console.warn('[llm] No API key provided (apiKeyEncrypted is empty)');
   }
 
   const baseUrl = opts.provider.baseUrl.replace(/\/+$/, '');
+  const endpoint = `${baseUrl}/chat/completions`;
 
   // Headers
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -32,45 +82,68 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
     ...opts.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  // Log request details
+  const requestBody = {
+    model: opts.provider.model,
+    messages: chatMessages,
+    max_tokens: 32768,
+    temperature: 0.7,
+    stream: false,
+  };
+  const requestJson = JSON.stringify(requestBody);
+  console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
+    endpoint,
+    opts.provider.model,
+    requestJson.length,
+    chatMessages.length,
+    opts.system.length
+  );
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const attemptStart = Date.now();
+    console.log('[llm] Attempt %d/%d starting...', attempt, maxRetries);
+
     try {
-      console.log('[llm] Attempt %d/%d model=%s max_tokens=%d baseUrl=%s', attempt, maxRetries, opts.provider.model, 32768, baseUrl);
-      const res = await fetch(`${baseUrl}/chat/completions`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: opts.provider.model,
-          messages: chatMessages,
-          max_tokens: 32768,
-          temperature: 0.7,
-          stream: false,
-        }),
+        body: requestJson,
         signal: AbortSignal.timeout(240_000),
       });
 
-      console.log('[llm] Response status=%d content-length=%s', res.status, res.headers.get('content-length'));
+      const attemptDuration = Date.now() - attemptStart;
+      const contentLength = res.headers.get('content-length');
+      console.log('[llm] Response received: status=%d contentLength=%s duration=%dms',
+        res.status, contentLength ?? 'unknown', attemptDuration
+      );
+
       const responseText = await res.text();
+      console.log('[llm] Response body length: %d bytes', responseText.length);
 
       if (!res.ok) {
-        console.error('[llm] HTTP error %d body=%s', res.status, responseText.slice(0, 500));
+        console.error('[llm] HTTP error %d: %s', res.status, responseText.slice(0, 500));
         throw new Error(`Provider HTTP ${res.status}: ${responseText.slice(0, 500)}`);
       }
 
       let parsed: Record<string, unknown>;
       try {
         parsed = JSON.parse(responseText);
-      } catch {
-        console.error('[llm] Invalid JSON body=%s', responseText.slice(0, 500));
-        throw new Error(`Provider response bukan JSON valid: ${responseText.slice(0, 500)}`);
+      } catch (parseErr) {
+        console.error('[llm] JSON parse failed. Body preview: %s', responseText.slice(0, 500));
+        throw new Error(`Provider response bukan JSON valid: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
       }
 
       const choices = parsed?.choices as Array<{ message?: { content?: string } }> | undefined;
       const content = choices?.[0]?.message?.content;
       if (!content) {
-        console.error('[llm] Empty content, keys=%s', Object.keys(parsed ?? {}));
+        const keys = Object.keys(parsed ?? {});
+        console.error('[llm] Empty content. Response keys: %s', keys.join(', '));
         throw new Error('Provider response kosong / format tidak dikenal');
       }
-      console.log('[llm] Content length=%d preview=%s', content.length, content.slice(0, 200).replace(/\n/g, '\\n'));
+      console.log('[llm] Content received: length=%d preview=%s',
+        content.length,
+        content.slice(0, 200).replace(/\n/g, '\\n')
+      );
 
       // Multi-strategy JSON extraction:
       // 1. Strip  antml tags / thinking blocks (model reasoning mode)
@@ -85,6 +158,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
       const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (jsonMatch?.[1]) {
         jsonStr = jsonMatch[1].trim();
+        console.log('[llm] Extracted JSON from code block: length=%d', jsonStr.length);
       } else {
         // 3. Cari raw JSON object/array (first { atau [ sampai akhir)
         const firstBrace = cleaned.search(/[\[{]/);
@@ -108,6 +182,7 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
           }
           if (endIdx > 0) {
             jsonStr = cleaned.slice(firstBrace, endIdx + 1);
+            console.log('[llm] Extracted raw JSON: length=%d', jsonStr.length);
           }
         }
       }
@@ -115,25 +190,59 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
       let parsedJson: unknown;
       try {
         parsedJson = JSON.parse(jsonStr);
-      } catch (e) {
-        console.error('[llm] JSON parse gagal. cleaned=%s', cleaned.slice(0, 500).replace(/\n/g, '\\n'));
-        console.error('[llm] jsonStr=%s', jsonStr.slice(0, 500).replace(/\n/g, '\\n'));
-        throw new Error(`Response bukan JSON valid: ${e instanceof Error ? e.message : String(e)}`);
+      } catch (parseErr) {
+        console.error('[llm] JSON parse gagal:');
+        console.error('[llm]   cleaned preview: %s', cleaned.slice(0, 500).replace(/\n/g, '\\n'));
+        console.error('[llm]   jsonStr preview: %s', jsonStr.slice(0, 500).replace(/\n/g, '\\n'));
+        throw new Error(`Response bukan JSON valid: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
       }
-      const validated = PromptPackageSchema.parse(parsedJson);
-      console.log('[llm] Validasi sukses: %d scenes, %d chars, %d img_prompts', validated.scenes.length, validated.character_profiles.length, validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length);
-      return validated;
+
+      // Validate with Zod - catch and format errors
+      try {
+        const validated = PromptPackageSchema.parse(parsedJson);
+        const totalDuration = Date.now() - totalStart;
+        console.log('[llm] Validation SUCCESS: scenes=%d chars=%d img_prompts=%d totalDuration=%dms',
+          validated.scenes.length,
+          validated.character_profiles.length,
+          validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length,
+          totalDuration
+        );
+        return validated;
+      } catch (validationErr) {
+        const categorized = categorizeError(validationErr, 'Zod validation');
+        console.error('[llm] VALIDATION ERROR [%s]: %s', categorized.category, categorized.message);
+        if (categorized.details) {
+          console.error('[llm] Validation details: %j', categorized.details);
+        }
+        throw validationErr;
+      }
     } catch (err) {
       lastError = err;
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[llm] Attempt %d GAGAL: %s', attempt, errMsg);
+      const attemptDuration = Date.now() - attemptStart;
+      const categorized = categorizeError(err, `Attempt ${attempt}`);
+
+      console.error('[llm] Attempt %d FAILED after %dms:', attempt, attemptDuration);
+      console.error('[llm]   Category: %s', categorized.category);
+      console.error('[llm]   Message: %s', categorized.message);
+      if (categorized.details) {
+        console.error('[llm]   Details: %j', categorized.details);
+      }
+
       if (attempt < maxRetries) {
         const backoff = Math.min(2000 * 2 ** (attempt - 1), 8000);
-        console.log('[llm] Retry dalam %dms...', backoff);
+        console.log('[llm] Retrying in %dms (attempt %d/%d)...', backoff, attempt + 1, maxRetries);
         await new Promise((r) => setTimeout(r, backoff));
       }
     }
   }
-  console.error('[llm] SEMUA %d attempt gagal. Last error: %s', maxRetries, lastError instanceof Error ? lastError.message : String(lastError));
-  throw lastError ?? new Error('Generation failed');
+
+  const totalDuration = Date.now() - totalStart;
+  const finalCategorized = categorizeError(lastError, 'All attempts failed');
+  console.error('[llm] ALL %d ATTEMPTS FAILED after %dms', maxRetries, totalDuration);
+  console.error('[llm]   Final category: %s', finalCategorized.category);
+  console.error('[llm]   Final error: %s', finalCategorized.message);
+
+  // Enhance error message with category
+  const enhancedMessage = `[${finalCategorized.category}] ${finalCategorized.message}`;
+  throw new Error(enhancedMessage);
 }
