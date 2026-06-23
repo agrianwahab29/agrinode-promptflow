@@ -8,7 +8,7 @@ import { generateAllStoryboardSegments } from '@/lib/ai/storyboard-engine';
 import { PromptPackageSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
-export const maxDuration = 600; // long-running for multiple segments
+export const maxDuration = 300; // Vercel Hobby plan max; generate long stories in chunks
 export const dynamic = 'force-dynamic';
 
 interface SseEvent {
