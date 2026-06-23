@@ -207,6 +207,53 @@ export type CreateProviderConfigInput = z.infer<typeof CreateProviderConfigInput
 export type UpdateProviderConfigInput = z.infer<typeof UpdateProviderConfigInputSchema>;
 export type GenerateInput = z.infer<typeof GenerateInputSchema>;
 
+// ===== Storyboard schemas (F-SB-01) =====
+export const StoryboardPanelSchema = z.object({
+  index: z.number().int().min(1),
+  time: z.string().min(1),
+  sceneCode: z.string().min(1),
+  title: z.string().min(1),
+  imagePrompt: z.string().min(1),
+  actionVisual: z.string().min(1),
+  cameraMovement: z.string().min(1),
+  dialogueVo: z.string(),
+  transition: z.string().min(1),
+  charactersPresent: z.array(z.string()),
+  location: z.string().min(1),
+  negativePrompt: z.string().optional(),
+  audioNotes: z.string().optional(),
+});
+
+export const StoryboardSegmentSchema = z.object({
+  segmentIndex: z.number().int().min(1),
+  segmentTimeStart: z.number().int().min(0),
+  segmentTimeEnd: z.number().int().min(1),
+  durationSeconds: z.number().int().min(1),
+  panelCount: z.number().int().min(1),
+  visualStyle: z.object({
+    aspectRatio: z.string().min(1),
+    artDirection: z.string().min(1),
+    colorPalette: z.string().min(1),
+    cinematography: z.string().min(1),
+  }),
+  characterSheet: z.array(z.object({
+    name: z.string().min(1),
+    visualDescription: z.string().min(1),
+    referenceImagePrompt: z.string().optional(),
+  })),
+  locationSheet: z.array(z.object({
+    name: z.string().min(1),
+    visualDescription: z.string().min(1),
+    referenceImagePrompt: z.string().optional(),
+  })),
+  panels: z.array(StoryboardPanelSchema).min(1),
+  segmentTransitionNote: z.string().min(1),
+  compiledMarkdownPrompt: z.string().min(1),
+});
+
+export type StoryboardPanel = z.infer<typeof StoryboardPanelSchema>;
+export type StoryboardSegment = z.infer<typeof StoryboardSegmentSchema>;
+
 // ===== DTO Types =====
 export type ProjectDTO = {
   id: number;

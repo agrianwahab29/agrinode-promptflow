@@ -7,6 +7,7 @@ import {
   AssetRoleEnum,
   ClassificationResultSchema,
   SseLogEntrySchema,
+  StoryboardSegmentSchema,
 } from './schemas';
 
 describe('TitleSchema', () => {
@@ -268,4 +269,41 @@ describe('V2: GenerateReferenceSchema 6-tipe', () => {
     });
     expect(r.success).toBe(false);
   });
+});
+
+const minimalSegment = {
+  segmentIndex: 1,
+  segmentTimeStart: 0,
+  segmentTimeEnd: 10,
+  durationSeconds: 10,
+  panelCount: 8,
+  visualStyle: {
+    aspectRatio: '16:9',
+    artDirection: '3D animation semi-realistic',
+    colorPalette: 'warm golden hour',
+    cinematography: 'wide shots with slow push-ins',
+  },
+  characterSheet: [{ name: 'Adrian', visualDescription: 'young man, white shirt, black trousers' }],
+  locationSheet: [{ name: 'Office Lobby', visualDescription: 'modern marble lobby, golden sunset light' }],
+  panels: [
+    {
+      index: 1,
+      time: '0:00 - 0:01.25',
+      sceneCode: 'INT. LOBBY - DAY',
+      title: 'Lobby Pertama',
+      imagePrompt: 'low angle shot of Adrian walking into luxury office lobby...',
+      actionVisual: 'Adrian walks confidently into the lobby',
+      cameraMovement: 'LOW ANGLE - slow push in',
+      dialogueVo: 'Setiap mimpi dimulai dari sebuah keinginan kecil.',
+      transition: 'FADE IN',
+      charactersPresent: ['Adrian'],
+      location: 'Office Lobby',
+    },
+  ],
+  segmentTransitionNote: 'FADE OUT to segment 2',
+  compiledMarkdownPrompt: '# Storyboard Segment 1...',
+};
+
+it('validates a minimal storyboard segment', () => {
+  expect(StoryboardSegmentSchema.safeParse(minimalSegment).success).toBe(true);
 });
