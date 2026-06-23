@@ -109,7 +109,7 @@ export function renderMarkdown(pkg: PromptPackage, storyDesc?: string | null): s
         if (a.music_tempo_bpm) lines.push(`  - **Tempo:** ${a.music_tempo_bpm} BPM`);
         if (a.music_instruments) lines.push(`  - **Instruments:** ${a.music_instruments}`);
         if (a.ambient_type) lines.push(`  - **Ambient Type:** ${a.ambient_type}`);
-        if (a.sfx_list) lines.push(`  - **SFX List:** ${a.sfx_list}`);
+        if (a.sfx_list) lines.push(`  - **SFX List:** ${Array.isArray(a.sfx_list) ? a.sfx_list.join(', ') : a.sfx_list}`);
       }
       lines.push('');
     }

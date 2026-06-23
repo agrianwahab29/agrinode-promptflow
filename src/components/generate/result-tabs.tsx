@@ -17,9 +17,11 @@ type Warning = { code: string; message: string; target?: string; scene?: number 
 export function ResultTabs({
   result,
   warnings,
+  partialSceneIds = [],
 }: {
   result: PromptPackage;
   warnings: Warning[];
+  partialSceneIds?: number[];
 }) {
   const t = useTranslations('generate');
   const tVoice = useTranslations('voice');
@@ -43,6 +45,13 @@ export function ResultTabs({
               <li key={i}>{w.message}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {partialSceneIds.length > 0 && (
+        <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <strong className="font-medium">Partial Generation</strong>
+          <p className="mt-1">Scene {partialSceneIds.join(', ')} gagal persist — regenerate perlu.</p>
         </div>
       )}
 

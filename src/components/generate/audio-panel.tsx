@@ -24,7 +24,7 @@ interface AudioEntry {
   music_mood?: string | null;
   music_tempo_bpm?: number | null;
   music_instruments?: string | null;
-  sfx_list?: string | null;
+  sfx_list?: string | string[] | null;
   ambient_type?: string | null;
   ambient_volume?: number;
 }

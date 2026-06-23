@@ -46,6 +46,7 @@
     "drizzle-kit": "^0.30.0",
     "drizzle-orm": "^0.38.0",
     "framer-motion": "^12.40.0",
+    "jsonrepair": "^3.14.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
     "next-auth": "5.0.0-beta.25",

@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
 export interface LogEntry {

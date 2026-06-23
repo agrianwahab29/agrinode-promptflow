@@ -11,7 +11,7 @@ import { bulkCreateSupportingCharacters, deleteSupportingCharactersByProject } f
 import { createGenerationLog } from '@/lib/db/repositories/generation-log.repo';
 import { attachOrphanedRefs } from '@/lib/db/repositories/asset-reference.repo';
 import { createSceneAudio } from '@/lib/db/repositories/scene-audio.repository';
-import { generatePromptPackage } from '@/lib/ai/llm-client';
+import { generatePromptPackage, categorizeError } from '@/lib/ai/llm-client';
 import { buildSystemPrompt, buildUserMessage } from '@/lib/ai/prompt-builder';
 import { checkConsistency } from '@/lib/ai/consistency-checker';
 import { createLogBuffer, type LogBuffer } from '@/lib/ai/log-buffer';
@@ -225,7 +225,8 @@ export async function POST(req: NextRequest) {
               messages: [{ role: 'user', content: userMessage }],
               onStreamChunk: (chunk) => {
                 send({ event: 'stream_chunk', data: { chunk } });
-              }
+              },
+              onLog: (level, message) => emitLog(level, message),
             });
           } finally {
             clearInterval(heartbeatId);
@@ -264,6 +265,19 @@ export async function POST(req: NextRequest) {
         }
 
         emitLog('info', `LLM response diterima. ${pkg.character_profiles?.length ?? 0} karakter, ${pkg.scenes?.length ?? 0} scene.`);
+
+        // V3: Safety sanitizer — strip age-explicit phrases sebelum validation & save
+        // Mencegah downstream video/image generator menolak prompt karena filter CSAM
+        try {
+          const { sanitizePromptPackage } = await import('@/lib/ai/safety-sanitizer');
+          const sanitizeReport = sanitizePromptPackage(pkg as unknown as import('@/lib/validation/schemas').PromptPackage);
+          if (sanitizeReport.modified) {
+            emitLog('warn', `Safety sanitizer: ${sanitizeReport.changes.length} field diubah (menghapus frasa usia eksplisit).`);
+            console.log('[generate] Safety sanitizer changes:', sanitizeReport.changes);
+          }
+        } catch (sanitizeErr) {
+          console.error('[generate] Safety sanitizer failed (non-fatal):', sanitizeErr instanceof Error ? sanitizeErr.message : String(sanitizeErr));
+        }
 
         let validated;
         try {
@@ -312,10 +326,12 @@ export async function POST(req: NextRequest) {
         advance('saving', {}, 'Menyimpan hasil ke database...');
         emitLog('info', 'Menyimpan hasil ke database...');
 
+        // Note: Project status will be updated to 'partial' at the end if there are failures
         await safeDbOp(
           () => updateProjectResult(finalProjectId, userId, JSON.stringify(validated), 'complete'),
           'updateProjectResult', logBuffer, emitLog,
         );
+        const partialSceneIds: number[] = [];
         await safeDbOp(() => deleteImagePromptsByProject(finalProjectId), 'deleteImagePrompts', logBuffer, emitLog);
         await safeDbOp(() => deleteSupportingCharactersByProject(finalProjectId), 'deleteSupportingChars', logBuffer, emitLog);
         await safeDbOp(() => deleteScenesByProject(finalProjectId), 'deleteScenes', logBuffer, emitLog);
@@ -365,6 +381,7 @@ export async function POST(req: NextRequest) {
 
           if (!savedScenes) {
             emitLog('error', 'Gagal menyimpan scenes - skipping scene-level saves');
+            validated.scenes.forEach(s => { if (!partialSceneIds.includes(s.order)) partialSceneIds.push(s.order); });
           } else {
             if (savedScenes.length !== validated.scenes.length) {
               emitLog('warn', `Scene count mismatch: expected ${validated.scenes.length}, saved ${savedScenes.length}`);
@@ -394,13 +411,14 @@ export async function POST(req: NextRequest) {
                     musicTempoBpm: audio.music_tempo_bpm ?? null,
                     musicInstruments: audio.music_instruments ?? null,
                     musicVolume: audio.music_volume ?? null,
-                    sfxList: audio.sfx_list ?? null,
+                    sfxList: Array.isArray(audio.sfx_list) ? audio.sfx_list.join(', ') : (audio.sfx_list ?? null),
                     ambientType: audio.ambient_type ?? null,
                     ambientVolume: audio.ambient_volume ?? null,
                   });
                   audioCount++;
                 } catch (audioErr) {
                   audioErrors++;
+                  if (!partialSceneIds.includes(sceneData.order)) partialSceneIds.push(sceneData.order);
                   console.error('[generate] Audio save failed scene=%d: %s', si, audioErr instanceof Error ? audioErr.message : String(audioErr));
                 }
               }
@@ -449,13 +467,17 @@ export async function POST(req: NextRequest) {
               }
             }
             if (allSceneImagePrompts.length > 0) {
-              await safeDbOp(
+              const res = await safeDbOp(
                 () => bulkCreateImagePrompts(allSceneImagePrompts)
                   .then(() => {
                     emitLog('info', `Menyimpan ${allSceneImagePrompts.length} prompt gambar scene (dengan sceneId)...`);
+                    return true;
                   }),
                 'bulkCreateSceneImagePrompts', logBuffer, emitLog,
               );
+              if (!res) {
+                validated.scenes.forEach(s => { if (!partialSceneIds.includes(s.order)) partialSceneIds.push(s.order); });
+              }
             }
           }
         }
@@ -495,37 +517,47 @@ export async function POST(req: NextRequest) {
 
         const warnings = checkConsistency(validated);
         const durationMs = Date.now() - start;
-        emitLog('info', `Generate selesai dalam ${durationMs}ms. ${warnings.length} warning(s).`);
+        const isPartial = warnings.length > 0 || partialSceneIds.length > 0;
+        emitLog('info', `Generate selesai dalam ${durationMs}ms. ${warnings.length} warning(s). ${partialSceneIds.length} scene partial.`);
+
+        if (partialSceneIds.length > 0) {
+           await updateProjectResult(finalProjectId, userId, JSON.stringify(validated), 'partial').catch(() => {});
+        }
 
         // V2: persist logs to generation_logs
         const logEntries = logBuffer.drain();
+        const logsJsonData = {
+          entries: logEntries,
+          partialSceneIds: partialSceneIds.length > 0 ? partialSceneIds : undefined
+        };
         try {
           const log = await createGenerationLog({
             projectId: finalProjectId,
             provider: cfg.provider,
             model: cfg.model,
             durationMs,
-            status: warnings.length > 0 ? 'partial' : 'success',
+            status: isPartial ? 'partial' : 'success',
             errorMessage: null,
-            logsJson: JSON.stringify(logEntries),
+            logsJson: JSON.stringify(logsJsonData),
           });
           logId = log.id;
-          console.log('[generate] Generation log saved: id=%d duration=%dms status=%s', logId, durationMs, warnings.length > 0 ? 'partial' : 'success');
+          console.log('[generate] Generation log saved: id=%d duration=%dms status=%s', logId, durationMs, isPartial ? 'partial' : 'success');
         } catch (logErr) {
           console.error('[generate] Failed to save generation log:', logErr instanceof Error ? logErr.message : String(logErr));
         }
 
-        send({ event: 'done', data: { result: validated, warnings, generationLogId: logId } });
+        send({ event: 'done', data: { result: validated, warnings, generationLogId: logId, partialSceneIds: partialSceneIds.length > 0 ? partialSceneIds : undefined } });
         console.log('[generate] ===== REQUEST COMPLETE: project=%d duration=%dms =====', finalProjectId, Date.now() - requestStart);
       } catch (e) {
         const durationMs = Date.now() - start;
-        const errMsg = e instanceof Error ? e.message : String(e);
+        const categorized = categorizeError(e, 'generate.route.catch');
+        const fullErrMsg = `[${categorized.category}] ${categorized.message}`;
         const errStack = e instanceof Error ? e.stack : 'no stack';
         console.error('[generate] ===== UNHANDLED ERROR =====');
         console.error('[generate]   project=%d duration=%dms', finalProjectId, durationMs);
-        console.error('[generate]   error: %s', errMsg);
+        console.error('[generate]   error: %s', fullErrMsg);
         console.error('[generate]   stack: %s', errStack);
-        emitLog('error', `Generate gagal: ${errMsg}`);
+        emitLog('error', `Generate gagal: ${fullErrMsg}`);
 
         // Mark project as failed (not stuck in 'draft')
         try {
@@ -541,11 +573,11 @@ export async function POST(req: NextRequest) {
             model: cfg.model,
             durationMs,
             status: 'fail',
-            errorMessage: errMsg.slice(0, 500),
-            logsJson: JSON.stringify(logEntries),
+            errorMessage: fullErrMsg.slice(0, 500),
+            logsJson: JSON.stringify({ entries: logEntries }),
           });
         } catch { /* ignore */ }
-        send({ event: 'error', data: { code: 'PROVIDER_ERROR', message: errMsg } });
+        send({ event: 'error', data: { code: categorized.category, message: fullErrMsg } });
       } finally {
         controller.close();
         console.log('[generate] SSE stream closed. Total request time: %dms', Date.now() - requestStart);

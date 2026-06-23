@@ -1,7 +1,9 @@
 import 'server-only';
 import { z } from 'zod';
+import { jsonrepair } from 'jsonrepair';
 import { PromptPackageSchema, type PromptPackage } from '@/lib/validation/schemas';
 import { decryptFromString } from '@/lib/crypto/aes';
+import { normalizePromptPackage } from './response-normalizer';
 import type { ProviderConfigInput } from './provider-registry';
 
 export interface GenerateOptions {
@@ -10,12 +12,13 @@ export interface GenerateOptions {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   maxRetries?: number;
   onStreamChunk?: (chunk: string) => void;
+  onLog?: (level: 'info' | 'warn' | 'error', message: string) => void;
 }
 
 /**
  * Categorize error for better debugging
  */
-function categorizeError(err: unknown, context?: string): { category: string; message: string; details?: Record<string, unknown> } {
+export function categorizeError(err: unknown, context?: string): { category: string; message: string; details?: Record<string, unknown> } {
   const msg = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : 'UnknownError';
 
@@ -59,7 +62,15 @@ function repairTruncatedJson(jsonStr: string): string {
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (escape) { escape = false; continue; }
-    if (c === '\\') { escape = true; continue; }
+    if (c === '\\') {
+      // Look ahead to check if it's the last character (broken escape at end)
+      if (i === s.length - 1) {
+        s = s.slice(0, s.length - 1); // Remove trailing backslash
+        break;
+      }
+      escape = true;
+      continue;
+    }
     if (c === '"') { inString = !inString; }
   }
   if (inString) {
@@ -97,6 +108,66 @@ function repairTruncatedJson(jsonStr: string): string {
   }
 
   return s;
+}
+
+/**
+ * Sanitize JSON string before parsing to fix raw newlines, control chars, BOM, etc.
+ */
+function sanitizeJsonString(jsonStr: string): string {
+  let s = jsonStr;
+  // Remove BOM
+  if (s.charCodeAt(0) === 0xFEFF) {
+    s = s.slice(1);
+  }
+  
+  // We do NOT slice by lastIndexOf('}') here because it would destroy truncated JSON tails!
+  // extractJsonFromContent already handles finding the best candidate bounds.
+
+  // Escape unescaped newlines/tabs inside strings
+  // A simplistic approach: replace actual \n with \\n
+  // We should do this only inside strings, but for now we'll do a global cleanup
+  // Replace control chars 0x00-0x1F (except \r\n\t which might be structural)
+  // Actually, raw newlines inside strings break JSON.parse.
+  let inString = false;
+  let escape = false;
+  let result = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) {
+      result += c;
+      escape = false;
+      continue;
+    }
+    if (c === '\\') {
+      result += c;
+      escape = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      result += c;
+      continue;
+    }
+    if (inString) {
+      if (c === '\n') {
+        result += '\\n';
+      } else if (c === '\r') {
+        // drop raw CR
+      } else if (c === '\t') {
+        result += '\\t';
+      } else {
+        const code = s.charCodeAt(i);
+        if (code < 0x20) {
+          result += '\\u' + code.toString(16).padStart(4, '0');
+        } else {
+          result += c;
+        }
+      }
+    } else {
+      result += c;
+    }
+  }
+  return result;
 }
 
 /**
@@ -235,7 +306,7 @@ function findMatchingBrace(s: string, start: number): number {
 }
 
 export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
-  const maxRetries = opts.maxRetries ?? 2;
+  const maxRetries = opts.maxRetries ?? 3;
   let lastError: unknown = null;
   const totalStart = Date.now();
 
@@ -264,22 +335,28 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
     ...opts.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const requestBody = {
-    model: opts.provider.model,
-    messages: chatMessages,
-    max_tokens: 32768,
-    temperature: 0.7,
-    stream: true,
-  };
-  const requestJson = JSON.stringify(requestBody);
-  console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
-    endpoint, opts.provider.model, requestJson.length, chatMessages.length, opts.system.length
-  );
+  let currentMessages = chatMessages;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const attemptStart = Date.now();
     console.log('[llm] Attempt %d/%d starting...', attempt, maxRetries);
 
+    const requestBody = {
+      model: opts.provider.model,
+      messages: currentMessages,
+      max_tokens: attempt === 1 ? 32768 : (attempt === 2 ? 32768 : 65536),
+      temperature: attempt === 1 ? 0.7 : (attempt === 2 ? 0.5 : 0.3 + Math.random() * 0.1),
+      stream: attempt === 1 || attempt === 2 ? true : false,
+    };
+    const requestJson = JSON.stringify(requestBody);
+    console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
+      endpoint, opts.provider.model, requestJson.length, currentMessages.length, opts.system.length
+    );
+    if (attempt > 1) {
+      opts.onLog?.('warn', `Attempt ${attempt}/${maxRetries} starting...`);
+    }
+
+    let content = '';
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -297,7 +374,6 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
         throw new Error(`Provider HTTP ${res.status}: ${responseText.slice(0, 500)}`);
       }
 
-      let content = '';
       const contentType = res.headers.get('content-type') || '';
 
       if (contentType.includes('event-stream') && res.body) {
@@ -355,24 +431,37 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
 
       // Try parsing — with auto-repair fallback
       let parsedJson: unknown;
+      let sanitizedStr = jsonStr;
       try {
-        parsedJson = JSON.parse(jsonStr);
-        console.log('[llm] JSON parse OK (first try)');
+        sanitizedStr = sanitizeJsonString(jsonStr);
+        parsedJson = JSON.parse(sanitizedStr);
+        console.log('[llm] JSON parse OK (first try after sanitize)');
       } catch (firstParseErr) {
         console.warn('[llm] JSON parse failed, attempting auto-repair...');
         console.warn('[llm]   Error: %s', firstParseErr instanceof Error ? firstParseErr.message : String(firstParseErr));
         try {
-          const repaired = repairTruncatedJson(jsonStr);
-          console.log('[llm] Repaired JSON length: %d (original: %d)', repaired.length, jsonStr.length);
+          const repaired = repairTruncatedJson(sanitizedStr);
+          console.log('[llm] Repaired JSON length: %d (original: %d)', repaired.length, sanitizedStr.length);
           parsedJson = JSON.parse(repaired);
           console.log('[llm] JSON parse OK after repair');
-        } catch (repairErr) {
-          console.error('[llm] JSON repair also failed:');
-          console.error('[llm]   jsonStr preview (first 500): %s', jsonStr.slice(0, 500).replace(/\n/g, '\\n'));
-          console.error('[llm]   jsonStr preview (last 200): %s', jsonStr.slice(-200).replace(/\n/g, '\\n'));
-          throw new Error(`Response bukan JSON valid: ${repairErr instanceof Error ? repairErr.message : String(repairErr)}`);
+        } catch {
+          // Last resort: jsonrepair library (robust terhadap truncated/missing comma/quote)
+          console.warn('[llm] Custom repair failed, trying jsonrepair library...');
+          try {
+            const libRepaired = jsonrepair(sanitizedStr);
+            parsedJson = JSON.parse(libRepaired);
+            console.log('[llm] JSON parse OK after jsonrepair (length=%d)', libRepaired.length);
+          } catch (libRepairErr) {
+            console.error('[llm] jsonrepair also failed:');
+            console.error('[llm]   jsonStr preview (first 500): %s', sanitizedStr.slice(0, 500).replace(/\n/g, '\\n'));
+            console.error('[llm]   jsonStr preview (last 200): %s', sanitizedStr.slice(-200).replace(/\n/g, '\\n'));
+            throw new Error(`Response bukan JSON valid: ${libRepairErr instanceof Error ? libRepairErr.message : String(libRepairErr)}`);
+          }
         }
       }
+
+      // Normalize raw LLM output sebelum Zod (null→default, enum unknown→fallback, sfx array→string)
+      parsedJson = normalizePromptPackage(parsedJson);
 
       // Validate with Zod
       try {
@@ -406,6 +495,20 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
       }
 
       if (attempt < maxRetries) {
+        if (categorized.category === 'VALIDATION' && err instanceof Error) {
+          const zErr = err as Error & { issues?: unknown[] };
+          const issues = zErr.issues ? JSON.stringify(zErr.issues) : err.message;
+          const correctiveMessage = `Terdapat error validasi pada JSON sebelumnya. Perbaiki field berikut sesuai schema:\n${issues}\n\nPastikan output valid JSON.`;
+          currentMessages = [
+            ...currentMessages,
+            { role: 'assistant', content: content || '...' },
+            { role: 'user', content: correctiveMessage }
+          ];
+          opts.onLog?.('warn', `[VALIDATION] Attempt ${attempt} failed. Retrying with corrective prompt...`);
+        } else {
+          opts.onLog?.('error', `[${categorized.category}] Attempt ${attempt} failed: ${categorized.message}`);
+        }
+
         const backoff = Math.min(2000 * 2 ** (attempt - 1), 8000);
         console.log('[llm] Retrying in %dms (attempt %d/%d)...', backoff, attempt + 1, maxRetries);
         await new Promise((r) => setTimeout(r, backoff));

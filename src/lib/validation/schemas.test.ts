@@ -150,7 +150,7 @@ describe('PromptPackageSchema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('rejects invalid peran enum', () => {
+  it('accepts arbitrary peran string (schema loosened in e3dc6ac)', () => {
     const r = PromptPackageSchema.safeParse({
       title: 'Test',
       duration_target: { type: 'shorts', seconds: 60 },
@@ -161,7 +161,7 @@ describe('PromptPackageSchema', () => {
       supporting_characters: [],
       moral_message: 'Hi',
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 });
 

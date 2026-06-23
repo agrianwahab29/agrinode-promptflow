@@ -11,8 +11,8 @@ export const CharacterProfileSchema = z.object({
   deskripsi_latar: z.string(),
   aksi: z.string(),
   peran: z.string(),
-  // V3: voice assignment
-  voice_type: z.enum(['child', 'teen', 'adult_male', 'adult_female', 'elderly_male', 'elderly_female', 'narrator']).optional(),
+  // V3: voice assignment — toleran terhadap nilai unknown (normalizer sudah coerce)
+  voice_type: z.enum(['child', 'teen', 'adult_male', 'adult_female', 'elderly_male', 'elderly_female', 'narrator']).catch('narrator').optional(),
   age_range: z.string().optional(),
 });
 
@@ -37,19 +37,19 @@ export const SceneImagePromptsSchema = z.object({
 
 // V3: Scene audio spec (embedded in scene, not DB table)
 export const SceneAudioSpecSchema = z.object({
-  audio_type: z.enum(['background_music', 'sfx', 'ambient', 'music_cue', 'transition_audio']),
+  audio_type: z.string().default('ambient'),
   description: z.string().min(1),
-  timing: z.enum(['start', 'throughout', 'end', 'specific_moment']).default('throughout'),
+  timing: z.string().default('throughout'),
   duration_seconds: z.number().nullable().optional(),
   volume: z.number().min(0).max(1).default(0.5),
   fade_in_ms: z.number().min(0).default(0),
   fade_out_ms: z.number().min(0).default(0),
   music_genre: z.string().nullable().optional(),
   music_mood: z.string().nullable().optional(),
-  music_tempo_bpm: z.number().min(60).max(200).nullable().optional(),
+  music_tempo_bpm: z.number().nullable().optional(),
   music_instruments: z.string().nullable().optional(),
   music_volume: z.number().min(0).max(1).default(0.5),
-  sfx_list: z.string().nullable().optional(),
+  sfx_list: z.union([z.string(), z.array(z.string())]).nullable().optional(),
   ambient_type: z.string().nullable().optional(),
   ambient_volume: z.number().min(0).max(1).default(0.4),
 });
@@ -57,25 +57,23 @@ export const SceneAudioSpecSchema = z.object({
 export const SceneSchema = z.object({
   order: z.number(),
   description: z.string(),
-  voiceover_script: z.string(),
-  voiceover_speaker: z.string().default('narrator'),
+  // LLM kadang kirim null → normalizer coerce ke '', Zod terima
+  voiceover_script: z.string().catch(''),
+  voiceover_speaker: z.string().catch('narrator').default('narrator'),
   image_prompts: SceneImagePromptsSchema,
-  // V3: Audio specs per scene (embedded, from LLM)
   audio_specs: z.array(SceneAudioSpecSchema).optional(),
-  // V3: Transition
-  transition_type: z.enum(['cut', 'dissolve', 'fade_to_black', 'fade_to_white', 'wipe', 'match_cut', 'fade_in']).default('dissolve'),
-  transition_duration_ms: z.number().min(0).max(5000).default(1500),
-  transition_easing: z.enum(['linear', 'ease_in', 'ease_out', 'ease_in_out']).default('ease_in_out'),
-  transition_direction: z.enum(['forward', 'backward', 'loop']).default('forward'),
-  // V3: Voice
-  voice_type: z.enum(['child', 'teen', 'adult_male', 'adult_female', 'elderly_male', 'elderly_female', 'narrator']).default('narrator'),
-  voice_emotion: z.enum(['neutral', 'happy', 'sad', 'excited', 'calm', 'dramatic']).default('neutral'),
-  voice_speed: z.number().min(0.5).max(2.0).default(1.0),
-  voice_pitch: z.enum(['low', 'medium', 'high', 'auto']).default('auto'),
-  // V3: Duration + Pacing + Mood
+  transition_type: z.string().catch('dissolve').default('dissolve'),
+  transition_duration_ms: z.number().min(0).catch(1500).default(1500),
+  transition_easing: z.string().catch('ease_in_out').default('ease_in_out'),
+  transition_direction: z.string().catch('forward').default('forward'),
+  // Scene voice_type string longgar (model kadang kirim nilai kreatif)
+  voice_type: z.string().catch('narrator').default('narrator'),
+  voice_emotion: z.string().catch('neutral').default('neutral'),
+  voice_speed: z.number().catch(1.0).default(1.0),
+  voice_pitch: z.string().catch('auto').default('auto'),
   duration_seconds: z.number().nullable().optional(),
-  scene_pacing: z.enum(['fast', 'normal', 'slow']).default('normal'),
-  scene_mood: z.enum(['cheerful', 'dramatic', 'tense', 'peaceful', 'mysterious']).nullable().optional(),
+  scene_pacing: z.string().catch('normal').default('normal'),
+  scene_mood: z.string().nullable().optional(),
 });
 
 export const SupportingCharacterSchema = z.object({
@@ -89,7 +87,7 @@ export const SceneAudioSchema = z.object({
   description: z.string().min(1),
   timing: z.enum(['start', 'throughout', 'end', 'specific_moment']).default('throughout'),
   duration_seconds: z.number().nullable().optional(),
-  volume: z.number().min(0).max(1).default(0.7),
+  volume: z.number().min(0).max(1).default(0.5),
   fade_in_ms: z.number().min(0).default(0),
   fade_out_ms: z.number().min(0).default(0),
   music_genre: z.string().nullable().optional(),

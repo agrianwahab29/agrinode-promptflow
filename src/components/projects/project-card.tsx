@@ -69,6 +69,14 @@ export function ProjectCard({
     onToggle?.();
   }
 
+  function handleCheckboxKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggle?.();
+    }
+  }
+
   return (
     <>
       <Link href={`/${locale}/projects/${p.id}`}>
@@ -78,7 +86,11 @@ export function ProjectCard({
               <div className="flex items-center gap-2 min-w-0">
                 {selectable && (
                   <div
+                    role="checkbox"
+                    aria-checked={selected}
+                    tabIndex={0}
                     onClick={handleCheckboxClick}
+                    onKeyDown={handleCheckboxKeyDown}
                     className={`flex-shrink-0 h-5 w-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
                       selected
                         ? 'bg-primary border-primary text-primary-foreground'
