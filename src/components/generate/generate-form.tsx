@@ -65,6 +65,8 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [llmElapsedMs, setLlmElapsedMs] = useState<number | null>(null);
   const [savingStarted, setSavingStarted] = useState(false);
+  const [projectId, setProjectId] = useState<number | null>(null);
+  const [partialSceneIds, setPartialSceneIds] = useState<number[]>([]);
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -161,6 +163,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             if (evType === 'stage' || evType === 'progress') {
               setCurrentStage(parsed.stage ?? evType);
               setStageMeta(parsed);
+              if (parsed.projectId != null && typeof parsed.projectId === 'number') setProjectId(parsed.projectId);
               if (parsed.stage === 'llm_calling') setLlmElapsedMs(0);
               if (parsed.stage === 'saving' && !savingStarted) setSavingStarted(true);
             } else if (evType === 'heartbeat') {
@@ -174,6 +177,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
               receivedDone = true;
               setResult(parsed.result as PromptPackage);
               setWarnings(parsed.warnings ?? []);
+              setPartialSceneIds(parsed.partialSceneIds ?? []);
               setCurrentStage(null);
               toast.success('Generate selesai');
             } else if (evType === 'error') {
@@ -199,7 +203,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
     }
   }
 
-  if (result) {
+  if (result && projectId != null) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -208,7 +212,7 @@ export function GenerateForm({ locale: _locale }: { locale: string }) {
             Generate Baru
           </Button>
         </div>
-        <ResultTabs result={result} warnings={warnings} />
+        <ResultTabs result={result} warnings={warnings} partialSceneIds={partialSceneIds} projectId={projectId} />
       </div>
     );
   }

@@ -157,6 +157,7 @@
     "tabImagePrompts": "Image Prompts",
     "tabVoiceover": "Voiceover",
     "tabMoral": "Moral",
+    "tabStoryboard": "Storyboard",
     "warningsTitle": "Consistency warnings:",
     "voiceover": "Voiceover",
     "characters": "Characters",
@@ -176,7 +177,15 @@
     "audioSpec": "Audio Spec",
     "ageRange": "Age Range",
     "masterDesc": "Master design references for consistency.",
-    "transitionTo": "{type} ({duration}ms, {easing})"
+    "transitionTo": "{type} ({duration}ms, {easing})",
+    "storyboardTitle": "Storyboard Prompt",
+    "storyboardDescription": "Generate visual storyboard prompts per 10-second segment for AI image/video generators.",
+    "generateStoryboard": "Generate Storyboard",
+    "regenerateStoryboard": "Regenerate Storyboard",
+    "generatingStoryboard": "Generating...",
+    "storyboardSegments": "{count} segments generated",
+    "loadingStoryboard": "Loading storyboard...",
+    "regenerating": "Regenerating..."
   },
   "transition": {
     "types": {

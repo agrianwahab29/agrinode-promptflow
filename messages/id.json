@@ -157,6 +157,7 @@
     "tabImagePrompts": "Image Prompts",
     "tabVoiceover": "Voiceover",
     "tabMoral": "Moral",
+    "tabStoryboard": "Storyboard",
     "warningsTitle": "Peringatan konsistensi:",
     "voiceover": "Voiceover",
     "characters": "Karakter",
@@ -176,7 +177,15 @@
     "audioSpec": "Spesifikasi Audio",
     "ageRange": "Rentang Usia",
     "masterDesc": "Referensi desain master untuk konsistensi.",
-    "transitionTo": "{type} ({duration}ms, {easing})"
+    "transitionTo": "{type} ({duration}ms, {easing})",
+    "storyboardTitle": "Prompt Storyboard",
+    "storyboardDescription": "Generate prompt storyboard visual per segmen 10 detik untuk generator gambar/video AI.",
+    "generateStoryboard": "Generate Storyboard",
+    "regenerateStoryboard": "Regenerate Storyboard",
+    "generatingStoryboard": "Generating...",
+    "storyboardSegments": "{count} segmen dihasilkan",
+    "loadingStoryboard": "Memuat storyboard...",
+    "regenerating": "Regenerating..."
   },
   "transition": {
     "types": {

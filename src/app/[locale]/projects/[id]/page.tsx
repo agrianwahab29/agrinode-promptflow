@@ -89,7 +89,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {pkg ? (
-        <ResultTabs result={pkg} warnings={[]} />
+        <ResultTabs result={pkg} warnings={[]} projectId={id} />
       ) : (
         <Card>
           <CardHeader><CardTitle>Belum di-generate</CardTitle></CardHeader>

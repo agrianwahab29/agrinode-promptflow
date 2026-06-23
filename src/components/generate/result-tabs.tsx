@@ -9,6 +9,7 @@ import { SceneTransitionCard } from './scene-transition-card';
 import { VoiceTypeSelector } from './voice-type-selector';
 import { ImagePromptDisplay } from './image-prompt-display';
 import { AudioPanel } from './audio-panel';
+import { StoryboardTab } from './storyboard-tab';
 import { Mic, Clock, User } from 'lucide-react';
 import type { PromptPackage } from '@/lib/validation/schemas';
 
@@ -18,10 +19,12 @@ export function ResultTabs({
   result,
   warnings,
   partialSceneIds = [],
+  projectId,
 }: {
   result: PromptPackage;
   warnings: Warning[];
   partialSceneIds?: number[];
+  projectId: number;
 }) {
   const t = useTranslations('generate');
   const tVoice = useTranslations('voice');
@@ -29,12 +32,13 @@ export function ResultTabs({
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+      <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
         <TabsTrigger value="scenes">{t('tabScenes')} ({result.scenes.length})</TabsTrigger>
         <TabsTrigger value="characters">{t('tabCharacters')} ({result.character_profiles.length})</TabsTrigger>
         <TabsTrigger value="imagePrompts">{t('tabImagePrompts')}</TabsTrigger>
         <TabsTrigger value="voiceover">{t('tabVoiceover')}</TabsTrigger>
         <TabsTrigger value="moral">{t('tabMoral')}</TabsTrigger>
+        <TabsTrigger value="storyboard">{t('tabStoryboard')}</TabsTrigger>
       </TabsList>
 
       {warnings.length > 0 && (
@@ -303,6 +307,9 @@ export function ResultTabs({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+      <TabsContent value="storyboard" className="space-y-3">
+        <StoryboardTab projectId={projectId} />
       </TabsContent>
     </Tabs>
   );
