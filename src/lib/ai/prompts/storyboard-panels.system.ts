@@ -10,25 +10,27 @@ export interface PanelsContext {
 }
 
 export function buildStoryboardPanelsSystemPrompt(): string {
-  return `You are an expert prompt engineer for AI image and video generators (Midjourney, Runway, Kling, Stable Video Diffusion).
-Turn a storyboard outline into detailed image prompts per panel.
+  return `Kamu adalah prompt engineer ahli untuk generator gambar/video AI (Midjourney, Runway, Kling, Stable Video Diffusion, Luma, Pika).
+Ubah outline storyboard menjadi panel-panel detail yang kompleks dan siap generate.
 
-Rules:
-- Each image_prompt must be a single, rich English prompt ready for an image generator.
-- Keep visual style consistent across all panels using the style guide and sheets.
-- Mention character names and exact outfit/appearance from the character sheet.
-- Mention location names and lighting from the location sheet.
-- Camera movement must be concise cinematography language.
-- Negative prompt should list things to avoid (text, watermark, blur, deformity, etc.).
-- Dialogue/VO can be empty if no voice-over.
+Aturan wajib:
+- Setiap image_prompt HARUS dalam Bahasa Inggris, kaya detail, dan siap langsung dipakai generator gambar AI.
+- Jaga konsistensi visual di seluruh panel menggunakan style guide dan sheet yang diberikan. Konsistensi adalah MUTLAK.
+- Sebutkan nama karakter, pakaian, warna, bentuk wajah, dan detail visual eksak dari Character Sheet.
+- Sebutkan nama lokasi, pencahayaan, dan suasana dari Location Sheet.
+- Camera movement gunakan bahasa sinematografi profesional.
+- Negative prompt sebutkan hal-hal yang harus dihindari (text, watermark, blur, deformity, extra limbs, dll).
+- Dialogue/VO ditulis dalam Bahasa Indonesia. Kosongkan jika tidak ada suara.
+- Semua field selain imagePrompt, referenceImagePrompt, dan negativePrompt harus dalam Bahasa Indonesia.
+- Tambahkan detail: komposisi, pencahayaan, mood, properti, catatan kostum, catatan produksi, dan teks di layar jika relevan.
 
-Output ONLY valid JSON matching the requested schema. No markdown, no prose.`;
+Output HANYA valid JSON sesuai schema. Tanpa markdown, tanpa prosa.`;
 }
 
 export function buildStoryboardPanelsUserMessage(ctx: PanelsContext): string {
   return [
-    `Title: ${ctx.title}`,
-    `Segment ${ctx.segment.segmentIndex}: ${ctx.segment.start}s - ${ctx.segment.end}s`,
+    `Judul Proyek: ${ctx.title}`,
+    `Segmen ${ctx.segment.segmentIndex}: ${ctx.segment.start}s - ${ctx.segment.end}s`,
     '',
     'CHARACTER SHEET:',
     JSON.stringify(ctx.sheets.characterSheet, null, 2),
@@ -42,6 +44,6 @@ export function buildStoryboardPanelsUserMessage(ctx: PanelsContext): string {
     'SEGMENT OUTLINE:',
     JSON.stringify(ctx.outline, null, 2),
     '',
-    `Generate detailed panels JSON with this exact shape:\n{\n  "panels": [\n    {\n      "index": number,\n      "time": "0:00 - 0:01.25",\n      "scene_code": "...",\n      "title": "...",\n      "imagePrompt": "full English image prompt",\n      "actionVisual": "description of action",\n      "cameraMovement": "e.g. WIDE SHOT - slow push in",\n      "dialogueVo": "voice-over text or empty string",\n      "transition": "CUT",\n      "charactersPresent": ["Name"],\n      "location": "location name",\n      "negativePrompt": "things to avoid",\n      "audioNotes": "optional SFX/music cue"\n    }\n  ],\n  "segmentTransitionNote": "..."\n}`
+    `Hasilkan JSON panel detail dengan bentuk persis ini. Semua teks penjelasan dalam Bahasa Indonesia kecuali imagePrompt, referenceImagePrompt, negativePrompt:\n{\n  "panels": [\n    {\n      "index": number,\n      "time": "0:00 - 0:01.25",\n      "scene_code": "EXT. LOKASI - WAKTU",\n      "title": "judul panel Bahasa Indonesia",\n      "imagePrompt": "prompt gambar Bahasa Inggris yang sangat detail",\n      "referenceImagePrompt": "prompt thumbnail referensi visual Bahasa Inggris",\n      "actionVisual": "deskripsi aksi/visual dalam Bahasa Indonesia",\n      "cameraMovement": "contoh: WIDE SHOT - slow push in",\n      "composition": "komposisi frame",\n      "lighting": "pencahayaan dan waktu",\n      "mood": "suasana/emosi",\n      "dialogueVo": "teks voice-over Bahasa Indonesia atau kosong",\n      "onScreenText": "teks di layar jika ada, atau kosong",\n      "transition": "CUT | MATCH CUT | DISSOLVE | WIPE | FADE IN | FADE OUT | LIGHT LEAK/FLASH | JUMP CUT",\n      "charactersPresent": ["Nama"],\n      "location": "nama lokasi",\n      "props": ["properti"],\n      "costumeNotes": "catatan kostum/detail penampilan",\n      "negativePrompt": "things to avoid in English",\n      "audioNotes": "catatan musik/SFX Bahasa Indonesia",\n      "productionNotes": "catatan produksi Bahasa Indonesia",\n      "durationSeconds": 1.25\n    }\n  ],\n  "segmentTransitionNote": "catatan transisi antar segmen Bahasa Indonesia"\n}`
   ].join('\n');
 }

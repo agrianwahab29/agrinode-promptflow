@@ -6,8 +6,9 @@ import { StoryboardSegmentSchema } from '@/lib/validation/schemas';
 describe('storyboard prompts', () => {
   it('outline system prompt contains required rules', () => {
     const prompt = buildStoryboardOutlineSystemPrompt();
-    expect(prompt).toContain('10-second segment');
+    expect(prompt).toContain('maksimal 10 detik');
     expect(prompt).toContain('FADE IN');
+    expect(prompt).toContain('Bahasa Indonesia');
   });
 
   it('compiles markdown from a valid segment', () => {
@@ -40,5 +41,7 @@ describe('storyboard prompts', () => {
     expect(md).toContain('STORYBOARD');
     expect(md).toContain('Adrian');
     expect(md).toContain('WIDE SHOT');
+    expect(md).toContain('Panduan Gaya Visual');
+    expect(md).toContain('ACTION/VISUAL');
   });
 });

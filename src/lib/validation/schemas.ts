@@ -209,20 +209,32 @@ export type UpdateProviderConfigInput = z.infer<typeof UpdateProviderConfigInput
 export type GenerateInput = z.infer<typeof GenerateInputSchema>;
 
 // ===== Storyboard schemas (F-SB-01) =====
+// Rich Indonesian storyboard panel matching professional storyboard format.
 export const StoryboardPanelSchema = z.object({
   index: z.number().int().min(1),
   time: z.string().min(1),
   sceneCode: z.string().min(1),
   title: z.string().min(1),
+  // Image prompt stays in English because image/video generators understand English best.
   imagePrompt: z.string().min(1),
+  // Reference thumbnail prompt (English) used as visual reference for the panel.
+  referenceImagePrompt: z.string().optional(),
   actionVisual: z.string().min(1),
   cameraMovement: z.string().min(1),
+  composition: z.string().optional(),
+  lighting: z.string().optional(),
+  mood: z.string().optional(),
   dialogueVo: z.string(),
+  onScreenText: z.string().optional(),
   transition: z.string().min(1),
   charactersPresent: z.array(z.string()),
   location: z.string().min(1),
+  props: z.array(z.string()).optional(),
+  costumeNotes: z.string().optional(),
   negativePrompt: z.string().optional(),
   audioNotes: z.string().optional(),
+  productionNotes: z.string().optional(),
+  durationSeconds: z.number().min(0.1).optional(),
 });
 
 // Storyboard LLM Stage 1 output: outline panels per 10-second segment
@@ -235,6 +247,7 @@ export const StoryboardOutlinePanelSchema = z.object({
   location: z.string().min(1),
   transition: z.string().min(1),
   brief: z.string().min(1),
+  duration_seconds: z.number().min(0.1).optional(),
 });
 
 export const StoryboardOutlineSchema = z.object({
@@ -250,14 +263,23 @@ export const StoryboardDetailedPanelSchema = z.object({
   scene_code: z.string().min(1),
   title: z.string().min(1),
   imagePrompt: z.string().min(1),
+  referenceImagePrompt: z.string().optional(),
   actionVisual: z.string().min(1),
   cameraMovement: z.string().min(1),
+  composition: z.string().optional(),
+  lighting: z.string().optional(),
+  mood: z.string().optional(),
   dialogueVo: z.string(),
+  onScreenText: z.string().optional(),
   transition: z.string().min(1),
   charactersPresent: z.array(z.string()),
   location: z.string().min(1),
+  props: z.array(z.string()).optional(),
+  costumeNotes: z.string().optional(),
   negativePrompt: z.string().optional(),
   audioNotes: z.string().optional(),
+  productionNotes: z.string().optional(),
+  durationSeconds: z.number().min(0.1).optional(),
 });
 
 export const StoryboardPanelsSchema = z.object({

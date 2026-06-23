@@ -14,35 +14,35 @@ export interface OutlineContext {
 }
 
 export function buildStoryboardOutlineSystemPrompt(): string {
-  return `You are an expert storyboard artist and prompt engineer for AI video generation.
-Your task is to break a video segment into a sequence of visual panels.
+  return `Kamu adalah seniman storyboard dan prompt engineer ahli untuk pembuatan video AI.
+Tugasmu: memecah satu segmen video menjadi urutan panel visual yang kompleks dan sempurna.
 
-Rules:
-- Each panel must fit within the 10-second segment.
-- Panel durations should sum to exactly the segment duration.
-- Use timestamp format: 0:00 - 0:01.25
-- Each panel needs: index, time, scene_code (e.g. INT. LOBBY - DAY), title, characters_present, location, transition, brief.
-- The first panel of segment 1 uses FADE IN.
-- The last panel of the final segment uses FADE OUT.
-- Other panels use CUT, MATCH CUT, DISSOLVE, or WIPE as appropriate.
-- Maintain character and location consistency using the provided sheets.
-- Camera language should be concise (e.g. LOW ANGLE - slow push in).
+Aturan wajib:
+- Setiap panel harus masuk dalam durasi segmen (maksimal 10 detik).
+- Total durasi semua panel dalam segmen harus sama persis dengan durasi segmen.
+- Gunakan format waktu: 0:00 - 0:01.25
+- Setiap panel wajib memiliki: index, time, scene_code (contoh: EXT. HUTAN - SORE), title (Bahasa Indonesia), characters_present, location, transition, brief, duration_seconds.
+- Panel pertama segmen 1 gunakan FADE IN.
+- Panel terakhir segmen terakhir gunakan FADE OUT.
+- Panel lain gunakan CUT, MATCH CUT, DISSOLVE, WIPE, LIGHT LEAK/FLASH, atau JUMP CUT sesuai konteks.
+- Jaga konsistensi karakter dan lokasi menggunakan Character Sheet & Location Sheet yang diberikan.
+- Bahasa brief harus Bahasa Indonesia, padat, dan menggambarkan visual + kamera.
 
-Output ONLY valid JSON matching the requested schema. No markdown, no prose.`;
+Output HANYA valid JSON sesuai schema. Tanpa markdown, tanpa prosa.`;
 }
 
 export function buildStoryboardOutlineUserMessage(ctx: OutlineContext): string {
   const parts = [
-    `Title: ${ctx.title}`,
-    `Total duration: ${ctx.durationTargetSeconds}s`,
-    `This segment: ${ctx.segment.start}s - ${ctx.segment.end}s (segment ${ctx.segment.segmentIndex} of ${ctx.totalSegments})`,
-    `Target panels in this segment: ${ctx.panelsPerSegment}`,
-    ctx.storyDescription ? `Story description: ${ctx.storyDescription}` : '',
+    `Judul Proyek: ${ctx.title}`,
+    `Durasi Total: ${ctx.durationTargetSeconds} detik`,
+    `Segmen Ini: ${ctx.segment.start}s - ${ctx.segment.end}s (segmen ${ctx.segment.segmentIndex} dari ${ctx.totalSegments})`,
+    `Jumlah Panel Target: ${ctx.panelsPerSegment}`,
+    ctx.storyDescription ? `Deskripsi Cerita: ${ctx.storyDescription}` : '',
     '',
-    'CHARACTER SHEET (use exact visual descriptions):',
+    'CHARACTER SHEET (gunakan deskripsi visual secara eksak):',
     JSON.stringify(ctx.sheets.characterSheet, null, 2),
     '',
-    'LOCATION SHEET (use exact visual descriptions):',
+    'LOCATION SHEET (gunakan deskripsi visual secara eksak):',
     JSON.stringify(ctx.sheets.locationSheet, null, 2),
     '',
     'VISUAL STYLE GUIDE:',
@@ -50,15 +50,15 @@ export function buildStoryboardOutlineUserMessage(ctx: OutlineContext): string {
   ];
 
   if (ctx.previousSegmentSummary) {
-    parts.push('', `PREVIOUS SEGMENT SUMMARY:\n${ctx.previousSegmentSummary}`);
+    parts.push('', `RINGKASAN SEGMENT SEBELUMNYA:\n${ctx.previousSegmentSummary}`);
   }
   if (ctx.nextSegmentPreview) {
-    parts.push('', `NEXT SEGMENT PREVIEW:\n${ctx.nextSegmentPreview}`);
+    parts.push('', `PRATINJAU SEGMENT BERIKUTNYA:\n${ctx.nextSegmentPreview}`);
   }
 
   parts.push(
     '',
-    `Generate an outline JSON with this exact shape:\n{\n  "panel_count": number,\n  "panels": [\n    {\n      "index": number,\n      "time": "0:00 - 0:01.25",\n      "scene_code": "INT/EXT. LOCATION - TIME",\n      "title": "short panel title",\n      "characters_present": ["Name"],\n      "location": "location name",\n      "transition": "CUT | MATCH CUT | FADE IN | FADE OUT | DISSOLVE | WIPE",\n      "brief": "one sentence visual/camera direction"\n    }\n  ],\n  "segment_transition_note": "how this segment connects to the next"\n}`
+    `Hasilkan outline JSON dengan bentuk persis ini:\n{\n  "panel_count": number,\n  "panels": [\n    {\n      "index": number,\n      "time": "0:00 - 0:01.25",\n      "scene_code": "INT/EXT. LOKASI - WAKTU",\n      "title": "judul panel dalam Bahasa Indonesia",\n      "characters_present": ["Nama"],\n      "location": "nama lokasi",\n      "transition": "CUT | MATCH CUT | FADE IN | FADE OUT | DISSOLVE | WIPE | LIGHT LEAK/FLASH | JUMP CUT",\n      "brief": "satu kalimat arahan visual/kamera dalam Bahasa Indonesia",\n      "duration_seconds": 1.25\n    }\n  ],\n  "segment_transition_note": "cara segmen ini menyambung ke segmen berikutnya dalam Bahasa Indonesia"\n}`
   );
 
   return parts.filter(Boolean).join('\n');
