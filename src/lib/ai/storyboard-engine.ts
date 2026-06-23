@@ -1,11 +1,17 @@
 import 'server-only';
-import { generatePromptPackage } from './llm-client';
+import { generateStructuredResponse } from './llm-client';
 import { extractSheets } from './storyboard-sheet-extractor';
 import { calculateSegments } from './storyboard-segmenter';
 import { buildStoryboardOutlineSystemPrompt, buildStoryboardOutlineUserMessage, type OutlineContext } from './prompts/storyboard-outline.system';
 import { buildStoryboardPanelsSystemPrompt, buildStoryboardPanelsUserMessage, type PanelsContext } from './prompts/storyboard-panels.system';
 import { compileStoryboardMarkdown } from './prompts/storyboard-compiler';
-import { StoryboardSegmentSchema, type PromptPackage, type StoryboardSegment } from '@/lib/validation/schemas';
+import {
+  StoryboardSegmentSchema,
+  StoryboardOutlineSchema,
+  StoryboardPanelsSchema,
+  type PromptPackage,
+  type StoryboardSegment,
+} from '@/lib/validation/schemas';
 import type { ProviderConfig } from '@/lib/db/schema';
 import type { SegmentRange } from './storyboard-segmenter';
 
@@ -16,42 +22,6 @@ export interface StoryboardEngineOptions {
   panelsPerSegment: number;
   previousSegmentSummary?: string;
   nextSegmentPreview?: string;
-}
-
-export interface StoryboardPanelOutline {
-  index: number;
-  time: string;
-  scene_code: string;
-  title: string;
-  characters_present: string[];
-  location: string;
-  transition: string;
-  brief: string;
-}
-
-interface OutlineOutput {
-  panel_count: number;
-  panels: StoryboardPanelOutline[];
-  segment_transition_note: string;
-}
-
-interface PanelsOutput {
-  panels: Array<{
-    index: number;
-    time: string;
-    scene_code: string;
-    title: string;
-    imagePrompt: string;
-    actionVisual: string;
-    cameraMovement: string;
-    dialogueVo: string;
-    transition: string;
-    charactersPresent: string[];
-    location: string;
-    negativePrompt?: string;
-    audioNotes?: string;
-  }>;
-  segmentTransitionNote: string;
 }
 
 export async function generateStoryboardSegment(
@@ -73,7 +43,7 @@ export async function generateStoryboardSegment(
     storyDescription: pkg.moral_message,
   };
 
-  const outlineRaw = await generatePromptPackage({
+  const outline = await generateStructuredResponse({
     provider: {
       provider: opts.providerConfig.provider,
       baseUrl: opts.providerConfig.baseUrl,
@@ -82,9 +52,10 @@ export async function generateStoryboardSegment(
     },
     system: buildStoryboardOutlineSystemPrompt(),
     messages: [{ role: 'user', content: buildStoryboardOutlineUserMessage(outlineCtx) }],
+    schema: StoryboardOutlineSchema,
+    validateLabel: 'StoryboardOutline',
   });
 
-  const outline = outlineRaw as unknown as OutlineOutput;
   if (!outline?.panels || outline.panels.length === 0) {
     throw new Error('Outline generation returned empty panels');
   }
@@ -98,7 +69,7 @@ export async function generateStoryboardSegment(
     outline,
   };
 
-  const panelsRaw = await generatePromptPackage({
+  const panelsData = await generateStructuredResponse({
     provider: {
       provider: opts.providerConfig.provider,
       baseUrl: opts.providerConfig.baseUrl,
@@ -107,9 +78,10 @@ export async function generateStoryboardSegment(
     },
     system: buildStoryboardPanelsSystemPrompt(),
     messages: [{ role: 'user', content: buildStoryboardPanelsUserMessage(panelsCtx) }],
+    schema: StoryboardPanelsSchema,
+    validateLabel: 'StoryboardPanels',
   });
 
-  const panelsData = panelsRaw as unknown as PanelsOutput;
   if (!panelsData?.panels || panelsData.panels.length === 0) {
     throw new Error('Panel generation returned empty panels');
   }

@@ -3,7 +3,7 @@ import { generateStoryboardSegment, type StoryboardEngineOptions } from './story
 import { type PromptPackage } from '@/lib/validation/schemas';
 
 vi.mock('./llm-client', () => ({
-  generatePromptPackage: vi.fn().mockResolvedValueOnce({
+  generateStructuredResponse: vi.fn().mockResolvedValueOnce({
     panel_count: 4,
     panels: [
       { index: 1, time: '0:00 - 0:02.5', scene_code: 'INT. LOBBY - DAY', title: 'Enter', characters_present: ['Adrian'], location: 'Office Lobby', transition: 'FADE IN', brief: 'Adrian enters' },

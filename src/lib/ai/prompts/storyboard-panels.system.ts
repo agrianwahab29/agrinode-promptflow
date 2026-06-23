@@ -1,16 +1,12 @@
 import type { StoryboardSheets } from '../storyboard-sheet-extractor';
-import type { StoryboardPanelOutline } from '../storyboard-engine';
+import type { StoryboardOutline } from '@/lib/validation/schemas';
 
 export interface PanelsContext {
   title: string;
   segment: { segmentIndex: number; start: number; end: number };
   panelsPerSegment: number;
   sheets: StoryboardSheets;
-  outline: {
-    panel_count: number;
-    panels: StoryboardPanelOutline[];
-    segment_transition_note: string;
-  };
+  outline: StoryboardOutline;
 }
 
 export function buildStoryboardPanelsSystemPrompt(): string {

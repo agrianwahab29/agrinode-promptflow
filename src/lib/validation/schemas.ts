@@ -225,6 +225,46 @@ export const StoryboardPanelSchema = z.object({
   audioNotes: z.string().optional(),
 });
 
+// Storyboard LLM Stage 1 output: outline panels per 10-second segment
+export const StoryboardOutlinePanelSchema = z.object({
+  index: z.number().int().min(1),
+  time: z.string().min(1),
+  scene_code: z.string().min(1),
+  title: z.string().min(1),
+  characters_present: z.array(z.string()),
+  location: z.string().min(1),
+  transition: z.string().min(1),
+  brief: z.string().min(1),
+});
+
+export const StoryboardOutlineSchema = z.object({
+  panel_count: z.number().int().min(1),
+  panels: z.array(StoryboardOutlinePanelSchema).min(1),
+  segment_transition_note: z.string().min(1),
+});
+
+// Storyboard LLM Stage 2 output: detailed panel prompts
+export const StoryboardDetailedPanelSchema = z.object({
+  index: z.number().int().min(1),
+  time: z.string().min(1),
+  scene_code: z.string().min(1),
+  title: z.string().min(1),
+  imagePrompt: z.string().min(1),
+  actionVisual: z.string().min(1),
+  cameraMovement: z.string().min(1),
+  dialogueVo: z.string(),
+  transition: z.string().min(1),
+  charactersPresent: z.array(z.string()),
+  location: z.string().min(1),
+  negativePrompt: z.string().optional(),
+  audioNotes: z.string().optional(),
+});
+
+export const StoryboardPanelsSchema = z.object({
+  panels: z.array(StoryboardDetailedPanelSchema).min(1),
+  segmentTransitionNote: z.string().min(1),
+});
+
 export const StoryboardSegmentSchema = z.object({
   segmentIndex: z.number().int().min(1),
   segmentTimeStart: z.number().int().min(0),
@@ -253,6 +293,10 @@ export const StoryboardSegmentSchema = z.object({
 });
 
 export type StoryboardPanel = z.infer<typeof StoryboardPanelSchema>;
+export type StoryboardOutlinePanel = z.infer<typeof StoryboardOutlinePanelSchema>;
+export type StoryboardOutline = z.infer<typeof StoryboardOutlineSchema>;
+export type StoryboardDetailedPanel = z.infer<typeof StoryboardDetailedPanelSchema>;
+export type StoryboardPanels = z.infer<typeof StoryboardPanelsSchema>;
 export type StoryboardSegment = z.infer<typeof StoryboardSegmentSchema>;
 
 // ===== DTO Types =====

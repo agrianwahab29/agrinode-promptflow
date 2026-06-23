@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generatePromptPackage, categorizeError } from './llm-client';
+import type { PromptPackage } from '@/lib/validation/schemas';
 
 const mockProvider = {
   provider: 'custom' as const,
@@ -13,7 +14,7 @@ const mockSystem = 'system';
 const mockMessages = [{ role: 'user' as const, content: 'user message' }];
 
 // A valid, minimal prompt package matching PromptPackageSchema
-const validResponse = {
+const validResponse: PromptPackage = {
   title: "Test",
   duration_target: { type: "shorts", seconds: 60 },
   style: { type: "3D", aspect_ratio: "16:9" },
@@ -42,7 +43,7 @@ const validResponse = {
   image_prompts: { characters: [], backgrounds: [] },
   supporting_characters: [],
   moral_message: "Test"
-};
+} satisfies PromptPackage;
 
 const validResponseJson = JSON.stringify(validResponse);
 

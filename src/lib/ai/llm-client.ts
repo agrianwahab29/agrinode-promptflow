@@ -15,6 +15,12 @@ export interface GenerateOptions {
   onLog?: (level: 'info' | 'warn' | 'error', message: string) => void;
 }
 
+export interface StructuredGenerateOptions<T> extends GenerateOptions {
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>;
+  normalizer?: (raw: unknown) => unknown;
+  validateLabel?: string;
+}
+
 /**
  * Categorize error for better debugging
  */
@@ -305,10 +311,11 @@ function findMatchingBrace(s: string, start: number): number {
   return -1; // unclosed
 }
 
-export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
+export async function generateStructuredResponse<T>(opts: StructuredGenerateOptions<T>): Promise<T> {
   const maxRetries = opts.maxRetries ?? 3;
   let lastError: unknown = null;
   const totalStart = Date.now();
+  const label = opts.validateLabel ?? 'response';
 
   // Decrypt API key
   let apiKey = '';
@@ -460,19 +467,15 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
         }
       }
 
-      // Normalize raw LLM output sebelum Zod (null→default, enum unknown→fallback, sfx array→string)
-      parsedJson = normalizePromptPackage(parsedJson);
+      if (opts.normalizer) {
+        parsedJson = opts.normalizer(parsedJson);
+      }
 
       // Validate with Zod
       try {
-        const validated = PromptPackageSchema.parse(parsedJson);
+        const validated = opts.schema.parse(parsedJson);
         const totalDuration = Date.now() - totalStart;
-        console.log('[llm] Validation SUCCESS: scenes=%d chars=%d img_prompts=%d totalDuration=%dms',
-          validated.scenes.length,
-          validated.character_profiles.length,
-          validated.image_prompts.characters.length + validated.image_prompts.backgrounds.length,
-          totalDuration
-        );
+        console.log('[llm] Validation SUCCESS for %s: totalDuration=%dms', label, totalDuration);
         return validated;
       } catch (validationErr) {
         const categorized = categorizeError(validationErr, 'Zod validation');
@@ -524,4 +527,13 @@ export async function generatePromptPackage(opts: GenerateOptions): Promise<Prom
 
   const enhancedMessage = `[${finalCategorized.category}] ${finalCategorized.message}`;
   throw new Error(enhancedMessage);
+}
+
+export async function generatePromptPackage(opts: GenerateOptions): Promise<PromptPackage> {
+  return generateStructuredResponse({
+    ...opts,
+    schema: PromptPackageSchema,
+    normalizer: normalizePromptPackage,
+    validateLabel: 'PromptPackage',
+  });
 }
