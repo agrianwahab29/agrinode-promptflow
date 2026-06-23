@@ -122,6 +122,7 @@ export function StoryboardTab({ projectId }: StoryboardTabProps) {
 }
 
 function StoryboardSegmentCard({ segment }: { segment: StoryboardSegment }) {
+  const panels = segment.panels ?? [];
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -138,7 +139,7 @@ function StoryboardSegmentCard({ segment }: { segment: StoryboardSegment }) {
       </CardHeader>
       <CardContent className="space-y-2">
         <Accordion type="multiple" className="w-full">
-          {segment.panels.map((panel) => (
+          {panels.map((panel) => (
             <AccordionItem key={panel.index} value={`panel-${panel.index}`}>
               <AccordionTrigger className="text-sm">
                 Panel {panel.index} | {panel.time} | {panel.title}
