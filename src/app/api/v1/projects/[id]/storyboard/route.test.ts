@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 vi.mock('@/lib/auth/config', () => ({
@@ -17,7 +18,7 @@ vi.mock('@/lib/db/repositories/storyboard-segment.repo', () => ({
 
 describe('GET /api/v1/projects/[id]/storyboard', () => {
   it('returns segments for the project', async () => {
-    const req = new Request('http://localhost/api/v1/projects/1/storyboard');
+    const req = new NextRequest('http://localhost/api/v1/projects/1/storyboard');
     const res = await GET(req, { params: Promise.resolve({ id: '1' }) });
     const json = await res.json();
     expect(json.segments).toHaveLength(1);
