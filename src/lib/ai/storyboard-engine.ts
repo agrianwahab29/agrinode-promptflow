@@ -1,6 +1,6 @@
 import 'server-only';
 import { generatePromptPackage } from './llm-client';
-import { extractSheets, type StoryboardSheets } from './storyboard-sheet-extractor';
+import { extractSheets } from './storyboard-sheet-extractor';
 import { calculateSegments } from './storyboard-segmenter';
 import { buildStoryboardOutlineSystemPrompt, buildStoryboardOutlineUserMessage, type OutlineContext } from './prompts/storyboard-outline.system';
 import { buildStoryboardPanelsSystemPrompt, buildStoryboardPanelsUserMessage, type PanelsContext } from './prompts/storyboard-panels.system';

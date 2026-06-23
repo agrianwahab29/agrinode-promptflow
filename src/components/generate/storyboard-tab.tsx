@@ -22,7 +22,8 @@ export function StoryboardTab({ projectId }: StoryboardTabProps) {
   const [progress, setProgress] = useState('');
 
   useEffect(() => {
-    fetchSegments();
+    void fetchSegments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   async function fetchSegments() {
