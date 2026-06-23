@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 
@@ -16,7 +16,15 @@ vi.mock('@/lib/db/repositories/storyboard-segment.repo', () => ({
   ]),
 }));
 
+vi.mock('@/lib/db/client', () => ({
+  db: {},
+}));
+
 describe('GET /api/v1/projects/[id]/storyboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns segments for the project', async () => {
     const req = new NextRequest('http://localhost/api/v1/projects/1/storyboard');
     const res = await GET(req, { params: Promise.resolve({ id: '1' }) });

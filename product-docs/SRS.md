@@ -647,7 +647,241 @@ Return `{check, status: 'ok'|'fail', detail}`.
 
 ---
 
+### 3.12 Storyboard Prompt Generator (F-SB-01)
+
+> Feature code: **F-SB-01**. Source of truth: `docs/plans/2026-06-23-storyboard-prompt-generator-design.md`. Status: design complete, ready for implementation.
+
+#### 3.12.1 F-SB-01: Tujuan & scope teknis
+
+**Goal**: Menambahkan tab **Storyboard** di halaman `/generate` yang mengubah `PromptPackage` hasil generate menjadi satu atau lebih prompt storyboard visual kompleks, di mana setiap prompt merepresentasikan **10 detik video** dan siap digunakan di AI image/video generator (Midjourney, Runway, Kling, dll.).
+
+**Scope**: MVP generator terintegrasi di tab `/generate`. Tidak ada fitur edit manual panel, tidak ada ekspor PDF/DOCX khusus storyboard. Output = hybrid JSON + Markdown, copy-paste ready.
+
+**Acceptance teknis**:
+- Setiap segmen = 10 detik video, default 8 panel, panel count dinamis berdasarkan kompleksitas (min 4, max 12, ASUMSI batas UX).
+- Satu panel = satu still image prompt komplit (image prompt, action visual, camera movement, dialogue/VO, transition, characters present, location).
+- Storyboard harus mempertahankan konsistensi karakter, lokasi, gaya visual, transisi, dan komposisi kamera antar segmen.
+
+---
+
+#### 3.12.2 F-SB-01-01: Segment calculation algorithm
+
+**Input**: `PromptPackage.duration_target_seconds` (integer) atau fallback dari `durationType` mapping ke durasi standar (ASUMSI: shorts=60, mid=180, long=300).
+
+**Algoritma** (`src/lib/ai/storyboard-segmenter.ts`):
+```typescript
+function calculateSegments(
+  totalDurationSeconds: number,
+  segmentDurationSeconds = 10
+): Array<{ segmentIndex: number; start: number; end: number }> {
+  const count = Math.ceil(totalDurationSeconds / segmentDurationSeconds);
+  return Array.from({ length: count }, (_, i) => ({
+    segmentIndex: i + 1,
+    start: i * segmentDurationSeconds,
+    end: Math.min((i + 1) * segmentDurationSeconds, totalDurationSeconds),
+  }));
+}
+```
+
+**Constraint**: `segmentDurationSeconds` wajib configurable via request body (default 10, min 5, max 30). `totalDurationSeconds` < `segmentDurationSeconds` tetap menghasilkan 1 segmen dengan `end = totalDurationSeconds`.
+
+**Edge cases**:
+- Durasi tidak positif -> 400 VALIDATION_ERROR.
+- Durasi hasil mapping tidak ditemukan -> fallback ke 60 detik (ASUMSI).
+
+---
+
+#### 3.12.3 F-SB-01-02: Sheet extraction logic
+
+**Tujuan**: Ekstrak "immutable visual anchors" dari `PromptPackage` agar setiap segmen mendapat karakter, lokasi, dan gaya visual yang identik.
+
+**Character Sheet** (`src/lib/ai/storyboard-sheet-extractor.ts`):
+- Sumber: `character_profiles` + `image_prompts` dengan `tipe = 'tokoh'`.
+- Field:
+  - `name`
+  - `visualDescription`: gabungan `age_range`, `ethnicity`, `hair_style`, `outfit`, `key_expression`, `signature_pose` (ASUMSI field tersedia di `character_profiles` sesuai FR-EXP-01).
+  - `referenceImagePrompt`: dari `image_prompts.promptText` untuk target karakter.
+- Mapping: untuk setiap karakter unik (unik by `name`), ambil image prompt pertama yang target-nya mengandung nama karakter.
+
+**Location Sheet**:
+- Sumber: `scenes[].location`, `image_prompts` dengan `tipe = 'background'`, `style`.
+- Field:
+  - `name`
+  - `visualDescription`: gabungan `architecture`, `time_of_day`, `lighting`, `color_palette`, `dominant_props`.
+  - `referenceImagePrompt`: dari `image_prompts` target lokasi.
+
+**Visual Style Guide**:
+- Sumber: `style` + `aspect_ratio` + `duration_target`.
+- Field:
+  - `aspectRatio`
+  - `artDirection`
+  - `colorPalette`
+  - `cinematography`
+  - `frameRate` (ASUMSI default 24fps)
+  - `cameraLanguage` (ASUMSI: "cinematic, motivated movement, rule-of-thirds")
+
+**Fallback rules**:
+- Jika tidak ada character_profiles, character sheet kosong array; LLM prompt harus meminta infer karakter dari storyDescription.
+- Jika tidak ada image_prompts.backgrounds, location sheet kosong array; LLM infer lokasi dari scenes[].location atau storyDescription.
+- Jika style kosong, gunakan default `artDirection: 'cinematic realistic'`, `colorPalette: 'natural'`, `cinematography: 'standard lenses, shallow depth of field as needed'`.
+
+---
+
+#### 3.12.4 F-SB-01-03: Two-stage LLM architecture
+
+**Orchestrator** (`src/lib/ai/storyboard-engine.ts`):
+1. Hitung segmen -> loop per segmen.
+2. Bangun context: project title, style, duration_target, Character Sheet, Location Sheet, Visual Style Guide, previous segment summary, next segment preview.
+3. Stage 1: kirim system prompt `storyboard-outline.system.ts` -> output JSON outline per segmen.
+4. Stage 2: kirim system prompt `storyboard-panels.system.ts` dengan outline dari Stage 1 -> output JSON panel detail.
+5. Compile -> `StoryboardSegmentSchema` -> Markdown -> persist ke DB.
+
+**Stage 1 — Segment Outline** (`src/lib/ai/prompts/storyboard-outline.system.ts`):
+- Output schema:
+```json
+{
+  "panel_count": 8,
+  "panels": [
+    {
+      "index": 1,
+      "time": "0:00 - 0:01.25",
+      "scene_code": "INT. LOBBY - DAY",
+      "title": "Lobby Pertama",
+      "characters_present": ["Adrian"],
+      "location": "Lobby kantor mewah",
+      "transition": "FADE IN",
+      "brief": "Adrian melangkah masuk lobby, kamera low angle slow push in"
+    }
+  ],
+  "segment_transition_note": "FADE OUT ke segmen 2..."
+}
+```
+- Constraint waktu: total durasi semua panel <= `segmentDurationSeconds`; setiap panel punya `time` string human-readable, tidak wajib ms presisi.
+
+**Stage 2 — Detailed Panel Prompts** (`src/lib/ai/prompts/storyboard-panels.system.ts`):
+- Input: outline panel + sheet context.
+- Output: setiap panel diperkaya menjadi:
+  - `imagePrompt`: prompt lengkap untuk AI image generator (80-200 kata, ASUMSI selaras 8-layer image prompt)
+  - `actionVisual`: deskripsi adegan/visual
+  - `cameraMovement`: shot + movement (mis. "WIDE SHOT - slow push in")
+  - `dialogueVo`: voice-over/dialogue
+  - `negativePrompt`: elemen yang harus dihindari (opsional)
+  - `audioNotes`: SFX/music cue (opsional)
+- Output disusun ke `StoryboardSegmentSchema`.
+
+**Compiler** (`src/lib/ai/prompts/storyboard-compiler.ts`):
+- Kompilasi array panel + sheet menjadi `compiledMarkdownPrompt` per segmen.
+- Format markdown minimal: header `# Storyboard Segment {N} (0:00-0:10)`, sub-header per panel `## Panel {index} — {time}`, bullet image prompt, action, camera, dialogue, transition.
+
+---
+
+#### 3.12.5 F-SB-01-04: Consistency rules (segment boundaries)
+
+**Boundary rules**:
+- Segmen ke-N menerima `previous_segment_summary` (string ringkasan panel terakhir segmen N-1) dan `next_segment_preview` (string ringkasan panel pertama segmen N+1).
+- Panel pertama segmen ke-N harus menyebutkan transisi dari segmen sebelumnya (kecuali segmen 1, transisi = "FADE IN").
+- Panel terakhir segmen ke-N harus mengarahkan ke segmen berikutnya (kecuali segmen terakhir, transisi = "FADE OUT / END").
+- Karakter, lokasi, gaya visual, color palette, dan cinematography wajib sama antar segmen (di-inject ulang di setiap LLM call).
+
+**Enforcement**:
+- Pre-prompt injection: setiap system prompt dimulai dengan Character Sheet + Location Sheet + Visual Style Guide verbatim.
+- Post-validation: `StoryboardSegmentSchema.parse` -> cross-check `charactersPresent` subset dari character sheet names; `location` harus match salah satu location sheet name (fuzzy allowed, fallback warning).
+
+---
+
+#### 3.12.6 F-SB-01-05: Storage & status lifecycle
+
+**DB table**: `storyboard_segments` (detail di Section 4.10).
+
+**Status**:
+- `draft`: outline/panel awal tersimpan tapi belum final.
+- `complete`: semua segmen berhasil digenerate dan tervalidasi.
+- `failed`: satu atau lebih segmen gagal (timeout/validation/error) dan retry habis.
+
+**Regeneration rules**:
+- `POST /api/v1/projects/[id]/storyboard` tanpa parameter khusus = regenerate all, hapus segmen lama (`DELETE FROM storyboard_segments WHERE projectId = ?`) lalu insert baru.
+- Regenerate per segmen = endpoint PATCH/POST khusus (ASUMSI: `POST /api/v1/projects/[id]/storyboard/[segmentIndex]/regenerate`).
+
+---
+
+#### 3.12.7 F-SB-01-06: API endpoints
+
+| Method | Path | Purpose | Auth | Runtime | Citation |
+|---|---|---|---|---|---|
+| POST | `/api/v1/projects/[id]/storyboard` | Generate/regenerate semua segmen untuk project. Body `{ providerId?: number, panelsPerSegment?: number, segmentDurationSeconds?: number }`. Response SSE: `starting`, `progress` (stage: extracting_sheets / generating_outline / generating_panels), `done` / `error`. | wajib + ownership | nodejs, maxDuration 300, force-dynamic | Design doc Section 6.1 |
+| GET | `/api/v1/projects/[id]/storyboard` | List semua segmen (untuk tab Storyboard). Response JSON array `StoryboardSegmentSchema`. | wajib + ownership | default | Design doc Section 6.2 |
+| GET | `/api/v1/projects/[id]/storyboard/[segmentIndex]` | Get satu segmen spesifik. Response JSON `StoryboardSegmentSchema`. | wajib + ownership | default | Design doc Section 6.3 |
+
+**SSE event shape**:
+```json
+{ "event": "stage", "data": { "stage": "starting" } }
+{ "event": "progress", "data": { "stage": "extracting_sheets", "segment": 0, "total": 3 } }
+{ "event": "progress", "data": { "stage": "generating_outline", "segment": 1, "total": 3 } }
+{ "event": "progress", "data": { "stage": "generating_panels", "segment": 1, "total": 3 } }
+{ "event": "done", "data": { "segments": 3, "projectId": 42 } }
+{ "event": "error", "data": { "code": "STORYBOARD_ERROR", "message": "...", "segment": 2 } }
+```
+
+---
+
+#### 3.12.8 F-SB-01-07: Error handling
+
+**Kategori error** (extend `categorizeError` dari `llm-client.ts`):
+- `STORYBOARD_SHEET_ERROR`: gagal ekstrak sheet dari PromptPackage (mis. JSON parse resultJson gagal).
+- `STORYBOARD_SEGMENT_ERROR`: perhitungan segmen invalid.
+- `STORYBOARD_LLM_ERROR`: LLM Stage 1 / Stage 2 gagal (timeout, validation, JSON parse).
+- `STORYBOARD_PERSIST_ERROR`: gagal insert ke `storyboard_segments`.
+
+**Response**:
+- SSE `error` event dengan `{ code, message, segment? }`.
+- HTTP non-SSE error pakai error envelope `errorResponse` (`src/lib/api/error.ts`).
+- Setiap error log ke `generation_logs` dengan `logsJson` entry yang mencakup stage, segment, attempt, error category.
+
+**Retry per segmen**:
+- Stage 1 / Stage 2 retry max 2 kali per segmen dengan corrective message mirip FR-GEN-05.
+- Jika segmen N gagal setelah retry, tandai segmen tersebut `failed`, lanjut segmen N+1 (partial acceptable, status project tidak wajib fail seluruhnya).
+
+---
+
+#### 3.12.9 F-SB-01-09: Testing requirements
+
+**Unit tests**:
+- `src/lib/ai/storyboard-segmenter.test.ts`: perhitungan segmen untuk durasi 5, 60, 61, 180, 300 detik; validasi default 10 detik; edge case durasi 0 / negatif.
+- `src/lib/ai/storyboard-sheet-extractor.test.ts`: ekstraksi character/location/style sheet dari PromptPackage minimal + lengkap; fallback bila sheet kosong.
+- `src/lib/ai/storyboard-engine.test.ts`: mock LLM two-stage, validasi output `StoryboardSegmentSchema`, boundary rules check.
+- `src/lib/db/repositories/storyboard-segment.repo.test.ts`: CRUD repo + ownership + unique constraint projectId+segmentIndex.
+
+**Integration tests**:
+- `src/app/api/v1/projects/[id]/storyboard/route.test.ts`: POST generate SSE events, GET list, GET single segment, regenerate all, error event.
+
+**E2E (opsional)**:
+- Generate PromptPackage dari UI -> buka tab Storyboard -> klik Generate Storyboard -> verifikasi segmen muncul -> copy markdown.
+
+---
+
+#### 3.12.10 F-SB-01-10: UI components (ringkasan teknis)
+
+Komponen wajib dibuat di `src/components/generate/`:
+- `storyboard-tab.tsx`: tab baru di `ResultTabs`, menerima `PromptPackage` + `projectId`.
+- `storyboard-segment-card.tsx`: header segmen, list panel expandable, tombol Generate/Regenerate per segmen, Copy Markdown / Copy JSON.
+- `storyboard-panel-card.tsx`: detail satu panel (timestamp, scene code, title, image prompt, action, camera, dialogue, transition).
+- `storyboard-generate-button.tsx`: tombol generate all segments.
+
+**UX constraint**:
+- Tab Storyboard hanya muncul setelah `project.status` = `complete`/`partial` dan `resultJson` tidak null (backward compatible dengan project lama tanpa storyboard).
+- Copy markdown/json via clipboard API dengan toast sonner.
+
+---
+
+#### 3.12.11 F-SB-01-11: Migration
+
+- `drizzle-kit generate` untuk tabel baru `storyboard_segments` (Section 4.10).
+- Backward compatible: tab Storyboard hanya muncul setelah PromptPackage tergenerate.
+
+---
+
 ## 4. Data Model / Struktur Data / Skema
+
 
 > DB = Turso/libSQL (SQLite-compatible). 9 tabel. Timestamp = unixepoch integer. Schema source: `src/lib/db/schema.ts:5-201` (`RAG S9`).
 
@@ -831,6 +1065,85 @@ Return `{check, status: 'ok'|'fail', detail}`.
 - projects 1—N supporting_characters (cascade); sceneId nullable set null
 - projects 1—N scene_audio (cascade); scene_audio.sceneId -> scenes (cascade)
 
+### 4.12 `storyboard_segments` (F-SB-01 NEW)
+
+Tabel untuk menyimpan hasil generate storyboard per project, satu row per segmen 10 detik.
+
+| Kolom | Type | Constraint |
+|---|---|---|
+| id | integer | PK autoIncrement |
+| projectId | integer | -> projects.id cascade, notNull |
+| segmentIndex | integer | notNull |
+| segmentTimeStart | integer | notNull (seconds) |
+| segmentTimeEnd | integer | notNull (seconds) |
+| panelCount | integer | notNull |
+| visualStyleJson | text | notNull (JSON string) |
+| characterSheetJson | text | notNull (JSON string) |
+| locationSheetJson | text | notNull (JSON string) |
+| panelsJson | text | notNull (JSON string array of StoryboardPanelSchema) |
+| markdownPrompt | text | notNull |
+| segmentTransitionNote | text | nullable |
+| provider | text | notNull |
+| model | text | notNull |
+| status | text | notNull default 'draft' (draft/complete/failed) |
+| createdAt | integer | default unixepoch notNull |
+| updatedAt | integer | default unixepoch notNull |
+| Index | projectId; unique (projectId, segmentIndex) | |
+
+**Zod schema output** (`src/lib/validation/schemas.ts`):
+
+```typescript
+export const StoryboardPanelSchema = z.object({
+  index: z.number().int().min(1),
+  time: z.string(),                    // e.g. "0:00 - 0:01.25"
+  sceneCode: z.string(),               // e.g. "INT. LOBBY - DAY"
+  title: z.string(),
+  imagePrompt: z.string(),
+  actionVisual: z.string(),
+  cameraMovement: z.string(),
+  dialogueVo: z.string(),
+  transition: z.string(),
+  charactersPresent: z.array(z.string()),
+  location: z.string(),
+  negativePrompt: z.string().optional(),
+  audioNotes: z.string().optional(),
+});
+
+export const StoryboardSegmentSchema = z.object({
+  segmentIndex: z.number().int().min(1),
+  segmentTimeStart: z.number().int().min(0),
+  segmentTimeEnd: z.number().int().min(1),
+  durationSeconds: z.number().int(),
+  panelCount: z.number().int(),
+  visualStyle: z.object({
+    aspectRatio: z.string(),
+    artDirection: z.string(),
+    colorPalette: z.string(),
+    cinematography: z.string(),
+  }),
+  characterSheet: z.array(z.object({
+    name: z.string(),
+    visualDescription: z.string(),
+    referenceImagePrompt: z.string().optional(),
+  })),
+  locationSheet: z.array(z.object({
+    name: z.string(),
+    visualDescription: z.string(),
+    referenceImagePrompt: z.string().optional(),
+  })),
+  panels: z.array(StoryboardPanelSchema),
+  segmentTransitionNote: z.string(),
+  compiledMarkdownPrompt: z.string(),
+});
+```
+
+**Relasi**: projects 1—N storyboard_segments (cascade). Unique constraint `(projectId, segmentIndex)` mencegah duplikat segmen.
+
+### 4.13 Relasi (revisi)
+
+Tambahan relasi untuk F-SB-01:
+- projects 1—N storyboard_segments (cascade)
+
 ---
 
 ## 5. Interface / API
@@ -880,6 +1193,9 @@ Return `{check, status: 'ok'|'fail', detail}`.
 | GET | `/api/v1/projects/[id]/logs` | List generation logs | wajib + ownership | `RAG S4 F18` |
 | GET/POST | `/api/v1/projects/[id]/scenes/[sceneId]/audio` | List/create scene audio | wajib + ownership | `RAG S4 F11` |
 | PATCH/DELETE | `/api/v1/projects/[id]/scenes/[sceneId]/audio/[audioId]` | Update/delete scene audio | wajib + ownership | `RAG S4 F11` |
+| POST | `/api/v1/projects/[id]/storyboard` | Generate/regenerate storyboard segments. SSE: `starting`, `progress` (extracting_sheets / generating_outline / generating_panels), `done` / `error`. | wajib + ownership | nodejs, maxDuration 300, force-dynamic | F-SB-01 |
+| GET | `/api/v1/projects/[id]/storyboard` | List semua storyboard segments (untuk tab Storyboard). | wajib + ownership | default | F-SB-01 |
+| GET | `/api/v1/projects/[id]/storyboard/[segmentIndex]` | Get satu segmen spesifik. | wajib + ownership | default | F-SB-01 |
 
 ### 5.5 Upload
 
@@ -957,6 +1273,14 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 - max_tokens 32768 default (`llm-client.ts:270`); 65536 attempt stream:false (FR-GEN-03 ASUMSI).
 - SSE headers: `text/event-stream`, `no-cache`, `X-Accel-Buffering: no` (`route.ts:557-563`).
 
+### 6.6.1 Storyboard SSE constraints (F-SB-01)
+
+- Endpoint `POST /api/v1/projects/[id]/storyboard` pakai runtime `nodejs`, `maxDuration: 300`, `force-dynamic` (sama dengan `/api/v1/generate`).
+- Timeout per segmen = 120s; total timeout = max(300s, `segmentCount * 120s`) dibatasi oleh Vercel maxDuration 300s.
+- SSE events wajib: `stage: starting`, `progress` dengan field `stage` (`extracting_sheets`, `generating_outline`, `generating_panels`) dan `segment`/`total`, `done`, `error`.
+- Retry per segmen max 2 kali; segmen gagal tidak menghentikan segmen berikutnya (partial acceptable).
+- Payload request: `{ providerId?: number, panelsPerSegment?: number, segmentDurationSeconds?: number }`. Default `panelsPerSegment=8`, `segmentDurationSeconds=10`.
+
 ### 6.7 LLM provider
 
 - Provider enum `ollama|openrouter|9router|custom` (`schemas.ts:159`).
@@ -964,6 +1288,16 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 - Endpoint build: `${baseUrl}/chat/completions` (`llm-client.ts:256-257`).
 - Body: `{model, messages, max_tokens, temperature, stream}` (`llm-client.ts:267-274`).
 - Provider "tokenrouter" + model "MiniMax-M3" = ASUMSI dari log user (`RAG S12 G8`), kemungkinan disimpan sebagai `custom`. Tidak hardcode.
+
+### 6.7.1 Storyboard LLM constraints (F-SB-01)
+
+- Menggunakan provider/model yang sama dengan konfigurasi user (custom/OpenRouter/9Router/ollama), tidak menambah dependency model baru.
+- Two-stage per segmen:
+  1. Stage 1 `storyboard-outline.system.ts`: output JSON outline panel (panel_count, panels[], segment_transition_note). Temperature 0.7, max_tokens 8192 (ASUMSI cukup untuk outline).
+  2. Stage 2 `storyboard-panels.system.ts`: output JSON detailed prompts per panel. Temperature 0.7, max_tokens 16384 (ASUMSI cukup untuk 8 panel kompleks).
+- Setiap LLM call wajib mengandung Character Sheet + Location Sheet + Visual Style Guide + boundary context verbatim di awal system prompt.
+- Output Stage 2 divalidasi dengan `StoryboardSegmentSchema.parse` sebelum persist; fallback repair pakai `sanitizeJsonString` + `repairTruncatedJson` (reuse FR-GEN-04).
+- Negative prompt dan audio notes opsional; jika LLM tidak mengisi, default ke string kosong.
 
 ### 6.8 Blob storage
 
@@ -1075,13 +1409,39 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
     - E2E `pnpm e2e` (Playwright): generate shorts 3-5 scene sukses, generate tutorial 8-15 scene sukses, error categorize tampil di UI.
     - Coverage target >= 80% pipeline generasi (`NFR-MAINT-06` ASUMSI).
 
-**Verifikasi Fase 3**:
-- `pnpm test --coverage` - coverage >= 80% untuk `src/lib/ai/`, `src/lib/validation/schemas.ts`, `src/app/api/v1/generate/route.ts`.
-- `pnpm e2e` - semua E2E pass.
-- `pnpm build` - 0 type error, 0 lint error.
-- `pnpm lint` + `pnpm format` - 0 error.
-- Submit 100 generate (mix shorts + tutorial + sfx scene) via script/E2E - hitung success rate >= 95% (`AC-KPI-01`).
-- Cek `generation_logs` - 0 silent failure (semua error ter-kategorisasi).
+### 8.4 Fase 4: Storyboard Prompt Generator (F-SB-01)
+
+**Deliverable**:
+13. **D12 Schema + migration** (`src/lib/db/schema.ts`, `drizzle-kit generate`):
+    - Tambah tabel `storyboard_segments` (Section 4.12).
+    - Tambah Zod schema `StoryboardPanelSchema` dan `StoryboardSegmentSchema` di `src/lib/validation/schemas.ts`.
+14. **D13 Sheet extractor + segmenter** (`src/lib/ai/storyboard-sheet-extractor.ts`, `src/lib/ai/storyboard-segmenter.ts`):
+    - Implementasi perhitungan segmen 10 detik dari `durationTargetSeconds`.
+    - Ekstrak Character Sheet, Location Sheet, Visual Style Guide dari `PromptPackage`.
+15. **D14 Two-stage LLM engine** (`src/lib/ai/storyboard-engine.ts`, `src/lib/ai/prompts/storyboard-outline.system.ts`, `src/lib/ai/prompts/storyboard-panels.system.ts`, `src/lib/ai/prompts/storyboard-compiler.ts`):
+    - Stage 1: outline panel per segmen.
+    - Stage 2: detailed prompts per panel.
+    - Compiler ke Markdown.
+16. **D15 Repository + API routes** (`src/lib/db/repositories/storyboard-segment.repo.ts`, `src/app/api/v1/projects/[id]/storyboard/route.ts`, `src/app/api/v1/projects/[id]/storyboard/[segmentIndex]/route.ts`):
+    - POST generate/regenerate SSE.
+    - GET list dan single segment.
+    - Ownership check + unique constraint.
+17. **D16 UI storyboard tab** (`src/components/generate/storyboard-tab.tsx`, `storyboard-segment-card.tsx`, `storyboard-panel-card.tsx`, `storyboard-generate-button.tsx`):
+    - Tab hanya muncul setelah project complete/partial dan `resultJson` tidak null.
+    - Copy markdown / JSON per segmen.
+18. **D17 Tests storyboard**:
+    - Unit: segmenter, sheet extractor, engine, repo.
+    - Integration: route SSE.
+    - E2E (opsional): generate storyboard dari UI.
+
+**Verifikasi Fase 4**:
+- `pnpm test src/lib/ai/storyboard-segmenter.test.ts` - pass.
+- `pnpm test src/lib/ai/storyboard-sheet-extractor.test.ts` - pass.
+- `pnpm test src/lib/ai/storyboard-engine.test.ts` - pass.
+- `pnpm test src/lib/db/repositories/storyboard-segment.repo.test.ts` - pass.
+- `pnpm test src/app/api/v1/projects/[id]/storyboard` - integration pass.
+- `pnpm tsc --noEmit` - 0 error.
+- `pnpm db:generate` + `pnpm db:migrate` (dev) - tabel `storyboard_segments` terbuat.
 
 ---
 
@@ -1103,6 +1463,8 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 | Fase 3 | `pnpm e2e` | semua E2E pass |
 | Fase 3 | `pnpm build` | 0 type error, 0 lint error |
 | Fase 3 | 100 generate script | success rate >= 95%, 0 silent failure |
+| Fase 4 | `pnpm test` storyboard unit + integration | semua pass |
+| Fase 4 | `pnpm tsc --noEmit` + `pnpm db:migrate` | tabel `storyboard_segments` terbuat, 0 type error |
 
 ### 9.2 Definition of Done teknis (gate release)
 
@@ -1118,6 +1480,7 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 - [ ] E2E pass: shorts 3-5 scene, tutorial 8-15 scene, sfx scene, error categorize UI.
 - [ ] `pnpm build` + `pnpm lint` + `pnpm format` 0 error.
 - [ ] KPI `AC-KPI-01`: success rate >= 95% pada 100 generate.
+- [ ] **F-SB-01**: storyboard tab generate segments, output JSON + Markdown valid, konsistensi karakter/lokasi/gaya antar segmen, API SSE + GET list/single, DB `storyboard_segments` terisi.
 
 ### 9.3 Test framework
 
@@ -1144,6 +1507,9 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 | AS10 | Endpoint diagnose/test/dashboard isi (`RAG G18-G20`) | FR-PROV-03/04, FR-DASH-01 asumsi |
 | AS11 | fetch timeout 600s samakan ke 300s match Vercel (`NFR-PERF-05`) | ASUMSI hardening |
 | AS12 | serverActions experiment di next.config.ts (tak diverifikasi) | ASUMSI - route utama pakai SSE route handler |
+| AS13 | Field `age_range`, `ethnicity`, `hair_style`, `outfit`, `key_expression`, `signature_pose`, `reference_image_prompt` ada di `character_profiles` atau dapat disusun dari field eksisting (FR-EXP-01) | F-SB-01 Character Sheet fallback ke field yang tersedia |
+| AS14 | Mapping `durationType` ke detik standar: shorts=60, mid=180, long=300 | F-SB-01 segment calculation fallback |
+| AS15 | Panel count dinamis max 12, min 4 berasal dari keputusan UX design doc | F-SB-01 default 8 panel, dinamis |
 
 ---
 
@@ -1183,6 +1549,9 @@ Kategori error (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTT
 | Dashboard | `RAG S4 F8` | `dashboard.repo.ts` |
 | Diagnose/test endpoint | `RAG S12 G18, G19` | route files (isi ASUMSI) |
 | Data model 9 tabel | `RAG S9` | `schema.ts:5-201` |
+| Data model storyboard_segments (F-SB-01) | Design doc Section 5.1 | `schema.ts` extend, `drizzle-kit generate` |
+| Storyboard two-stage LLM architecture | Design doc Section 7 | `src/lib/ai/storyboard-engine.ts` |
+| Storyboard consistency rules | Design doc Section 4 | sheet extractor + boundary rules |
 | Env vars | `RAG S10.5` | `.env.example:1-17` |
 | KPI bisnis | `BRD S4` | - |
 | Scope in/out | `BRD S8.1, S8.2`, `PRD S9` | - |

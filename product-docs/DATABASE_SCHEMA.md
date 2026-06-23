@@ -23,7 +23,7 @@
 
 **Justifikasi Turso/libSQL** (`SRS S1.1`): monolith Next.js Vercel-managed, butuh DB hosted zero-ops, edge-read, SQLite wire-compatible. libSQL = SQLite extended dengan native replication. Tipe data terbatas: `integer`, `text`, `real`. Tidak ada `jsonb`, `timestamptz`, `uuid`, `serial` Postgres-style. Timestamp = `integer` (unixepoch second). Boolean = `integer` 0/1 (`RAG S9`).
 
-### 1.2 Daftar entitas (12 tabel)
+### 1.2 Daftar entitas (11 tabel)
 
 | # | Entitas | Tabel DB | Deskripsi | Citation |
 |---|---|---|---|---|
@@ -37,8 +37,9 @@
 | E8 | GenerationLog | `generation_logs` | Audit log generate (success/partial/fail + logsJson) | `schema.ts:147-160` |
 | E9 | SupportingCharacter | `supporting_characters` | Karakter pendukung per scene | `schema.ts:163-174` |
 | E10 | SceneAudio | `scene_audio` | Spec audio per scene (V3) - background_music/sfx/ambient/music_cue/transition_audio | `schema.ts:177-201` |
+| E11 | StoryboardSegment | `storyboard_segments` | Storyboard prompt per 10-detik segmen (F-SB-01) | Design doc S5.1 |
 
-> **Catatan**: RAG S9 menyebut "9 tabel" tapi schema.ts mendefinisikan 10 `sqliteTable`. `accounts` + `sessions` (NextAuth adapter tables) **TIDAK ADA** di schema.ts - NextAuth v5 beta pakai Credentials provider + JWT session strategy, tidak pakai DB adapter (`RAG S10.1`, `config.ts:6` edge). Jadi total tabel persisten = 10. Task prompt menyebut "users, accounts, sessions" - `accounts`/`sessions` ASUMSI tidak terdefinisi di repo (NextAuth JWT mode).
+> **Catatan**: RAG S9 menyebut "9 tabel" tapi schema.ts mendefinisikan 10 `sqliteTable` (V3) + 1 tabel storyboard (F-SB-01). `accounts` + `sessions` (NextAuth adapter tables) **TIDAK ADA** di schema.ts - NextAuth v5 beta pakai Credentials provider + JWT session strategy, tidak pakai DB adapter (`RAG S10.1`, `config.ts:6` edge). Jadi total tabel persisten = 11. Task prompt menyebut "users, accounts, sessions" - `accounts`/`sessions` ASUMSI tidak terdefinisi di repo (NextAuth JWT mode).
 
 ---
 
@@ -55,6 +56,7 @@ erDiagram
     projects ||--o{ generation_logs : "1-N cascade"
     projects ||--o{ supporting_characters : "1-N cascade"
     projects ||--o{ scene_audio : "1-N cascade"
+    projects ||--o{ storyboard_segments : "1-N cascade unique segmentIndex"
     scenes ||--o{ image_prompts : "1-N cascade nullable(master=null)"
     scenes ||--o{ supporting_characters : "1-N set null"
     scenes ||--o{ scene_audio : "1-N cascade"
@@ -68,6 +70,7 @@ erDiagram
     generation_logs { integer id PK integer project_id FK text provider text model integer duration_ms text status text error_message text logs_json integer created_at }
     supporting_characters { integer id PK integer project_id FK integer scene_id FK text nama text tipe text aksi integer created_at }
     scene_audio { integer id PK integer project_id FK integer scene_id FK text audio_type text description text timing integer duration_seconds real volume integer fade_in_ms integer fade_out_ms text music_genre text music_mood integer music_tempo_bpm text music_instruments real music_volume text sfx_list text ambient_type real ambient_volume integer created_at }
+    storyboard_segments { integer id PK integer project_id FK integer segment_index integer segment_time_start integer segment_time_end integer panel_count text visual_style_json text character_sheet_json text location_sheet_json text panels_json text markdown_prompt text segment_transition_note text provider text model text status integer created_at integer updated_at }
 ```
 
 ---
@@ -264,6 +267,56 @@ erDiagram
 
 **Indexes**: `idx_scene_audio_project_id`, `idx_scene_audio_scene_id`, `idx_scene_audio_project_scene` ON `(project_id, scene_id)` (`schema.ts:198-200`, DDL `0001:41-43`).
 
+### 3.11 `storyboard_segments` (F-SB-01 NEW)
+
+| Kolom | Tipe Drizzle | PK | FK | Nullable | Default | Notes | Citation |
+|---|---|---|---|---|---|---|---|
+| `id` | integer PK autoInc | YA | - | NO | AUTOINC | - | Design doc S5.1 |
+| `projectId` / `project_id` | integer notNull refs projects.id cascade | - | projects.id | NO | - | On delete project -> hapus segmen | Design doc S5.1 |
+| `segmentIndex` / `segment_index` | integer notNull | - | - | NO | - | 1-based, unik per project | Design doc S5.1 |
+| `segmentTimeStart` / `segment_time_start` | integer notNull | - | - | NO | - | Detik awal segmen | Design doc S5.1 |
+| `segmentTimeEnd` / `segment_time_end` | integer notNull | - | - | NO | - | Detik akhir segmen (<= total durasi) | Design doc S5.1 |
+| `panelCount` / `panel_count` | integer notNull | - | - | NO | - | Jumlah panel per segmen | Design doc S5.1 |
+| `visualStyleJson` / `visual_style_json` | text notNull | - | - | NO | - | JSON Visual Style Guide | Design doc S5.1 |
+| `characterSheetJson` / `character_sheet_json` | text notNull | - | - | NO | - | JSON Character Sheet array | Design doc S5.1 |
+| `locationSheetJson` / `location_sheet_json` | text notNull | - | - | NO | - | JSON Location Sheet array | Design doc S5.1 |
+| `panelsJson` / `panels_json` | text notNull | - | - | NO | - | JSON array panel detail | Design doc S5.1 |
+| `markdownPrompt` / `markdown_prompt` | text notNull | - | - | NO | - | Compiled Markdown siap copy | Design doc S5.1 |
+| `segmentTransitionNote` / `segment_transition_note` | text | - | - | YA | - | Catatan transisi antar segmen | Design doc S5.1 |
+| `provider` | text notNull | - | - | NO | - | Provider name saat generate | Design doc S5.1 |
+| `model` | text notNull | - | - | NO | - | Model ID saat generate | Design doc S5.1 |
+| `status` | text notNull default 'draft' | - | - | NO | `'draft'` | Enum: `draft\|generating\|complete\|failed` | Design doc S5.1 |
+| `createdAt` | integer notNull default unixepoch | - | - | NO | unixepoch | - | Design doc S5.1 |
+| `updatedAt` | integer notNull default unixepoch | - | - | NO | unixepoch | - | Design doc S5.1 |
+
+**Indexes**: `idx_storyboard_segments_project_id` ON `(project_id)`; **unique** `idx_storyboard_segments_project_segment` ON `(project_id, segment_index)` (Design doc S5.1).
+
+**Drizzle ORM snippet** (`schema.ts` extend):
+```typescript
+export const storyboardSegments = sqliteTable('storyboard_segments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  segmentIndex: integer('segment_index').notNull(),
+  segmentTimeStart: integer('segment_time_start').notNull(),
+  segmentTimeEnd: integer('segment_time_end').notNull(),
+  panelCount: integer('panel_count').notNull(),
+  visualStyleJson: text('visual_style_json').notNull(),
+  characterSheetJson: text('character_sheet_json').notNull(),
+  locationSheetJson: text('location_sheet_json').notNull(),
+  panelsJson: text('panels_json').notNull(),
+  markdownPrompt: text('markdown_prompt').notNull(),
+  segmentTransitionNote: text('segment_transition_note'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  status: text('status').notNull().default('draft'),
+  createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at').default(sql`(unixepoch())`).notNull(),
+}, (t) => ({
+  projectIdx: index('idx_storyboard_segments_project_id').on(t.projectId),
+  projectSegmentIdx: uniqueIndex('idx_storyboard_segments_project_segment').on(t.projectId, t.segmentIndex),
+}));
+```
+
 ---
 
 ## 4. Kolom Kunci Minat: `scene_audio.sfxList` (BUG A)
@@ -339,6 +392,8 @@ const normalizedSfxList = Array.isArray(audio.sfx_list)
 | scene_audio | `idx_scene_audio_project_id` | `(project_id)` | INDEX | `schema.ts:198`, DDL `0001:41` |
 | scene_audio | `idx_scene_audio_scene_id` | `(scene_id)` | INDEX | `schema.ts:199`, DDL `0001:42` |
 | scene_audio | `idx_scene_audio_project_scene` | `(project_id, scene_id)` | INDEX | `schema.ts:200`, DDL `0001:43` |
+| storyboard_segments | `idx_storyboard_segments_project_id` | `(project_id)` | INDEX | Design doc S5.1 |
+| storyboard_segments | `idx_storyboard_segments_project_segment` | `(project_id, segment_index)` | UNIQUE | Design doc S5.1 |
 
 ### 5.2 Index yang SEHARUSNYA ada (SHOULD - belum di schema.ts)
 
@@ -368,6 +423,7 @@ SQLite/libSQL **TIDAK mendukung** `CHECK` constraint native yang kompleks, `ENUM
 - `scene_audio.audioType` IN (5 enum) - `prompt-builder.ts:152`
 - `generation_logs.status` IN (`success`, `partial`, `fail`) - `route.ts:502-513`
 - `asset_references.tipe` IN (6 enum) - `schemas.ts:173`
+- `storyboard_segments.status` IN (`draft`, `generating`, `complete`, `failed`) - Design doc S5.1 (F-SB-01)
 
 ---
 
@@ -393,6 +449,7 @@ Semua PK = `integer PRIMARY KEY AUTOINCREMENT NOT NULL`. Surrogate key, tidak ad
 | supporting_characters | scene_id | scenes.id | **set null** | no action | 1-N (nullable) | `schema.ts:166`, DDL `0000:122` |
 | scene_audio | project_id | projects.id | cascade | no action | 1-N | `schema.ts:179`, DDL `0001:38` |
 | scene_audio | scene_id | scenes.id | cascade | no action | 1-N | `schema.ts:180`, DDL `0001:39` |
+| storyboard_segments | project_id | projects.id | cascade | no action | 1-N (unique segmentIndex per project) | Design doc S5.1 (F-SB-01) |
 
 **Catatan ON DELETE**:
 - `cascade` = hapus parent -> hapus child otomatis (default untuk mayoritas relasi).
@@ -492,6 +549,7 @@ Berdasarkan FK dependency:
 8. `generation_logs` (FK -> projects)
 9. `supporting_characters` (FK -> projects, scenes)
 10. `scene_audio` (FK -> projects, scenes)
+11. `storyboard_segments` (FK -> projects) (F-SB-01)
 
 Drizzle Kit otomatis urutkan dependency saat generate. Manual create harus ikut urutan ini.
 
@@ -508,6 +566,20 @@ pnpm db:generate  # generate 0003_add_indexes.sql
 # review SQL
 pnpm db:migrate    # apply
 ```
+
+### 8.6 Migration plan untuk F-SB-01 (storyboard_segments)
+
+**Migration DB WAJIB** untuk tabel baru `storyboard_segments`:
+1. Ubah `src/lib/db/schema.ts` — tambah definisi `storyboardSegments` (lihat Section 3.11).
+2. Jalankan `pnpm db:generate` untuk membuat migration SQL baru (mis. `0003_storyboard_segments.sql`).
+3. Review migration SQL; pastikan:
+   - `CREATE TABLE storyboard_segments (...)`
+   - `REFERENCES projects(id) ON DELETE cascade`
+   - `UNIQUE INDEX idx_storyboard_segments_project_segment ON (project_id, segment_index)`
+   - `INDEX idx_storyboard_segments_project_id ON (project_id)`
+4. Jalankan `pnpm db:migrate` di dev / CI deploy step.
+
+**Tidak perlu backfill data** untuk project lama: tab Storyboard hanya muncul setelah user generate storyboard baru. Project tanpa storyboard tidak terdampak.
 
 ---
 
@@ -643,6 +715,7 @@ Hanya `projects` punya soft delete (`deletedAt` nullable, `schema.ts:47`). Imple
 | `src/lib/ai/prompt-builder.ts:152` | AUDIO_SPECS ambigu "Untuk sfx: sfx_list" |
 | `src/lib/ai/llm-client.ts:18-44` | error categorization |
 | `src/lib/ai/llm-client.ts:274,287` | retry body sama (Bug A retry identik) |
+| `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` | Storyboard Prompt Generator F-SB-01 design doc |
 | `src/app/api/v1/generate/route.ts:35-51` | safeDbOp swallow error (Bug D) |
 | `src/app/api/v1/generate/route.ts:238,316` | status failed/complete |
 | `src/app/api/v1/generate/route.ts:310-493` | persist block delete+recreate |
@@ -672,7 +745,9 @@ Hanya `projects` punya soft delete (`deletedAt` nullable, `schema.ts:47`). Imple
 | A8 | `music_tempo_bpm` range 60-200 | DB tanpa range, `SceneAudioSchema` duplikat punya range (`schemas.ts:93`) tapi tidak dipakai scene. |
 | A9 | Register route bcrypt.hash | `register/route.ts` ada tapi tidak dibaca (`RAG G4`). |
 | A10 | Soft delete project = child tetap ada | `project.repo.ts:33-65` tidak dibaca langsung. ASUMSI soft delete hanya set `deletedAt` parent, child intact. |
+| A11 | `storyboard_segments` migration file akan ter-generate otomatis oleh `pnpm db:generate` | Tidak ada migration file saat ini; akan dihasilkan setelah `schema.ts` di-extend. |
+| A12 | Field `segmentTransitionNote` nullable | Design doc S5.1 sebut `segmentTransitionNote: text('segment_transition_note')` tanpa `.notNull()`. |
 
 ---
 
-**END DATABASE_SCHEMA.md** - 10 tabel, DB Turso/libSQL SQLite, Drizzle ORM sqlite-core. Bug A `sfxList` = text DB (tidak perlu migration), fix di app layer union+normalizer per SRS FR-GEN-02.
+**END DATABASE_SCHEMA.md** - 11 tabel, DB Turso/libSQL SQLite, Drizzle ORM sqlite-core. Bug A `sfxList` = text DB (tidak perlu migration), fix di app layer union+normalizer per SRS FR-GEN-02. F-SB-01 menambah tabel `storyboard_segments` (perlu migration drizzle-kit).

@@ -100,6 +100,7 @@ Tidak ada RBAC granular per endpoint. `users.role` default `'user'` (`schema.ts:
 
 Request & response body = JSON (`application/json`), kecuali:
 - `POST /api/v1/generate` -> response `text/event-stream` (SSE, `route.ts:558`).
+- `POST /api/v1/projects/[id]/storyboard` -> response `text/event-stream` (SSE, F-SB-01).
 - `GET /api/v1/projects/[id]/export` -> response `text/markdown` (ASUMSI, `SRS S3.3.1`).
 - `POST /api/v1/upload` -> request `multipart/form-data` (ASUMSI upload file, `RAG S4 F6`).
 
@@ -208,7 +209,7 @@ Tidak ada full-text search. Filter = exact match field. ASUMSI future: search `t
 
 ### 6.1 Aturan
 
-In-memory Map single-instance, 10 request/menit per user/IP untuk `POST /api/v1/generate` (`middleware.ts:18-36,109-127`). Hanya endpoint generate yang di-rate-limit.
+In-memory Map single-instance, 10 request/menit per user/IP untuk `POST /api/v1/generate` (`middleware.ts:18-36,109-127`). `POST /api/v1/projects/[id]/storyboard` ASUMSI di-rate-limit sama (route-level atau matcher extended). Hanya endpoint SSE generate dan storyboard generate yang di-rate-limit.
 
 | Item | Nilai | Citation |
 |---|---|---|
@@ -305,8 +306,11 @@ ASUMSI same-origin only (Next.js App Router default). Tidak ada konfigurasi CORS
 | E27 | DELETE | `/api/v1/settings/providers/[id]` | Delete provider | YA + ownership | Hard delete | FR-PROV-01 | `RAG S3.2` |
 | E28 | POST | `/api/v1/settings/providers/[id]/delete` | Delete alt | YA + ownership | Alt path delete | FR-PROV-01 | `RAG S3.2` |
 | E29 | POST | `/api/v1/settings/providers/[id]/test` | Test provider | YA + ownership | Ping provider, latency | FR-PROV-03 | `RAG S12 G19` ASUMSI |
+| E30 | POST | `/api/v1/projects/[id]/storyboard` | Generate storyboard | YA + ownership + rate limit | Generate/regenerate storyboard segments (SSE) | F-SB-01 | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` |
+| E31 | GET | `/api/v1/projects/[id]/storyboard` | List storyboard | YA + ownership | Ambil semua storyboard segments | F-SB-01 | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` |
+| E32 | GET | `/api/v1/projects/[id]/storyboard/[segmentIndex]` | Get storyboard segment | YA + ownership | Ambil satu segment spesifik | F-SB-01 | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` |
 
-Total: 29 operasi (beberapa path mendukung multi-method).
+Total: 32 operasi (beberapa path mendukung multi-method).
 
 ---
 
@@ -945,13 +949,261 @@ Alt path delete (sama E27).
 **Relasi**: FR-PROV-03.
 **Citation**: `RAG S12 G19` ASUMSI.
 
+### 9.23 E30: POST /api/v1/projects/[id]/storyboard (SSE)
+
+**Method+Path**: `POST /api/v1/projects/{id}/storyboard` (`id` = integer project ID).
+**Auth**: YA + ownership + rate limit 10 req/min (ASUMSI).
+**Runtime**: `nodejs`, `maxDuration=300`, `force-dynamic` (ASUMSI, F-SB-01).
+**Content-Type response**: `text/event-stream; charset=utf-8` (ASUMSI, mengikuti pola `/generate`).
+**FR**: F-SB-01.
+
+#### 9.23.1 Request body (`StoryboardGenerateInputSchema`, ASUMSI)
+
+```json
+{
+  "providerId": 123,          // integer, opsional, default = active provider user
+  "panelsPerSegment": 8,      // integer 1-24, default 8
+  "segmentDurationSeconds": 10  // integer 1-300, default 10
+}
+```
+
+Contoh request:
+```json
+{
+  "providerId": 1,
+  "panelsPerSegment": 8,
+  "segmentDurationSeconds": 10
+}
+```
+
+#### 9.23.2 Validasi (status pre-SSE)
+
+| Status | Kapan | Body |
+|---|---|---|
+| 400 | body parse fail / Zod safeParse fail | `VALIDATION_ERROR` |
+| 400 | `panelsPerSegment` <1 atau >24, `segmentDurationSeconds` <1 | `VALIDATION_ERROR` + field hint |
+| 401 | session null | `UNAUTHORIZED` |
+| 404 | project not found / not owned | `NOT_FOUND` |
+| 404 | provider not found (bila `providerId` di-set) | `NOT_FOUND` |
+| 409 | project bukan milik user | `CONFLICT` |
+| 409 | project belum punya `resultJson` PromptPackage (status draft) | `CONFLICT` "Project belum memiliki PromptPackage" |
+| 429 | rate limit terlewati | `RATE_LIMITED` |
+
+#### 9.23.3 Response: SSE stream
+
+Format sama seperti E1: `event: <name>\ndata: <json>\n\n`.
+
+**Event types** (F-SB-01):
+
+| Event | data shape | Kapan |
+|---|---|---|
+| `stage` | `{ stage: 'starting' | 'extracting_sheets' | 'generating_outline' | 'generating_panels' | 'compiling' | 'saving' }` | tiap stage pipeline |
+| `progress` | `{ stage, segmentIndex: number, total: number, message?: string }` | progres per stage/segmen |
+| `segment_progress` | `{ stage, segmentIndex, totalPanels, currentPanel?: number }` | progres panel dalam segmen (ASUMSI) |
+| `done` | `{ segments: number, projectId: number, segmentIndices: number[] }` | sukses semua segmen |
+| `error` | `{ code: string, message: string }` | failure |
+
+Contoh stream:
+```
+event: stage
+data: {"stage":"starting"}
+
+event: progress
+data: {"stage":"extracting_sheets","segmentIndex":0,"total":3}
+
+event: progress
+data: {"stage":"generating_outline","segmentIndex":1,"total":3}
+
+event: segment_progress
+data: {"stage":"generating_panels","segmentIndex":1,"totalPanels":8,"currentPanel":4}
+
+event: progress
+data: {"stage":"generating_panels","segmentIndex":1,"total":3}
+
+event: done
+data: {"segments":3,"projectId":42,"segmentIndices":[1,2,3]}
+```
+
+#### 9.23.4 Persistensi
+
+Setiap segmen di-upsert ke tabel `storyboard_segments` (`projectId`, `segmentIndex` unique). Bila regenerasi, segmen lama ditimpa (delete then insert, ASUMSI).
+
+#### 9.23.5 Error event categories
+
+SSE `error` event mengikuti kategori internal LLM (`llm-client.ts:18-44`): `TIMEOUT`, `NETWORK`, `VALIDATION`, `HTTP`, `JSON_PARSE`, `UNKNOWN`, `DB_ERROR`.
+
+#### 9.23.6 Relasi
+
+- DB: `storyboard_segments` (F-SB-01 `design.md` S5.1), `projects.resultJson` (read PromptPackage), `provider_configs`.
+- Fitur PRD: F-SB-01 Storyboard Prompt Generator.
+- SRS: ASUMSI (belum ada section eksplisit di SRS yang dibaca).
+
+### 9.24 E31: GET /api/v1/projects/[id]/storyboard
+
+**Method+Path**: `GET /api/v1/projects/{id}/storyboard`.
+**Auth**: YA + ownership.
+**Purpose**: Ambil semua storyboard segments project.
+**Query**: none (ASUMSI, list kecil <=30 segmen).
+**Response**: `{ data: StoryboardSegmentDTO[] }`.
+
+#### 9.24.1 Response body
+
+`StoryboardSegmentDTO` (ASUMSI mapping dari `storyboard_segments`):
+
+```typescript
+{
+  id: number,
+  projectId: number,
+  segmentIndex: number,
+  segmentTimeStart: number,   // seconds
+  segmentTimeEnd: number,     // seconds
+  panelCount: number,
+  visualStyle: {
+    aspectRatio: string,
+    artDirection: string,
+    colorPalette: string,
+    cinematography: string,
+  },
+  characterSheet: Array<{
+    name: string,
+    visualDescription: string,
+    referenceImagePrompt?: string,
+  }>,
+  locationSheet: Array<{
+    name: string,
+    visualDescription: string,
+    referenceImagePrompt?: string,
+  }>,
+  panels: Array<StoryboardPanelDTO>,
+  segmentTransitionNote: string | null,
+  compiledMarkdownPrompt: string,
+  provider: string,
+  model: string,
+  status: 'draft' | 'complete' | 'failed',  // ASUMSI
+  createdAt: string,  // ISO-8601
+  updatedAt: string,  // ISO-8601
+}
+```
+
+`StoryboardPanelDTO`:
+```typescript
+{
+  index: number,
+  time: string,                // e.g. "0:00 - 0:01.25"
+  sceneCode: string,           // e.g. "INT. LOBBY - DAY"
+  title: string,
+  imagePrompt: string,
+  actionVisual: string,
+  cameraMovement: string,
+  dialogueVo: string,
+  transition: string,
+  charactersPresent: string[],
+  location: string,
+  negativePrompt?: string,
+  audioNotes?: string,
+}
+```
+
+Contoh response:
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "projectId": 42,
+      "segmentIndex": 1,
+      "segmentTimeStart": 0,
+      "segmentTimeEnd": 10,
+      "panelCount": 8,
+      "visualStyle": {
+        "aspectRatio": "9:16",
+        "artDirection": "Cinematic 3D animation",
+        "colorPalette": "Warm golden hour",
+        "cinematography": "Dynamic camera, shallow depth of field"
+      },
+      "characterSheet": [
+        { "name": "Adrian", "visualDescription": "Young man, black hair, white shirt, confident expression", "referenceImagePrompt": "3d render of young Asian man..." }
+      ],
+      "locationSheet": [
+        { "name": "Luxury Lobby", "visualDescription": "Marble floor, high ceiling, afternoon sun", "referenceImagePrompt": "luxury office lobby interior..." }
+      ],
+      "panels": [
+        {
+          "index": 1,
+          "time": "0:00 - 0:01.25",
+          "sceneCode": "INT. LOBBY - DAY",
+          "title": "Lobby Pertama",
+          "imagePrompt": "3D cinematic shot: young Asian man...",
+          "actionVisual": "Adrian walks into lobby, confident stride",
+          "cameraMovement": "Low angle slow push in",
+          "dialogueVo": "Adrian steps forward, the city behind him",
+          "transition": "FADE IN",
+          "charactersPresent": ["Adrian"],
+          "location": "Luxury Lobby",
+          "negativePrompt": "blurry, distorted hands",
+          "audioNotes": "ambient city hum"
+        }
+      ],
+      "segmentTransitionNote": "FADE OUT ke segmen 2...",
+      "compiledMarkdownPrompt": "# Segment 1 (0:00 - 0:10)...",
+      "provider": "custom",
+      "model": "minimax/MiniMax-M3",
+      "status": "complete",
+      "createdAt": "2026-06-23T00:00:00.000Z",
+      "updatedAt": "2026-06-23T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Status**: 200 OK. 401. 404 project not found / not owned. 409 bila bukan milik user.
+
+**Relasi**: F-SB-01. DB `storyboard_segments`.
+
+### 9.25 E32: GET /api/v1/projects/[id]/storyboard/[segmentIndex]
+
+**Method+Path**: `GET /api/v1/projects/{id}/storyboard/{segmentIndex}`.
+**Auth**: YA + ownership.
+**Path param**: `segmentIndex` integer >=1.
+**Purpose**: Ambil satu segment spesifik.
+**Response**: `{ data: StoryboardSegmentDTO }` (sama schema E31).
+
+Contoh response:
+```json
+{
+  "data": {
+    "id": 1,
+    "projectId": 42,
+    "segmentIndex": 1,
+    "segmentTimeStart": 0,
+    "segmentTimeEnd": 10,
+    "panelCount": 8,
+    "visualStyle": { "aspectRatio": "9:16", "artDirection": "Cinematic 3D animation", "colorPalette": "Warm golden hour", "cinematography": "Dynamic camera" },
+    "characterSheet": [{ "name": "Adrian", "visualDescription": "...", "referenceImagePrompt": "..." }],
+    "locationSheet": [{ "name": "Luxury Lobby", "visualDescription": "...", "referenceImagePrompt": "..." }],
+    "panels": [],
+    "segmentTransitionNote": "FADE OUT ke segmen 2...",
+    "compiledMarkdownPrompt": "# Segment 1...",
+    "provider": "custom",
+    "model": "minimax/MiniMax-M3",
+    "status": "complete",
+    "createdAt": "2026-06-23T00:00:00.000Z",
+    "updatedAt": "2026-06-23T00:00:00.000Z"
+  }
+}
+```
+
+**Status**: 200 OK. 400 bila `segmentIndex` bukan integer / <1. 401. 404 project atau segment not found. 409 ownership mismatch.
+
+**Relasi**: F-SB-01. DB `storyboard_segments`.
+
 ---
 
 ## 10. Webhook / Event Async
 
 **Tidak ada webhook inbound maupun outbound.** (`PROJECT_ARCHITECTURE S8`: "Tidak ada webhook inbound. Tidak ada message queue. Tidak ada cron.")
 
-Async real-time = SSE stream outbound (`POST /api/v1/generate`) — client subscribe, server push events, selesai close. Bukan webhook persistent. Tidak ada retry dari sisi server bila client disconnect (state di `generation_logs` untuk audit).
+Async real-time = SSE stream outbound (`POST /api/v1/generate` dan `POST /api/v1/projects/[id]/storyboard`) — client subscribe, server push events, selesai close. Bukan webhook persistent. Tidak ada retry dari sisi server bila client disconnect (state di `generation_logs` untuk audit).
 
 ---
 
@@ -1125,6 +1377,70 @@ components:
             - { type: string, nullable: true }
             - { type: array, items: { type: string }, nullable: true }
           description: 'TARGET FR-GEN-02: union string|array. Current: string only (Bug A).'
+    StoryboardGenerateInput:
+      type: object
+      properties:
+        providerId: { type: integer, nullable: true }
+        panelsPerSegment: { type: integer, minimum: 1, maximum: 24, default: 8 }
+        segmentDurationSeconds: { type: integer, minimum: 1, default: 10 }
+    StoryboardPanel:
+      type: object
+      required: [index, time, sceneCode, title, imagePrompt, actionVisual, cameraMovement, dialogueVo, transition, charactersPresent, location]
+      properties:
+        index: { type: integer, minimum: 1 }
+        time: { type: string }
+        sceneCode: { type: string }
+        title: { type: string }
+        imagePrompt: { type: string }
+        actionVisual: { type: string }
+        cameraMovement: { type: string }
+        dialogueVo: { type: string }
+        transition: { type: string }
+        charactersPresent: { type: array, items: { type: string } }
+        location: { type: string }
+        negativePrompt: { type: string, nullable: true }
+        audioNotes: { type: string, nullable: true }
+    StoryboardSegment:
+      type: object
+      required: [id, projectId, segmentIndex, segmentTimeStart, segmentTimeEnd, panelCount, visualStyle, characterSheet, locationSheet, panels, compiledMarkdownPrompt, provider, model, status]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        segmentIndex: { type: integer, minimum: 1 }
+        segmentTimeStart: { type: integer }
+        segmentTimeEnd: { type: integer }
+        panelCount: { type: integer }
+        visualStyle:
+          type: object
+          properties:
+            aspectRatio: { type: string }
+            artDirection: { type: string }
+            colorPalette: { type: string }
+            cinematography: { type: string }
+        characterSheet:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              visualDescription: { type: string }
+              referenceImagePrompt: { type: string, nullable: true }
+        locationSheet:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              visualDescription: { type: string }
+              referenceImagePrompt: { type: string, nullable: true }
+        panels: { type: array, items: { $ref: '#/components/schemas/StoryboardPanel' } }
+        segmentTransitionNote: { type: string, nullable: true }
+        compiledMarkdownPrompt: { type: string }
+        provider: { type: string }
+        model: { type: string }
+        status: { type: string, enum: [draft, complete, failed] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 security:
   - cookieAuth: []
 paths:
@@ -1152,6 +1468,72 @@ paths:
       summary: Health check
       security: []
       responses: { '200': { description: OK } }
+  /api/v1/projects/{id}/storyboard:
+    get:
+      summary: List storyboard segments
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: List of storyboard segments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/StoryboardSegment' } }
+        '401': { description: Unauthorized }
+        '404': { description: Project not found }
+    post:
+      summary: Generate storyboard segments (SSE)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StoryboardGenerateInput' }
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '400': { description: Validation error }
+        '401': { description: Unauthorized }
+        '404': { description: Project or provider not found }
+        '409': { description: Ownership mismatch or project has no PromptPackage }
+        '429': { description: Rate limited }
+  /api/v1/projects/{id}/storyboard/{segmentIndex}:
+    get:
+      summary: Get storyboard segment
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: segmentIndex
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Storyboard segment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoryboardSegment' }
+        '400': { description: Invalid segmentIndex }
+        '401': { description: Unauthorized }
+        '404': { description: Project or segment not found }
   # ... endpoint lain mengikuti pola di S9
 ```
 
@@ -1177,6 +1559,9 @@ paths:
 | E20-E21 scenes | FR-PROJ-01 | S3.2.1 | scenes |
 | E22-E23 scene audio | FR-PROJ-01 | S3.2.1 | scene_audio |
 | E24-E29 providers | FR-PROV-01, FR-PROV-02, FR-PROV-03 | S3.6.1..S3.6.3 | provider_configs |
+| E30 storyboard generate | F-SB-01 | ASUMSI SRS S3.x | storyboard_segments, projects, provider_configs |
+| E31 storyboard list | F-SB-01 | ASUMSI | storyboard_segments |
+| E32 storyboard get segment | F-SB-01 | ASUMSI | storyboard_segments |
 
 ---
 
@@ -1224,6 +1609,7 @@ paths:
 | `aes.ts:4-49` | AES-256-GCM |
 | `llm-client.ts:18-44` | categorizeError |
 | `llm-client.ts:284-289` | fetch timeout 600s |
+| `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` | Storyboard Prompt Generator F-SB-01 |
 
 ---
 
@@ -1247,6 +1633,9 @@ paths:
 | A14 | CORS same-origin only | tidak ada config CORS terbukti |
 | A15 | `role` admin RBAC | hanya default 'user' terdefinisi (`DATABASE_SCHEMA A2`) |
 | A16 | Bulk-delete multi-status 207 | repo tidak dibaca |
+| A17 | `POST /api/v1/projects/[id]/storyboard` rate-limit 10 req/min | route file belum ada; design doc sebut maxDuration 300s |
+| A18 | StoryboardSegmentDTO field camelCase mapping dari `storyboard_segments` | `design.md` sebut kolom DB snake_case; mapping DTO ASUMSI |
+| A19 | Status enum storyboard `draft|complete|failed` | `design.md` default 'draft'; nilai lain ASUMSI |
 
 ---
 

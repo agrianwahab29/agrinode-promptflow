@@ -153,6 +153,18 @@ Dikelompokkan per area. Format: `Sebagai [persona], saya ingin [aksi], sehingga 
 |---|---|---|---|
 | US-TPL-01 | Sebagai Rina, saya ingin **template presets** (tutorial, cinematic, kids, documentary, action) sebagai starting point, sehingga saya tidak mulai blank. | COULD | FR-TPL-01 |
 
+### 3.11 Storyboard Prompt Generator (F-SB-01)
+
+| ID | User Story | Prioritas | FR terkait |
+|---|---|---|---|
+| US-SB-01 | Sebagai creator video AI, saya ingin sistem **memecah video secara otomatis menjadi segmen 10 detik** dari `PromptPackage` yang sudah tergenerate, sehingga saya bisa generate setiap segmen terpisah. | MUST | FR-SB-01 |
+| US-SB-02 | Sebagai creator video AI, saya ingin setiap segmen 10 detik dipecah menjadi **panel storyboard visual yang konsisten** (karakter, lokasi, gaya, komposisi, transisi), sehingga output siap pakai ke Midjourney/Runway/Kling. | MUST | FR-SB-02 |
+| US-SB-03 | Sebagai creator video AI, saya ingin **storyboard prompts disimpan di project**, sehingga saya bisa buka ulang, copy, atau regenerate tanpa generate ulang dari awal. | MUST | FR-SB-03 |
+| US-SB-04 | Sebagai creator video AI, saya ingin melihat **progress generate storyboard real-time via SSE**, sehingga saya tahu segmen mana yang sedang diproses. | MUST | FR-SB-04 |
+| US-SB-05 | Sebagai creator video AI, saya ingin **menyalin storyboard prompt per segmen dalam format Markdown atau JSON**, sehingga saya paste ke AI generator favorit. | MUST | FR-SB-05 |
+| US-SB-06 | Sebagai creator video AI, saya ingin **regenerate satu segmen spesifik** bila hasilnya kurang pas, sehingga saya tidak perlu regenerate semua segmen. | SHOULD | FR-SB-06 |
+| US-SB-07 | Sebagai creator video AI, saya ingin sistem menjaga **kontinuitas antar segmen** dengan transisi note di panel pertama/terakhir, sehingga video akhir tetap nyambung. | SHOULD | FR-SB-07 |
+
 ---
 
 ## 4. MoSCoW Prioritization
@@ -213,6 +225,29 @@ Dikelompokkan per area. Format: `Sebagai [persona], saya ingin [aksi], sehingga 
 | W6 | Payment gateway / billing | Private package, no billing di repo | `BRD S8.2`, `RAG S12` |
 | W7 | Analytics custom engine (ganti Vercel Analytics) | Tetap `@vercel/analytics` | `BRD S8.2` |
 | W8 | Marketplace template | Fitur baru | `BRD S8.2` |
+| W9 | Storyboard Prompt Generator (F-SB-01) sebagai fitur mandiri di luar `/generate` | Scope creep - MVP terintegrasi tab | `Design Doc S3` |
+
+---
+
+## 4.5 Storyboard Prompt Generator — MoSCoW (F-SB-01)
+
+> Fitur baru terintegrasi di halaman `/generate`. Source: `docs/plans/2026-06-23-storyboard-prompt-generator-design.md`.
+
+| ID | Fitur | Prioritas | Alasan |
+|---|---|---|---|
+| M-SB-01 | **Storyboard tab di `/generate`** untuk project yang sudah punya `PromptPackage` | MUST | Entry point feature; tidak mengubah flow generate utama |
+| M-SB-02 | **Segmenter 10 detik per segmen** dari `durationTargetSeconds` | MUST | Core value proposition storyboard |
+| M-SB-03 | **Two-stage LLM generator** (outline → detailed panels) per segmen | MUST | Kualitas + kontrol + debugging |
+| M-SB-04 | **Character/Location/Style Sheet extraction** dari `PromptPackage` | MUST | Menjaga konsistensi visual antar segmen |
+| M-SB-05 | **Persist `storyboard_segments` ke DB** per project | MUST | Asset reusable, project bisa reopen |
+| M-SB-06 | **SSE streaming progress** (`starting` → `extracting_sheets` → `generating_outline` → `generating_panels` → `saving` → `done`) | MUST | UX observable, proses panjang |
+| M-SB-07 | **Copy Markdown / Copy JSON** per segmen | MUST | Output siap pakai ke AI image/video generator |
+| S-SB-01 | **Regenerate per segmen** (bukan all-or-nothing) | SHOULD | Fleksibilitas edit |
+| S-SB-02 | **Panel preview text-only** dengan timestamp, scene code, image prompt | SHOULD | Verifikasi cepat |
+| C-SB-01 | **Dynamic panel count** berdasarkan kompleksitas (default 8) | COULD | Fleksibel, default cukup |
+| C-SB-02 | **Segment boundary rules UI** (transisi antar segmen) | COULD | Polish continuity |
+| W-SB-01 | Generate video/image otomatis dari storyboard prompt | WON'T | Out of scope - PromptFlow hanya generate prompt |
+| W-SB-02 | Timeline drag-drop editor visual | WON'T | Kompleksitas UI tinggi, defer |
 
 ---
 
@@ -595,15 +630,178 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 
 #### FR-TPL-01: Template presets (COULD)
 
-**Requirement**: `presets.ts:53-224` (`RAG S4 F15`) - 5 preset (tutorial, cinematic, kids, documentary, action). `template-picker.tsx` UI. `titles.ts` (`RAG S12 G16` - ASUMSI).
+**Requirement**: `presets.ts:53-224` (`RAG S4 F15`) - 5 preset (tutorial, cinematic, kids, documentary, action). `template-picker.tsx` UI. `titles.ts` (`RAG S12 G16` ASUMSI).
 
 **Citation**: `RAG S4 F15`.
 
 ---
 
-### 5.11 Persist reliability FRs (MUST - tutup Bug D)
+### 5.11 Storyboard Prompt Generator FRs (F-SB-01 — MUST/SHOULD/COULD)
+
+#### FR-SB-01: Storyboard tab entry point + segmenter 10 detik
+
+**Requirement**:
+1. Tambah tab **Storyboard** di `ResultTabs` (`src/components/generate/result-tabs.tsx`) yang muncul setelah project punya `resultJson` PromptPackage.
+2. Tab menerima `projectId`, `durationTargetSeconds`, dan `PromptPackage`.
+3. Hitung segmen dengan `storyboard-segmenter.ts`:
+   - `segmentCount = ceil(durationTargetSeconds / segmentDurationSeconds)` (default `segmentDurationSeconds = 10`).
+   - `segmentTimeStart = (segmentIndex - 1) * segmentDurationSeconds`.
+   - `segmentTimeEnd = min(segmentIndex * segmentDurationSeconds, durationTargetSeconds)`.
+4. Durasi terakhir bisa kurang dari 10 detik bila total durasi bukan kelipatan 10.
+
+**Input**: `PromptPackage` + `segmentDurationSeconds` (default 10) + `panelsPerSegment` (default 8).
+**Proses**: Segmenter compute list `{segmentIndex, segmentTimeStart, segmentTimeEnd}`.
+**Output**: Array segmen untuk iterasi two-stage generator.
+
+**Acceptance**: Lihat S7.X AC-SB-01.
+
+---
+
+#### FR-SB-02: Consistency architecture (Character/Location/Style Sheet + Boundary Rules)
+
+**Requirement**:
+1. `storyboard-sheet-extractor.ts` ekstrak dari `PromptPackage`:
+   - **Character Sheet**: dari `character_profiles` + `image_prompts.characters`.
+     - `name`, `visualDescription`, `referenceImagePrompt` (optional).
+   - **Location Sheet**: dari `scenes[].location`, `image_prompts.backgrounds`, dan `style`.
+     - `name`, `visualDescription`, `referenceImagePrompt` (optional).
+   - **Visual Style Guide**: dari `style` + `duration_target`.
+     - `aspectRatio`, `artDirection`, `colorPalette`, `cinematography`.
+2. Character Sheet + Location Sheet + Style Guide di-inject ulang sebagai **immutable visual anchor** di setiap LLM call per segmen.
+3. **Segment Boundary Rules**:
+   - Segmen ke-N menerima `previousSegmentSummary` (panel terakhir segmen N-1: title + transition) dan `nextSegmentPreview` (panel pertama segmen N+1: title + transition).
+   - Panel pertama segmen ke-N harus menyebutkan transisi masuk dari segmen sebelumnya (atau `FADE IN` untuk segmen 1).
+   - Panel terakhir segmen ke-N harus mengarahkan ke segmen berikutnya (atau `FADE OUT` untuk segmen terakhir).
+
+**Input**: `PromptPackage` + segmen yang sedang/sudah di-generate.
+**Proses**: Ekstrak sheet -> pass ke LLM system prompt setiap segmen.
+**Output**: Sheet JSON + boundary note string.
+
+**Acceptance**: Lihat S7.X AC-SB-02.
+
+---
+
+#### FR-SB-03: Two-stage LLM generator per segmen
+
+**Requirement**:
+1. **Stage 1 — Segment Outline** (`storyboard-outline.system.ts`):
+   - System prompt meminta LLM menghasilkan outline panel untuk satu segmen 10 detik.
+   - Input: project context (title, style, duration_target), Character Sheet, Location Sheet, Visual Style Guide, previous/next segment summary.
+   - Output Stage 1: `{panel_count, panels: [{index, time, scene_code, title, characters_present, location, transition, brief}], segment_transition_note}`.
+2. **Stage 2 — Detailed Panel Prompts** (`storyboard-panels.system.ts`):
+   - System prompt meminta LLM memperkaya setiap panel outline menjadi:
+     - `imagePrompt`: prompt lengkap untuk AI image generator.
+     - `actionVisual`: deskripsi adegan/visual.
+     - `cameraMovement`: shot + movement.
+     - `dialogueVo`: voice-over/dialogue.
+     - `negativePrompt` (optional): elemen yang harus dihindari.
+     - `audioNotes` (optional): SFX/music cue.
+   - Output Stage 2 disusun menjadi `StoryboardSegmentSchema` (`schemas.ts`) dan dikompilasi ke Markdown oleh `storyboard-compiler.ts`.
+3. **Orchestrator** (`storyboard-engine.ts`):
+   - Loop per segmen: extract boundary context → Stage 1 → Stage 2 → Zod validate → persist ke DB.
+   - Provider = user configured provider (`providerId` dari request).
+   - Retry/variation reuse mekanisme `llm-client.ts` (FR-GEN-03/04/05) — tidak perlu reinvent.
+
+**Input**: Segmen list + sheets + provider config.
+**Proses**: Two-stage LLM per segmen → validasi schema → compile Markdown.
+**Output**: Array `StoryboardSegment` + persisted rows.
+
+**Acceptance**: Lihat S7.X AC-SB-03.
+
+---
+
+#### FR-SB-04: Persist `storyboard_segments` table
+
+**Requirement**:
+1. Tambah tabel `storyboard_segments` (lihat `DATABASE_SCHEMA.md` F-SB-01):
+   - `id`, `projectId`, `segmentIndex` (unique per project), `segmentTimeStart`, `segmentTimeEnd`, `panelCount`, `visualStyleJson`, `characterSheetJson`, `locationSheetJson`, `panelsJson`, `markdownPrompt`, `segmentTransitionNote`, `provider`, `model`, `status` (draft/generating/complete/failed), `createdAt`, `updatedAt`.
+2. Repository `storyboard-segment.repo.ts`:
+   - `createOrReplaceSegments(projectId, segments[])` - replace existing segments untuk regenerate all.
+   - `getSegmentsByProjectId(projectId)` - list semua segmen.
+   - `getSegmentByIndex(projectId, segmentIndex)` - single segmen.
+   - `updateSegment(projectId, segmentIndex, data)` - untuk regenerate per segmen.
+3. On POST `/api/v1/projects/{id}/storyboard` (regenerate all): hapus segment rows lama, insert hasil baru.
+4. Ownership check wajib: `project.userId === session.user.id`.
+
+**Input**: Validated `StoryboardSegment[]` + `projectId`.
+**Proses**: Replace/insert rows di `storyboard_segments`.
+**Output**: Persisted segments.
+
+**Acceptance**: Lihat S7.X AC-SB-04.
+
+---
+
+#### FR-SB-05: SSE streaming progress
+
+**Requirement**:
+1. Endpoint `POST /api/v1/projects/{id}/storyboard` mengembalikan SSE stream.
+2. Event sequence:
+   - `{event:'stage', data:{stage:'starting'}}`
+   - `{event:'progress', data:{stage:'extracting_sheets', segment:0, total:N}}`
+   - `{event:'progress', data:{stage:'generating_outline', segment:i, total:N}}`
+   - `{event:'progress', data:{stage:'generating_panels', segment:i, total:N}}`
+   - `{event:'done', data:{segments:N, projectId:id}}`
+3. Heartbeat 2s (reuse pattern dari `/api/v1/generate`, FR-GEN-07).
+4. Error event: `{event:'error', data:{code, message}}` dengan kategori `categorizeError` (TIMEOUT/NETWORK/VALIDATION/HTTP/JSON_PARSE/DB_ERROR/UNKNOWN).
+
+**Acceptance**: Client terima SSE events sesuai stage + done/error.
+
+---
+
+#### FR-SB-06: Copy Markdown / Copy JSON per segmen
+
+**Requirement**:
+1. UI `StoryboardSegmentCard` menyediakan:
+   - Tombol **Copy Markdown** → salin `markdownPrompt` ke clipboard (toast "Tersalin").
+   - Tombol **Copy JSON** → salin `panelsJson` pretty-printed ke clipboard.
+2. Markdown format siap paste ke AI image/video generator; berisi header segmen + daftar panel dengan image prompt, camera movement, transition, audio notes.
+
+**Acceptance**: Lihat S7.X AC-SB-05.
+
+---
+
+#### FR-SB-07: Regenerate per segmen (SHOULD)
+
+**Requirement**:
+1. Endpoint `POST /api/v1/projects/{id}/storyboard/{segmentIndex}` untuk regenerate satu segmen spesifik.
+2. Body sama dengan generate all (minimal `{}` atau `{providerId, panelsPerSegment, segmentDurationSeconds}`).
+3. Hanya replace row `segmentIndex` yang diminta; segmen lain tidak dihapus.
+4. SSE stream lebih pendek: `starting` → `generating_outline` → `generating_panels` → `saving` → `done`.
+
+**Acceptance**: Lihat S7.X AC-SB-06.
+
+---
+
+### 5.12 Persist reliability FRs (MUST - tutup Bug D)
 
 #### FR-PERSIST-01: Persist partial eksplisit + scene hilang dilaporkan
+
+**Root problem**: `safeDbOp` (`route.ts:35-51`) swallow error, return null. `bulkCreateScenes` null -> audio/image prompts scene-level skip (`route.ts:366-367`) tapi status `complete` (`route.ts:316`).
+
+**Requirement**:
+1. Bila ada `safeDbOp` gagal (return null), **status project = `partial`** (bukan `complete`).
+2. `done` event (`route.ts:518`) wajib sertakan `partialSceneIds` (scene yang gagal persist audio/image).
+3. `generation_logs.status` = `partial` (`route.ts:502-513` sudah ada logic partial jika warnings, extend untuk partial persist).
+4. UI `result-tabs.tsx` wajib tampilkan warning scene hilang.
+5. ASUMSI keputusan bisnis: **tidak ada rollback transaksi** (partial success acceptable, `RAG S11 Bug D` by design) - tapi status dan laporan wajib eksplisit.
+
+**Acceptance**: Lihat S7.1 AC-PERSIST-01.
+
+**Citation**: `RAG S5` step 15 (`route.ts:310-493`), `RAG S11 Bug D`, `RAG S13` (`route.ts:35-51`).
+
+---
+
+### 5.13 Migration FRs (SHOULD - maintain V2->V3)
+
+#### FR-MIG-01: V2->V3 migration + rollback
+
+**Requirement**: `migration/v2-to-v3.ts:59-142` (`RAG S4 F17`) - backfill scene transition/voice/audio fields + rollback. Trigger manual via admin/CLI (ASUMSI - endpoint tidak diverifikasi).
+
+**Citation**: `RAG S4 F17`, `RAG S13`.
+
+---
+
+## 6. Non-Functional Requirements
 
 **Root problem**: `safeDbOp` (`route.ts:35-51`) swallow error, return null. `bulkCreateScenes` null -> audio/image prompts scene-level skip (`route.ts:366-367`) tapi status `complete` (`route.ts:316`).
 
@@ -720,6 +918,17 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 | NFR-COMP-02 | Framework | Next.js 15.1 App Router (`^15.1.0`) | `RAG S2` |
 | NFR-COMP-03 | Provider LLM | ollama/openrouter/9router/custom (`schemas.ts:159`); OpenAI-compatible (`@ai-sdk/openai-compatible`) | `RAG S2`, `RAG S4 F2` |
 | NFR-COMP-04 | Deploy | Vercel (maxDuration 300s Pro, Blob, Analytics) | `RAG S3.2`, `RAG S3.6` |
+
+### 6.9 Storyboard-specific NFRs (F-SB-01)
+
+| ID | Requirement | Target | Bukti/ASUMSI |
+|---|---|---|---|
+| NFR-SB-01 | Storyboard tab render | < 500ms setelah tab click | ASUMSI - data local/DB kecil |
+| NFR-SB-02 | Generate all segments latency | < 300s untuk project 60-180 detik (6-18 segmen) | `Design Doc S3` MVP, maxDuration Vercel 300s |
+| NFR-SB-03 | Per-segment LLM latency | < 60s (Stage 1 + Stage 2) | ASUMSI - shorter than full PromptPackage |
+| NFR-SB-04 | Consistency anchor injection | 100% segmen menerima Character+Location+Style Sheet yang sama | `Design Doc S4` |
+| NFR-SB-05 | Markdown prompt max length | < 8.000 token / 30.000 char per segmen | `Design Doc S11` risk mitigasi |
+| NFR-SB-06 | Segment boundary rule coverage | Panel pertama/terakhir setiap segmen mengandung transisi note | `Design Doc S4.4` |
 
 ---
 
@@ -897,6 +1106,72 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 
 ---
 
+### 7.2 Storyboard Prompt Generator ACs (F-SB-01)
+
+#### AC-SB-01: Storyboard tab + segmenter 10 detik
+
+**Given** project dengan `durationTargetSeconds = 60` dan `PromptPackage` sudah tergenerate.
+**When** user buka tab Storyboard di `/generate`.
+**Then**:
+- [PASS] Tab Storyboard muncul di `ResultTabs` setelah Characters/Scenes/Image Prompts/Audio/Supporting/Moral.
+- [PASS] Sistem menghitung `segmentCount = 6` (`ceil(60/10)`).
+- [PASS] Setiap segmen memiliki `segmentTimeStart` dan `segmentTimeEnd` berturut-turut: `0-10`, `10-20`, `20-30`, `30-40`, `40-50`, `50-60`.
+- [FAIL] Tab tidak muncul atau perhitungan segmen salah.
+
+#### AC-SB-02: Consistency sheets extraction
+
+**Given** `PromptPackage` dengan `character_profiles[0].nama = "Adrian"`, `scenes[0].location = "Lobby kantor mewah"`, `style.aspect_ratio = "9:16"`.
+**When** `storyboard-sheet-extractor.ts` berjalan.
+**Then**:
+- [PASS] Character Sheet mengandung Adrian dengan visual description konsisten.
+- [PASS] Location Sheet mengandung "Lobby kantor mewah".
+- [PASS] Visual Style Guide mengandung `aspectRatio: "9:16"` dan art direction.
+- [PASS] Sheet JSON yang sama di-pass ke setiap LLM call per segmen.
+- [FAIL] Sheet berbeda antar segmen atau field hilang.
+
+#### AC-SB-03: Two-stage LLM output valid
+
+**Given** segmen 1 dari project 60 detik dengan 1 karakter dan 1 lokasi.
+**When** `storyboard-engine.ts` menjalankan Stage 1 lalu Stage 2.
+**Then**:
+- [PASS] Stage 1 output outline dengan `panel_count` dan array `panels` yang memenuhi `StoryboardSegmentSchema.panelCount`.
+- [PASS] Stage 2 output setiap panel memiliki `imagePrompt`, `actionVisual`, `cameraMovement`, `transition`, `charactersPresent`, `location`.
+- [PASS] Output Stage 2 tervalidasi `StoryboardSegmentSchema.parse()` tanpa error.
+- [FAIL] Output tidak memenuhi schema atau field hilang.
+
+#### AC-SB-04: Persist to `storyboard_segments`
+
+**Given** generate all storyboard untuk project 42 dengan 6 segmen sukses.
+**When** pipeline selesai.
+**Then**:
+- [PASS] Tabel `storyboard_segments` memiliki 6 rows untuk `projectId = 42`.
+- [PASS] `segmentIndex` unik per project (1..6).
+- [PASS] Setiap row memiliki `panelsJson`, `markdownPrompt`, `visualStyleJson`, `characterSheetJson`, `locationSheetJson` terisi.
+- [PASS] `status` = `'complete'` untuk semua segmen bila sukses.
+- [FAIL] Row kurang dari 6, duplikat `segmentIndex`, atau field kosong.
+
+#### AC-SB-05: Copy Markdown / Copy JSON
+
+**Given** segmen 3 sudah tergenerate dan UI `StoryboardSegmentCard` ditampilkan.
+**When** user klik **Copy Markdown** kemudian **Copy JSON**.
+**Then**:
+- [PASS] Clipboard Markdown mengandung header segmen + daftar panel dengan image prompt, camera movement, transition.
+- [PASS] Clipboard JSON valid parseable dan memenuhi `StoryboardSegmentSchema`.
+- [PASS] Toast "Tersalin" muncul.
+- [FAIL] Clipboard kosong atau JSON tidak valid.
+
+#### AC-SB-06: Regenerate per segmen
+
+**Given** project 42 memiliki 6 segmen storyboard yang sudah tergenerate.
+**When** user klik **Regenerate** di segmen 3.
+**Then**:
+- [PASS] Hanya row `segmentIndex = 3` yang di-update; row 1,2,4,5,6 tidak berubah.
+- [PASS] SSE stream mengirim progress dan done event untuk segmen 3.
+- [PASS] `updatedAt` segmen 3 lebih baru dari sebelumnya.
+- [FAIL] Semua segmen dihapus/regenerate ulang.
+
+---
+
 ## 8. Spesifikasi Deliverable
 
 > Apa yang dev agent harus produksi untuk tutup bug + harden pipeline. Selaras `BRD S8.1` in-scope.
@@ -956,9 +1231,20 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 - **Prompt contract** (`prompt-builder.ts`): system prompt + JSON_SCHEMA_EXAMPLE + user message builder.
 - **Schema** (`schemas.ts`): `PromptPackageSchema` root + `SceneAudioSpecSchema` + `SceneSchema` + `SceneAudioSchema` (konsolidasi).
 - **Pipeline** (`route.ts`, `llm-client.ts`): SSE handler + retry loop + repair + categorize + persist + log.
-- **DB** (`schema.ts`): 9 tabel (users, provider_configs, projects, asset_references, characters, scenes, image_prompts, generation_logs, supporting_characters, scene_audio) - tidak ada perubahan schema, hanya normalizer di route.
+- **DB** (`schema.ts`): 10 tabel (users, provider_configs, projects, asset_references, characters, scenes, image_prompts, generation_logs, supporting_characters, scene_audio, **storyboard_segments**) - migration `storyboard_segments` via drizzle-kit.
 - **Auth** (`config.ts`, `middleware.ts`): NextAuth + edge gate + rate limit.
 - **Export** (`markdown.template.ts`): Markdown template.
+- **Storyboard** (`src/lib/ai/storyboard-engine.ts`, `storyboard-sheet-extractor.ts`, `storyboard-segmenter.ts`, `storyboard-compiler.ts`, `prompts/storyboard-outline.system.ts`, `prompts/storyboard-panels.system.ts`; `src/lib/db/repositories/storyboard-segment.repo.ts`; `src/components/generate/storyboard-tab.tsx`, `storyboard-segment-card.tsx`, `storyboard-panel-card.tsx`, `storyboard-generate-button.tsx`): generate + persist + UI storyboard.
+
+---
+
+### 8.6 Aset wajib F-SB-01
+
+| Aset | Path | Status |
+|---|---|---|
+| Storyboard panel icons | lucide-react (`Panels`, `Clapperboard`, `Camera`, `Copy`, `RefreshCw`) | tersedia |
+| Empty state illustration | ASUMSI - tidak diverifikasi | perlu placeholder |
+| Markdown template asset | `src/lib/ai/storyboard-compiler.ts` (code, bukan gambar) | deliverable code |
 
 ---
 
@@ -1000,6 +1286,8 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 | A11 | Endpoint diagnose/test/dashboard isi (`RAG G18-G20`) | FR-PROV-03/04, FR-DASH-01 asumsi |
 | A12 | maxRetries naik ke 3 (`RAG S8.2.3` default 2) | FR-GEN-03 attempt 3 asumsi hardening |
 | A13 | p95 < 60s target | NFR-PERF-01 asumsi (BRD median shorts <=90s) |
+| A14 | Storyboard prompt template optimal untuk Midjourney/Runway/Kling | ASUMSI - perlu tuning iteratif berdasarkan output LLM |
+| A15 | `segmentDurationSeconds` default 10 detik dan `panelsPerSegment` default 8 | `Design Doc S3` - dapat dikonfigurasi di request |
 
 ---
 
@@ -1035,6 +1323,7 @@ Set active: `provider-config.repo.ts` setActive transaction (`RAG S13`). Unique 
 | Analytics | `RAG S4 F21` | `events.ts:1-22` |
 | Dashboard | `RAG S4 F8` | `dashboard.repo.ts` |
 | Diagnose/test endpoint | `RAG S12 G18, G19` | `route.ts` (file ada, isi ASUMSI) |
+| Storyboard Prompt Generator design | `Design Doc 2026-06-23` | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` |
 | KPI bisnis | `BRD S4` | - |
 | Scope in/out | `BRD S8.1, S8.2` | - |
 | Risiko | `BRD S7` | - |

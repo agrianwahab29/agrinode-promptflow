@@ -155,6 +155,7 @@ PromptFlow = pipeline generasi prompt animasi AI **reliable & observable**. UI w
 | Reduced motion | `prefers-reduced-motion: reduce` -> durasi 0.01ms | `globals.css:74-82` WAJIB hormati |
 | framer-motion | ^12.40.0 (`package.json:48`) | Landing hero, scroll-tracker, animated-counter, testimonial-card |
 | Log auto-scroll | `scrollIntoView({behavior:'smooth'})` (`log-viewer.tsx:51`) | Hormati reduced-motion (ASUMSI: cek `matchMedia`) |
+| Storyboard accordion expand | 300ms height | `Accordion` shadcn default; reduce-motion -> instant |
 
 ### 2.7 Container & breakpoint
 
@@ -194,6 +195,8 @@ PromptFlow = pipeline generasi prompt animasi AI **reliable & observable**. UI w
 | Textarea | `textarea.tsx` | state: default/focus/disabled/error | `value`, `onChange` | `src/components/ui/textarea` |
 
 > shadcn config (`components.json`): style `default`, rsc true, tsx true, baseColor `neutral`, cssVariables true, alias `@/components/ui`. CSS var source = `src/app/globals.css`.
+
+> **Catatan Storyboard**: komponen Storyboard memerlukan primitive `Accordion` (panel expand/collapse). Bila belum ada di `src/components/ui/accordion.tsx`, install via `npx shadcn add accordion` (ASUMSI A17).
 
 ### 3.2 Composite components - generate (di `src/components/generate/`, 9 file terverifikasi)
 
@@ -281,6 +284,29 @@ PromptFlow = pipeline generasi prompt animasi AI **reliable & observable**. UI w
 | error | border `--color-destructive`, text destructive | Alert variant destructive | `aria-invalid`, `aria-describedby` |
 | empty | Empty state illu/teks + CTA | muted-foreground | - |
 
+### 3.9 Storyboard Tab components (`src/components/generate/`)
+
+Komponen khusus tab Storyboard (F-SB-01) ditempatkan bersama generate composite. Semua komponen mengikuti design token S2 dan state matrix S3.8.
+
+| Komponen | File | Anatomi | State | Props inti |
+|---|---|---|---|---|
+| **StoryboardTab** | `storyboard-tab.tsx` | Tab content wrapper > StoryboardGenerateButton (empty/populated) > StoryboardProgressIndicator (streaming) > daftar `StoryboardSegmentCard` | empty / loading / generating / populated / error / partial | `promptPackage: PromptPackage`, `projectId: number`, `providerId?: number` |
+| **StoryboardGenerateButton** | `storyboard-generate-button.tsx` | Button dengan icon `Film` + label "Generate Storyboard" / "Regenerate" + spinner saat loading | idle / loading / disabled | `projectId`, `providerId`, `variant: 'primary' \| 'outline'`, `hasSegments: boolean`, `onGenerate: () => void` |
+| **StoryboardSegmentCard** | `storyboard-segment-card.tsx` | Card > Header (segment index + time range + panel count badge + status badge + per-segment regenerate Button) > Accordion daftar `StoryboardPanelCard` > Footer (Copy Markdown / Copy JSON) | collapsed / expanded / generating / error / complete | `segment: StoryboardSegment`, `projectId`, `onRegenerate: () => void` |
+| **StoryboardPanelCard** | `storyboard-panel-card.tsx` | Accordion.Item > Trigger (timestamp + scene code + title) > Content (image prompt, action visual, camera movement, dialogue/VO, transition, characters, location, negative prompt, audio notes) | default / expanded / copied | `panel: StoryboardPanel`, `segmentIndex`, `onCopyImagePrompt: () => void` |
+| **StoryboardProgressIndicator** | `storyboard-progress-indicator.tsx` | Stepper/linear progress: label stage + "Segmen X dari Y" + progress bar | idle / running / complete / error | `stage: string`, `currentSegment: number`, `totalSegments: number`, `percent: number` |
+| **StoryboardEmptyState** | `storyboard-empty-state.tsx` (ASUMSI) atau inline di `StoryboardTab` | Centered stack: icon `Film` 48px + heading + description + CTA Button | empty | `onGenerate: () => void` |
+
+**State mapping Storyboard**
+
+| State | Visual | Token | A11y |
+|---|---|---|---|
+| empty | icon `Film` muted + heading muted-foreground + primary CTA | `--color-muted-foreground`, `--color-primary` | `aria-live="polite"` wrapper |
+| generating | ProgressIndicator visible, segment skeleton cards, buttons disabled/spinner | `--color-primary`, skeleton pulse | `aria-busy="true"` region |
+| complete | status badge `success`, Copy buttons aktif | `--color-success` | `role="status"` badge |
+| partial | Alert warning + status badge `warning` + daftar segment yang gagal | `--color-warning` | `role="alert"` Alert |
+| error per segment | segment card border destructive, badge `fail`, retry button | `--color-destructive` | `aria-describedby` error message |
+
 ---
 
 ## 4. Layout & Grid
@@ -326,6 +352,42 @@ Layout vertikal full-width, section terpisah `space-y-16`:
 ```
 - Mobile: stack vertikal (form -> log -> result), log collapsible default closed.
 - Desktop lg: grid 3-kolom `lg:grid-cols-3 gap-6`.
+
+#### 4.3.1 Storyboard tab layout (di dalam ResultTabs)
+Tab Storyboard mengikuti layout ResultTabs yang sama: full-width content area di dalam `TabsContent value="storyboard"`.
+
+- **Empty state**: center aligned inside tab content, max-w-md, icon 48px, vertical stack gap-4.
+- **Generating state**: `StoryboardProgressIndicator` fixed/sticky top di dalam tab content + skeleton segment cards (`space-4`) + disabled Generate button.
+- **Populated state**: vertical stack segment cards `space-4`, card pertama segment 1 (0:00 - 0:10), dst. Scroll area bila total height melebihi 70vh.
+- **Segment card internal**: header horizontal (title kiri, actions kanan), body accordion `space-2`, footer actions horizontal.
+- **Panel card internal**: accordion trigger = row dengan timestamp badge kiri + scene code + title; content = grid metadata (2 kolon lg, 1 kolon mobile) + copy button per image prompt.
+- **Copy actions**: di footer segment card (Copy Markdown / Copy JSON) dan di tiap panel card (Copy Image Prompt). Menggunakan `CopyButton` S3.7 + toast "Tersalin". 
+
+```
++----------------------------------------------------------+
+| ResultTabs: [Characters][Scenes][ImagePrompts][Audio]    |
+|             [Supporting][Moral][Storyboard]              |
++----------------------------------------------------------+
+| StoryboardTab                                            |
+| +------------------------------------------------------+ |
+| | [StoryboardGenerateButton] Generate Storyboard         | |
+| +------------------------------------------------------+ |
+| | StoryboardProgressIndicator (hanya saat generating)    | |
+| | Stage: generating_panels   Segmen 2 dari 3  [====>..]  | |
+| +------------------------------------------------------+ |
+| | StoryboardSegmentCard #1  0:00 - 0:10  [complete]    | |
+| | +--------------------------------------------------+ | |
+| | | Header: [Segmen 1] [8 panel] [success badge]    | |
+| | |         [Regenerate icon] [Copy Markdown] [Copy JSON]| |
+| | | Body: Accordion                                  | |
+| | |  [0:00 - 0:01.25] INT. LOBBY - DAY - Lobby Pertama | |
+| | |    (expand -> image prompt + camera + copy)        | |
+| | |  [0:01.25 - 0:03...] ...                           | |
+| | +--------------------------------------------------+ | |
+| +------------------------------------------------------+ |
+| | StoryboardSegmentCard #2  0:10 - 0:20  [complete]    | |
+| +------------------------------------------------------+ |
+```
 
 ### 4.4 Projects list (`src/app/[locale]/projects/page.tsx`)
 Grid responsif `grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4`. Header: H1 + Button "New Project" + bulk-select toggle. Pagination bawah.
@@ -444,6 +506,27 @@ flowchart TD
     B --> E[WeeklyTrendChart]
     B --> F[PerProviderBreakdownTable]
     B --> G[RecentActivityTable]
+```
+
+#### Flow E: Generate Storyboard (F-SB-01)
+```mermaid
+flowchart TD
+    A[ResultTabs tab Storyboard] --> B{segments exist?}
+    B -->|tidak| C[StoryboardEmptyState + CTA Generate]
+    B -->|ya| D[Render StoryboardSegmentCard list]
+    C -->|klik Generate| E[POST /api/v1/projects/[id]/storyboard SSE]
+    E --> F[event stage: extracting_sheets]
+    F --> G[event progress: generating_outline segment N]
+    G --> H[event progress: generating_panels segment N]
+    H --> I{semua segment selesai?}
+    I -->|tidak| H
+    I -->|ya| J[event done]
+    J --> K[GET /api/v1/projects/[id]/storyboard]
+    K --> D
+    D -->|expand panel| L[Accordion panel details]
+    D -->|Copy Markdown / JSON| M[CopyButton + toast]
+    D -->|Regenerate per segment| N[POST per segment]
+    N --> E
 ```
 
 ---
@@ -633,6 +716,85 @@ ERROR terminal - JSON_PARSE:
 
 > **Wajib**: LogViewer HARUS bedakan visual VALIDATION vs JSON_PARSE vs TIMEOUT vs NETWORK vs HTTP. Level badge warna: info=blue, warn=yellow, error=red (saat ini hardcoded `log-viewer.tsx:14-19`). Kategori error ditampilkan sebagai prefix `[CATEGORY]` di message. retryCount + correctivePrompt wajib tampil sebagai log entry terpisah.
 
+### 6.8 Storyboard tab wireframes
+
+#### 6.8.1 Storyboard - empty state
+```
++----------------------------------------------------------+
+| Tab Storyboard                                           |
+|                                                          |
+|              [icon Film 48px muted]                      |
+|                                                          |
+|        Belum ada storyboard untuk project ini             |
+|        Generate storyboard untuk memecah video            |
+|        menjadi segmen 10 detik dengan prompt visual.      |
+|                                                          |
+|              [Generate Storyboard]                      |
+|                                                          |
++----------------------------------------------------------+
+```
+Copy: i18n keys `generate.storyboard.empty.title`, `generate.storyboard.empty.description`, `generate.storyboard.generate_button`.
+
+#### 6.8.2 Storyboard - generating state
+```
++----------------------------------------------------------+
+| [Generate Storyboard] (disabled/spinner)                 |
++----------------------------------------------------------+
+| Progress                                                 |
+| Stage: generating_panels  Segmen 2 dari 3                 |
+| [=======================>    ] 67%                       |
++----------------------------------------------------------+
+| [Skeleton card]                                            |
+| [Skeleton card]                                            |
++----------------------------------------------------------+
+```
+Progress stage label diambil dari SSE event `stage`. Skeleton card = `Card` dengan 4 baris `Skeleton`.
+
+#### 6.8.3 Storyboard - populated state (segment card expanded)
+```
++----------------------------------------------------------+
+| [Generate Storyboard]  [Regenerate All icon]             |
++----------------------------------------------------------+
+| +------------------Segment 1  0:00 - 0:10  [success]--+
+| | 8 panel  [Copy Markdown] [Copy JSON] [Regenerate]   | |
+| +------------------------------------------------------+ |
+| | [v] [0:00 - 0:01.25] INT. LOBBY - DAY - Lobby Pertama | |
+| |     imagePrompt: "cinematic wide shot, Adrian..."      | |
+| |     [Copy Image Prompt]                                | |
+| |     actionVisual: "Adrian melangkah masuk lobby..."    | |
+| |     cameraMovement: "low angle slow push in"           | |
+| |     dialogueVo: "..."                                  | |
+| |     transition: "FADE IN"                              | |
+| |     characters: Adrian                                 | |
+| |     location: Lobby kantor mewah                       | |
+| |     negativePrompt: "deformed hands, extra fingers"     | |
+| |     audioNotes: "footsteps echo, ambient office hum"  | |
+| | [v] [0:01.25 - 0:03...] INT. ...                       | |
+| +------------------------------------------------------+ |
++----------------------------------------------------------+
+| +------------------Segment 2  0:10 - 0:20  [success]--+
+| ...                                                      |
++----------------------------------------------------------+
+```
+Setiap panel dalam Accordion `type="single" collapsible` (shadcn Collapsible/Accordion). Image prompt wajib punya CopyButton sendiri.
+
+#### 6.8.4 Storyboard - partial/error state
+```
++----------------------------------------------------------+
+| [Alert variant="warning"]                                |
+| Beberapa segmen gagal di-generate (segmen 2).            |
+| Klik Regenerate pada segmen yang bermasalah.             |
++----------------------------------------------------------+
+| +------------------Segment 1  0:00 - 0:10  [success]--+
+| ...                                                      |
+| +------------------Segment 2  0:10 - 0:20  [error]------+
+| | 0 panel  [Regenerate]                                  | |
+| | Error: Provider timeout. Klik Regenerate untuk coba lagi.| |
+| +------------------------------------------------------+ |
++----------------------------------------------------------+
+```
+Partial state = status `partial` bila ada segment lain success tapi ada satu gagal. Error state = semua segment gagal.
+
 ---
 
 ## 7. Aksesibilitas (WCAG 2.1 AA)
@@ -676,6 +838,8 @@ ERROR terminal - JSON_PARSE:
 - Generate form submit: Button `disabled` + spinner + `aria-busy="true"`.
 - ResultTabs loading: Skeleton per tab content.
 - LogViewer streaming: badge level + auto-open, `aria-live`.
+- **Storyboard loading**: `StoryboardProgressIndicator` + skeleton segment cards + disabled Generate/Regenerate buttons. Region utama tab diberi `aria-busy="true"` saat generating. Progress stage wajib diumumkan via `aria-live="polite"`.
+- **Storyboard error**: per-segment error message pakai `aria-describedby` dari segment card. Global partial Alert pakai `role="alert"`. Copy error toast pakai `role="status"` fallback.
 
 ### 7.6 Reduce motion
 - `@media (prefers-reduced-motion: reduce)` di `globals.css:74-82` -> durasi 0.01ms. WAJIB hormati di framer-motion (landing) + auto-scroll log. **ASUMSI**: framer-motion component landing belum cek `matchMedia` - rekomendasi tambah `useReducedMotion()`.
@@ -698,12 +862,20 @@ Tailwind 4 utility default = mobile. Breakpoint `sm`/`md`/`lg`/`xl`/`2xl` untuk 
 | Settings | stack sidebar+main | sidebar+main | sidebar+main |
 | Dashboard | 1-kolom metric | 2-kolom metric, chart stack | 4-kolom metric, 2-kolom chart |
 | Auth | centered card | centered card | centered card |
+| **Storyboard tab** | segment card full-width, accordion vertical, copy buttons stacked | segment card full-width, metadata 2 kolom | segment card full-width, metadata 2 kolom, max 70vh scroll tab content |
 
 ### 8.3 Generate flow mobile khusus
 - Form: field collapse ke 1-kolom, template grid 2-kolom, dropzone full-width.
 - LogViewer: collapsible default closed, auto-open saat streaming, max-h 40vh scroll.
 - ResultTabs: tab horizontal scrollable (`ScrollArea`), content scroll vertikal.
 - Submit Button: sticky bottom bar mobile (`fixed bottom-0`).
+- **Storyboard mobile**:
+  - Tab list ResultTabs horizontal scrollable; tab "Storyboard" tetap visible.
+  - StoryboardGenerateButton full-width, sticky top di dalam tab content (`sticky top-0 z-10 bg-background`).
+  - Segment cards full-width, internal padding `p-3` (bukan `p-4`).
+  - Accordion panel content: metadata stack vertikal, no 2-column grid.
+  - Copy buttons (Markdown/JSON/Image Prompt) stack vertikal full-width, icon + label, tidak hanya icon (a11y touch target min 44x44 px).
+  - Progress indicator: progress bar full-width, stage label di atas/bawah bar (bukan horizontal inline) untuk avoid text truncation.
 
 ### 8.4 Safe-area
 - Tambah `env(safe-area-inset-bottom)` padding untuk sticky bottom bar mobile (notch). ASUMSI belum ada.
@@ -734,6 +906,38 @@ Tailwind 4 utility default = mobile. Breakpoint `sm`/`md`/`lg`/`xl`/`2xl` untuk 
 - Namespace rekomendasi: `common` (button/label umum), `landing` (hero/section), `auth` (login/register), `generate` (form stage label), `projects`, `settings`, `dashboard`, `errors` (kategori error message).
 - Stage labels generate (`generate-form.tsx:31-41`) saat ini hardcode ID - **rekomendasi**: pindah ke `messages/{id,en}.json` namespace `generate.stages`.
 - Error kategori (VALIDATION/JSON_PARSE/dll): tampilkan kode teknis apa adalah + terjemahkan deskripsi kontekstual. Contoh id: "Validasi gagal di field {path}. Diharapkan {expected}, diterima {received}." en: "Validation failed at {path}. Expected {expected}, received {received}."
+- **Storyboard i18n namespace**: `generate.storyboard`. Rekomendasi keys:
+  - `tab_label`: "Storyboard" / "Storyboard"
+  - `empty.title`: "Belum ada storyboard" / "No storyboard yet"
+  - `empty.description`: "Generate storyboard untuk memecah video menjadi segmen 10 detik dengan prompt visual per panel." / "Generate a storyboard to break your video into 10-second segments with visual prompts per panel."
+  - `generate_button`: "Generate Storyboard" / "Generate Storyboard"
+  - `regenerate_button`: "Regenerate" / "Regenerate"
+  - `regenerate_all_button`: "Regenerate All" / "Regenerate All"
+  - `copy_markdown`: "Copy Markdown" / "Copy Markdown"
+  - `copy_json`: "Copy JSON" / "Copy JSON"
+  - `copy_image_prompt`: "Copy Image Prompt" / "Copy Image Prompt"
+  - `copied`: "Tersalin" / "Copied"
+  - `segment_title`: "Segmen {index}" / "Segment {index}"
+  - `segment_time_range`: "{start} - {end}" / "{start} - {end}"
+  - `panel_count`: "{count} panel" / "{count} panels"
+  - `panel_time`: "{time}" / "{time}"
+  - `scene_code`: "Scene Code" / "Scene Code"
+  - `image_prompt_label`: "Prompt Gambar" / "Image Prompt"
+  - `action_visual_label`: "Aksi Visual" / "Action Visual"
+  - `camera_movement_label`: "Gerakan Kamera" / "Camera Movement"
+  - `dialogue_vo_label`: "Dialog / VO" / "Dialog / VO"
+  - `transition_label`: "Transisi" / "Transition"
+  - `characters_present_label`: "Karakter Hadir" / "Characters Present"
+  - `location_label`: "Lokasi" / "Location"
+  - `negative_prompt_label`: "Prompt Negatif" / "Negative Prompt"
+  - `audio_notes_label`: "Catatan Audio" / "Audio Notes"
+  - `status.complete`: "Selesai" / "Complete"
+  - `status.generating`: "Menghasilkan..." / "Generating..."
+  - `status.error`: "Gagal" / "Failed"
+  - `status.partial`: "Sebagian" / "Partial"
+  - `progress.stage`: "Stage: {stage}" / "Stage: {stage}"
+  - `progress.segment_of_total`: "Segmen {current} dari {total}" / "Segment {current} of {total}"
+  - `error.partial_summary`: "Beberapa segmen gagal di-generate ({segments}). Klik Regenerate pada segmen yang bermasalah." / "Some segments failed to generate ({segments}). Click Regenerate on affected segments."
 
 ### 9.4 Direction
 - id/en = LTR. Tidak ada RTL.
@@ -775,29 +979,49 @@ Tailwind 4 utility default = mobile. Breakpoint `sm`/`md`/`lg`/`xl`/`2xl` untuk 
 | Skeleton pulse | opacity | 1.5s infinite | ease-in-out |
 | Log auto-scroll | scrollIntoView smooth | 300ms | ease-in-out |
 | Landing framer-motion | variants per component | 400-600ms | spring/ease |
+| Storyboard accordion expand | height | 300ms | ease-in-out |
+| Storyboard progress bar width | width | 300ms | ease-in-out |
+| Storyboard skeleton fade | opacity pulse | 1.5s infinite | ease-in-out |
 
 ### 11.2 Loading state
 - **Skeleton**: `Skeleton` component (`bg-muted animate-pulse`) untuk: page (`PageLoadingSkeleton`), ResultTabs content, dashboard cards saat fetch.
 - **Button loading**: spinner inline + text "Generating..." + `disabled` + `aria-busy`.
 - **SSE streaming indicator**: ElapsedTimer (`generate-form.tsx:43-50`) + LogViewer auto-open + stage label live.
 - **Heartbeat**: server kirim `elapsedSec` tiap 2s (`route.ts:213-220`) - UI update timer.
+- **Storyboard loading**:
+  - Initial generate: skeleton segment cards sejumlah estimated segments (dari `duration_target / 10`) masing-masing 4 baris skeleton.
+  - Per-segment regenerate: skeleton hanya pada segment card yang sedang regenerate, lainnya tetap tampil hasil lama (optimistik UI).
+  - Progress indicator: stage + segment number + percentage. Spinner pada Generate/Regenerate button.
+  - `aria-busy="true"` pada region tab Storyboard saat generating.
 
 ### 11.3 Empty state
 - Projects empty: illu/icon + "Belum ada project" + CTA "Buat project pertama".
 - Logs empty: LogViewer return null (`log-viewer.tsx:55`) - tidak render. Rekomendasi: tampilkan placeholder "Menunggu generate..." saat idle.
 - Dashboard empty: "Belum ada data generate" + CTA ke /generate.
+- **Storyboard empty**: icon `Film` 48px + heading "Belum ada storyboard" + description "Generate storyboard untuk memecah video menjadi segmen 10 detik dengan prompt visual per panel." + CTA `StoryboardGenerateButton` primary. State idle, no skeleton. i18n namespace `generate.storyboard`.
 
 ### 11.4 Error state & feedback
 - **Toast (sonner)**: error -> `role="alert"` destructive style. success -> `role="status"`. warning -> warning style.
 - **Alert inline**: form error, VALIDATION error detail di ResultTabs.
 - **LogViewer error terminal**: kategori + path field + pesan + retryCount.
 - **PageErrorBoundary**: full-page error + retry Button.
+- **Storyboard error terminal**:
+  - Per-segment error: segment card border `--color-destructive`, badge `error`, pesan error singkat, tombol `Regenerate`. `aria-describedby` ke pesan error.
+  - Partial global error: Alert warning di atas segment list dengan daftar segment yang gagal (mis. "Segmen 2 gagal generate").
+  - Complete generation fail: empty state diisi dengan Alert destructive + CTA retry.
+  - Copy error: fallback toast "Gagal menyalin" bila clipboard API tidak tersedia.
 
 ### 11.5 Micro-interaction
 - CopyButton: icon check saat copied + toast "Tersalin".
 - ProviderCard test: spinner -> badge success/error.
 - ProjectCard hover: shadow-md + slight lift.
 - TemplatePicker select: ring primary + scale 1.02.
+- **Storyboard interactions**:
+  - Accordion expand/collapse: durasi 300ms, `ease-in-out`.
+  - Segment card hover: `shadow-md`.
+  - Generate/regenerate button: spinner + label berubah "Generating..." / "Regenerating...".
+  - Progress indicator: progress bar width transition 300ms, stage label fade 150ms.
+  - Copy markdown/JSON/image prompt: icon check 1.2s + toast.
 
 ---
 
@@ -826,6 +1050,17 @@ Tailwind 4 utility default = mobile. Breakpoint `sm`/`md`/`lg`/`xl`/`2xl` untuk 
 | Pengaturan | Settings | - |
 | Dashboard | Dashboard | - |
 | Ekspor | Export | Markdown |
+| **Storyboard** | **Storyboard** | - |
+| **Segmen** | **Segment** | 10 detik per segmen |
+| **Panel** | **Panel** | Storyboard panel dalam segmen |
+| **Durasi segmen** | **Segment duration** | default 10s |
+| **Jumlah panel per segmen** | **Panels per segment** | default 8 |
+| **Petunjuk visual** | **Image prompt** | per panel |
+| **Aksi visual** | **Action visual** | per panel |
+| **Gerakan kamera** | **Camera movement** | per panel |
+| **Dialog/VO** | **Dialogue/VO** | per panel |
+| **Prompt negatif** | **Negative prompt** | per panel |
+| **Catatan audio** | **Audio notes** | per panel |
 
 ### 12.3 Pesan error kategori (actionable, `PRD US-GEN-04`)
 | Kategori | Pesan id (template) | Pesan en | Aksi user |
@@ -836,6 +1071,9 @@ Tailwind 4 utility default = mobile. Breakpoint `sm`/`md`/`lg`/`xl`/`2xl` untuk 
 | HTTP | "Provider HTTP {status}: {detail}." | "Provider HTTP {status}: {detail}." | Cek API key/model |
 | JSON_PARSE | "Output LLM bukan JSON valid (pos {pos}). Repair gagal. {detail}" | "LLM output not valid JSON (pos {pos}). Repair failed. {detail}" | Retry auto; ganti model bila persisten |
 | UNKNOWN | "Error tidak teridentifikasi: {detail}. Lihat log." | "Unidentified error: {detail}. See log." | Lihat log, hubungi admin |
+| **STORYBOARD_TIMEOUT** | "Generate storyboard segmen {segment} melebihi batas waktu. Coba regenerate segmen." | "Storyboard segment {segment} timed out. Try regenerate segment." | Regenerate per segment |
+| **STORYBOARD_VALIDATION** | "Output storyboard segmen {segment} tidak valid. Lihat log." | "Storyboard segment {segment} output invalid. See log." | Regenerate / cek prompt |
+| **STORYBOARD_EMPTY** | "Tidak ada prompt yang bisa di-copy." | "No prompt available to copy." | Generate storyboard dulu |
 
 ### 12.4 Empty/placeholder
 - Form placeholder gunakan contoh. Title: "Mis. Petualangan Si Kancil". Story: "Deskripsikan premis cerita...".
@@ -880,6 +1118,10 @@ Lihat S8 untuk detail. Ringkas: mobile-first, breakpoint Tailwind 4, browser eve
 | sonner toast | `package.json:59` |
 | lucide icons | `package.json:49` |
 | Persona + pain "generation keeps failing" | `PRD S2` |
+| Storyboard feature design, data model, API SSE, components | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md` |
+| Storyboard schema `StoryboardPanelSchema` + `StoryboardSegmentSchema` | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md S5.2` |
+| Storyboard API POST/GET endpoints | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md S6` |
+| Storyboard UI component files | `docs/plans/2026-06-23-storyboard-prompt-generator-design.md S8` |
 
 ---
 
@@ -902,6 +1144,10 @@ Lihat S8 untuk detail. Ringkas: mobile-first, breakpoint Tailwind 4, browser eve
 | A13 | ResultTabs partial warning UI eksplisit | ASUMSI | `result-tabs.tsx` isi tidak dibaca, spec berdasarkan `PRD AC-PERSIST-01` |
 | A14 | ProviderConfigForm password input type | ASUMSI | Spec berdasarkan pattern API key masked |
 | A15 | Dashboard empty state illu | ASUMSI | Tidak diverifikasi |
+| A16 | StoryboardEmptyState sebagai komponen terpisah | ASUMSI | Desain dokumen storyboard mengasumsikan komponen; bisa inline di StoryboardTab |
+| A17 | `Accordion` shadcn primitive tersedia | ASUMSI | Storyboard panel pakai Accordion; bila belum ada, install `npx shadcn add accordion` |
+| A18 | Touch target copy button mobile 44x44 px | ASUMSI | Berdasarkan WCAG 2.5.5 target size (AA enhanced, rekomendasi) |
+| A19 | `ScrollArea` shadcn primitive tersedia | ASUMSI | Tab Storyboard scroll bila panjang; sudah ada di S3.1 |
 
 ---
 
