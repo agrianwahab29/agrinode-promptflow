@@ -200,6 +200,30 @@ export const sceneAudio = sqliteTable('scene_audio', {
   projectSceneIdx: index('idx_scene_audio_project_scene').on(t.projectId, t.sceneId),
 }));
 
+// storyboard_segments — F-SB-01
+export const storyboardSegments = sqliteTable('storyboard_segments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  projectId: integer('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  segmentIndex: integer('segment_index').notNull(),
+  segmentTimeStart: integer('segment_time_start').notNull(),
+  segmentTimeEnd: integer('segment_time_end').notNull(),
+  panelCount: integer('panel_count').notNull(),
+  visualStyleJson: text('visual_style_json').notNull(),
+  characterSheetJson: text('character_sheet_json').notNull(),
+  locationSheetJson: text('location_sheet_json').notNull(),
+  panelsJson: text('panels_json').notNull(),
+  markdownPrompt: text('markdown_prompt').notNull(),
+  segmentTransitionNote: text('segment_transition_note'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  status: text('status').notNull().default('draft'),
+  createdAt: integer('created_at').default(sql`(unixepoch())`).notNull(),
+  updatedAt: integer('updated_at').default(sql`(unixepoch())`).notNull(),
+}, (t) => ({
+  projectIdx: index('idx_storyboard_segments_project_id').on(t.projectId),
+  projectSegmentIdx: uniqueIndex('idx_storyboard_segments_project_segment').on(t.projectId, t.segmentIndex),
+}));
+
 // Inferred types — use everywhere instead of duplicating interfaces (CR §4.6)
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -221,3 +245,5 @@ export type SupportingCharacter = typeof supportingCharacters.$inferSelect;
 export type NewSupportingCharacter = typeof supportingCharacters.$inferInsert;
 export type SceneAudio = typeof sceneAudio.$inferSelect;
 export type NewSceneAudio = typeof sceneAudio.$inferInsert;
+export type StoryboardSegment = typeof storyboardSegments.$inferSelect;
+export type NewStoryboardSegment = typeof storyboardSegments.$inferInsert;
