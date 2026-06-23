@@ -74,6 +74,7 @@ export const SceneSchema = z.object({
   duration_seconds: z.number().nullable().optional(),
   scene_pacing: z.string().catch('normal').default('normal'),
   scene_mood: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
 });
 
 export const SupportingCharacterSchema = z.object({
