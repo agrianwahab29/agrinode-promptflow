@@ -48,13 +48,13 @@ const JSON_SCHEMA_EXAMPLE = `{
             "target": "Rina",
             "prompt_text": "Seorang petualang cilik dengan rambut hitam dikuncir dua, mata coklat besar, kaos kuning, celana biru navy, berdiri di teras rumah kayu, ekspresi penasaran, gaya 3D Pixar, golden hour lighting",
             "reference_filename": null,
-            "composition": "{\\"foreground\\": \\"Rina di teras\\", \\"midground\\": \\"teras kayu\\", \\"background\\": \\"hutan hijau\\"}",
-            "lighting": "{\\"key\\": \\"golden hour\\", \\"fill\\": \\"soft ambient\\", \\"rim\\": \\"backlight\\", \\"style\\": \\"warm cinematic\\"}",
-            "camera": "{\\"angle\\": \\"eye level medium shot\\", \\"lens\\": \\"50mm\\", \\"depth_of_field\\": \\"f/2.8\\", \\"movement\\": \\"static\\"}",
+            "composition": "foreground: Rina di teras; midground: teras kayu; background: hutan hijau",
+            "lighting": "key: golden hour; fill: soft ambient; rim: backlight; style: warm cinematic",
+            "camera": "angle: eye level medium shot; lens: 50mm; depth_of_field: f/2.8; movement: static",
             "mood_atmosphere": "penasaran, cerah, penuh harap",
             "style_references": "Pixar 3D, Disney, Studio Ghibli",
             "color_palette": ["#FFD700", "#FFA500", "#2E8B57"],
-            "technical": "{\\"resolution\\": \\"3840x2160\\", \\"aspect_ratio\\": \\"16:9\\", \\"engine\\": \\"Unreal Engine 5\\", \\"format\\": \\"PNG\\"}"
+            "technical": "resolution: 3840x2160; aspect_ratio: 16:9; engine: Unreal Engine 5; format: PNG"
           }
         ],
         "backgrounds": [
@@ -62,13 +62,13 @@ const JSON_SCHEMA_EXAMPLE = `{
             "target": "Teras Rumah Kakek",
             "prompt_text": "Teras rumah kayu tradisional dengan atap jerami, hutan lebat di latar belakang, gaya 3D Pixar, wide shot, pagi keemasan",
             "reference_filename": null,
-            "composition": "{\\"foreground\\": \\"lantai teras\\", \\"midground\\": \\"kursi kayu\\", \\"background\\": \\"hutan berkabut\\"}",
-            "lighting": "{\\"key\\": \\"sunrise\\", \\"fill\\": \\"soft fill\\", \\"rim\\": \\"hazy\\", \\"style\\": \\"natural morning\\"}",
-            "camera": "{\\"angle\\": \\"wide establishing\\", \\"lens\\": \\"24mm\\", \\"depth_of_field\\": \\"f/5.6\\", \\"movement\\": \\"static\\"}",
+            "composition": "foreground: lantai teras; midground: kursi kayu; background: hutan berkabut",
+            "lighting": "key: sunrise; fill: soft fill; rim: hazy; style: natural morning",
+            "camera": "angle: wide establishing; lens: 24mm; depth_of_field: f/5.6; movement: static",
             "mood_atmosphere": "damai, tradisional, misterius",
             "style_references": "Studio Ghibli, traditional Asian",
             "color_palette": ["#8B4513", "#2E8B57", "#FFD700"],
-            "technical": "{\\"resolution\\": \\"3840x2160\\", \\"aspect_ratio\\": \\"16:9\\", \\"engine\\": \\"Octane Render\\", \\"format\\": \\"EXR\\"}"
+            "technical": "resolution: 3840x2160; aspect_ratio: 16:9; engine: Octane Render; format: EXR"
           }
         ]
       },
@@ -110,13 +110,13 @@ const JSON_SCHEMA_EXAMPLE = `{
         "target": "Rina",
         "prompt_text": "Character reference sheet: petualang cilik dengan rambut hitam dikuncir dua, mata coklat besar, kaos kuning, celana biru navy, sandal gunung, full body turnaround, 3D Pixar style, clean background",
         "reference_filename": null,
-        "composition": "{\\"foreground\\": \\"Rina full body\\", \\"midground\\": \\"neutral\\", \\"background\\": \\"clean studio\\"}",
-        "lighting": "{\\"key\\": \\"studio key\\", \\"fill\\": \\"soft fill\\", \\"rim\\": \\"none\\", \\"style\\": \\"clean sheet\\"}",
-        "camera": "{\\"angle\\": \\"front view full body\\", \\"lens\\": \\"50mm\\", \\"depth_of_field\\": \\"f/4\\", \\"movement\\": \\"static\\"}",
+        "composition": "foreground: Rina full body; midground: neutral; background: clean studio",
+        "lighting": "key: studio key; fill: soft fill; rim: none; style: clean sheet",
+        "camera": "angle: front view full body; lens: 50mm; depth_of_field: f/4; movement: static",
         "mood_atmosphere": "neutral, professional",
         "style_references": "character turnaround, Pixar",
         "color_palette": ["#FFD700", "#1E3A5F", "#8B4513"],
-        "technical": "{\\"resolution\\": \\"3840x2160\\", \\"aspect_ratio\\": \\"16:9\\", \\"engine\\": \\"Unreal Engine 5\\", \\"format\\": \\"PNG\\"}"
+        "technical": "resolution: 3840x2160; aspect_ratio: 16:9; engine: Unreal Engine 5; format: PNG"
       }
     ],
     "backgrounds": [
@@ -124,13 +124,13 @@ const JSON_SCHEMA_EXAMPLE = `{
         "target": "Teras Rumah Kakek",
         "prompt_text": "Master establishing shot: rumah kayu tradisional, hutan lebat di belakang, pagi, gaya 3D Pixar, wide cinematic",
         "reference_filename": null,
-        "composition": "{\\"foreground\\": \\"rumah\\", \\"midground\\": \\"pohon\\", \\"background\\": \\"hutan\\"}",
-        "lighting": "{\\"key\\": \\"morning sun\\", \\"fill\\": \\"ambient\\", \\"rim\\": \\"rim light\\", \\"style\\": \\"natural\\"}",
-        "camera": "{\\"angle\\": \\"wide shot\\", \\"lens\\": \\"24mm\\", \\"depth_of_field\\": \\"f/8\\", \\"movement\\": \\"static\\"}",
+        "composition": "foreground: rumah; midground: pohon; background: hutan",
+        "lighting": "key: morning sun; fill: ambient; rim: rim light; style: natural",
+        "camera": "angle: wide shot; lens: 24mm; depth_of_field: f/8; movement: static",
         "mood_atmosphere": "establishing, master reference",
         "style_references": "establishing shot, Studio Ghibli",
         "color_palette": ["#8B4513", "#2E8B57", "#FFD700"],
-        "technical": "{\\"resolution\\": \\"3840x2160\\", \\"aspect_ratio\\": \\"16:9\\", \\"engine\\": \\"Octane Render\\", \\"format\\": \\"EXR\\"}"
+        "technical": "resolution: 3840x2160; aspect_ratio: 16:9; engine: Octane Render; format: EXR"
       }
     ]
   },
@@ -154,7 +154,7 @@ CHARACTER_PROFILES: nama, gayarambut, wajah_asal, pakaian_atas, pakaian_bawah, a
 
 SCENES: order, description, voiceover_script, voiceover_speaker, transition_type (cut|dissolve|fade_to_black|fade_to_white|wipe|match_cut|fade_in), transition_duration_ms, transition_easing (linear|ease_in|ease_out|ease_in_out), transition_direction (forward|backward|loop), voice_type, voice_emotion (neutral|happy|sad|excited|calm|dramatic), voice_speed (0.5-2.0), voice_pitch (low|medium|high|auto), duration_seconds, scene_pacing (fast|normal|slow), scene_mood (cheerful|dramatic|tense|peaceful|mysterious), image_prompts, audio_specs[]
 
-IMAGE PROMPTS 8 LAYERS: target, prompt_text (80-200 kata detail), reference_filename, composition (JSON string {foreground,midground,background}), lighting (JSON string {key,fill,rim,style}), camera (JSON string {angle,lens,depth_of_field,movement}), mood_atmosphere, style_references, color_palette (array hex), technical (JSON string {resolution,aspect_ratio,engine,format})
+IMAGE PROMPTS 8 LAYERS: target, prompt_text (80-200 kata detail), reference_filename, composition (plain string, jangan JSON escaped, contoh: "foreground: Rina di teras; midground: teras kayu; background: hutan hijau"), lighting (plain string, contoh: "key: golden hour; fill: soft ambient; rim: backlight; style: warm cinematic"), camera (plain string, contoh: "angle: eye level medium shot; lens: 50mm; depth_of_field: f/2.8; movement: static"), mood_atmosphere, style_references, color_palette (array hex), technical (plain string, contoh: "resolution: 3840x2160; aspect_ratio: 16:9; engine: Unreal Engine 5; format: PNG")
 
 AUDIO_SPECS: audio_type (background_music|sfx|ambient|music_cue|transition_audio), description, timing (start|throughout|end|specific_moment), volume (0-1), fade_in_ms, fade_out_ms. Untuk musik: music_genre, music_mood, music_tempo_bpm, music_instruments. Untuk ambient: ambient_type, ambient_volume. Untuk sfx: sfx_list (array of string, contoh: ["footstep","door creak","wind"]).
 
@@ -169,11 +169,14 @@ VOICE RULES:
 - narrator: hanya untuk narasi tanpa karakter bicara
 
 PENTING:
-- Jangan gunakan newline mentah (U+000A) di string value, gunakan \\n escape.
+- Output HANYA satu JSON object yang 100% valid. TANPA \`\`\`json wrapper, TANPA teks sebelum/sesudah, TANPA markdown.
+- Jangan gunakan newline mentah (U+000A) di dalam string value, gunakan \\n escape jika perlu.
+- JANGAN mengembalikan JSON string escaped di dalam value string untuk composition/lighting/camera/technical. Isi dengan plain string saja.
+- JANGAN gunakan tanda kutip ganda di dalam string value tanpa escape dengan backslash.
 - Setiap scene WAJIB punya image_prompts (min 1 character + 1 background) + audio_specs (min 1)
 - Root image_prompts = master reference list
 - duration_seconds = voiceover_script.length / 12
-- Output langsung JSON object, TANPA \`\`\`json wrapper, TANPA teks lain
+- Jika ragu, tetap output JSON valid dengan nilai default.
 
 === SAFETY RULES (WAJIB DIPATUHI) ===
 - DILARANG menyebutkan angka usia eksplisit (misalnya "9 tahun", "10 tahun", "anak 8 tahun") di prompt_text, description, deskripsi_latar, atau field output lainnya.

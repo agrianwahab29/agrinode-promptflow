@@ -173,4 +173,67 @@ describe('llm-client', () => {
     expect(result.title).toBe('Test');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('repairs nested escaped JSON strings inside values (9router-style)', async () => {
+    const withNestedJson = JSON.stringify({
+      ...validResponse,
+      scenes: [{
+        ...validResponse.scenes[0],
+        image_prompts: {
+          characters: [{
+            target: 'Rina',
+            prompt_text: 'Rina walks',
+            reference_filename: null,
+            composition: '{"foreground":"Rina","midground":"teras","background":"hutan"}',
+            lighting: '{"key":"golden hour","fill":"soft","rim":"backlight","style":"warm"}',
+            camera: '{"angle":"wide","lens":"24mm","depth_of_field":"f/8","movement":"static"}',
+            mood_atmosphere: 'cheerful',
+            style_references: 'Pixar',
+            color_palette: ['#FFD700'],
+            technical: '{"resolution":"3840x2160","aspect_ratio":"16:9","engine":"UE5","format":"PNG"}'
+          }],
+          backgrounds: []
+        }
+      }]
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers(),
+      text: async () => JSON.stringify({ choices: [{ message: { content: withNestedJson } }] })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generatePromptPackage({
+      provider: mockProvider,
+      system: mockSystem,
+      messages: mockMessages,
+      maxRetries: 1
+    });
+
+    const char = result.scenes[0]?.image_prompts.characters[0];
+    expect(char).toBeDefined();
+    expect(char!.composition).toContain('foreground');
+    expect(char!.lighting).toContain('key');
+  });
+
+  it('uses json_object response_format for custom provider', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers(),
+      text: async () => JSON.stringify({ choices: [{ message: { content: validResponseJson } }] })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await generatePromptPackage({
+      provider: mockProvider,
+      system: mockSystem,
+      messages: mockMessages,
+      maxRetries: 1
+    });
+
+    const call = fetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(call[1].body);
+    expect(body.response_format).toEqual({ type: 'json_object' });
+  });
 });

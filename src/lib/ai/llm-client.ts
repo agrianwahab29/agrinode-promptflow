@@ -53,6 +53,62 @@ export function categorizeError(err: unknown, context?: string): { category: str
 }
 
 /**
+ * Fix broken nested escaped JSON inside string values.
+ * Models sometimes emit: "composition": "{\\\"key\\\": \\\"value\\\"}" or invalid variants.
+ */
+function repairNestedEscapedJson(jsonStr: string): string {
+  // Replace over-escaped sequences: \\\" -> \"  and  \\\\ -> \
+  let s = jsonStr;
+  // Iteratively collapse double+ backslashes before quotes
+  for (let i = 0; i < 4; i++) {
+    const next = s.replace(/\\\\(?=["\\/bfnrt])/g, '\\');
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
+/**
+ * After JSON.parse, some string values may contain JSON-encoded substrings with broken escapes
+ * (e.g. "{\\\"key\\\": \\\"value\\\"}"). Try to repair the internal string so it is itself valid JSON,
+ * but keep it as a plain string so Zod string fields still pass.
+ */
+function repairNestedJsonStringValues(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        // Already a valid JSON-encoded string -> leave as-is
+        JSON.parse(trimmed);
+        return value;
+      } catch {
+        // Try to fix over-escaping and re-check
+        const fixed = repairNestedEscapedJson(trimmed);
+        try {
+          JSON.parse(fixed);
+          return fixed;
+        } catch {
+          // Could not repair -> keep original and let normalizer/schema handle it
+          return value;
+        }
+      }
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(repairNestedJsonStringValues);
+  }
+  if (typeof value === 'object' && value !== null) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = repairNestedJsonStringValues(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
  * Attempt to repair truncated JSON from LLM output.
  * Handles: unterminated strings, missing closing brackets/braces, trailing commas.
  */
@@ -348,13 +404,17 @@ export async function generateStructuredResponse<T>(opts: StructuredGenerateOpti
     const attemptStart = Date.now();
     console.log('[llm] Attempt %d/%d starting...', attempt, maxRetries);
 
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       model: opts.provider.model,
       messages: currentMessages,
       max_tokens: attempt === 1 ? 32768 : (attempt === 2 ? 32768 : 65536),
       temperature: attempt === 1 ? 0.7 : (attempt === 2 ? 0.5 : 0.3 + Math.random() * 0.1),
       stream: attempt === 1 || attempt === 2 ? true : false,
     };
+    // OpenAI-compatible providers (including 9router if compliant) produce cleaner JSON with json_object mode
+    if (['openrouter', '9router', 'custom'].includes(opts.provider.provider)) {
+      requestBody.response_format = { type: 'json_object' };
+    }
     const requestJson = JSON.stringify(requestBody);
     console.log('[llm] Request: endpoint=%s model=%s payloadSize=%d messages=%d systemLength=%d',
       endpoint, opts.provider.model, requestJson.length, currentMessages.length, opts.system.length
@@ -441,6 +501,7 @@ export async function generateStructuredResponse<T>(opts: StructuredGenerateOpti
       let sanitizedStr = jsonStr;
       try {
         sanitizedStr = sanitizeJsonString(jsonStr);
+        sanitizedStr = repairNestedEscapedJson(sanitizedStr);
         parsedJson = JSON.parse(sanitizedStr);
         console.log('[llm] JSON parse OK (first try after sanitize)');
       } catch (firstParseErr) {
@@ -466,6 +527,9 @@ export async function generateStructuredResponse<T>(opts: StructuredGenerateOpti
           }
         }
       }
+
+      // Repair any nested escaped JSON strings inside values while keeping them as strings
+      parsedJson = repairNestedJsonStringValues(parsedJson);
 
       if (opts.normalizer) {
         parsedJson = opts.normalizer(parsedJson);
