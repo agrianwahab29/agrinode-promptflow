@@ -162,7 +162,30 @@ function StoryboardSegmentCard({ segment }: { segment: StoryboardSegment }) {
                   {panel.lighting && <PanelSection label="Pencahayaan" value={panel.lighting} />}
                   {panel.mood && <PanelSection label="Mood/Suasana" value={panel.mood} />}
                   <Separator />
-                  <PanelSection label="Dialog/VO" value={panel.dialogueVo || '(tidak ada)'} />
+                  <div className="rounded border-l-4 border-primary bg-background p-2">
+                    <div className="font-semibold">Voiceover / Dialog</div>
+                    {panel.voiceoverScript ? (
+                      <>
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-medium">Speaker:</span> {panel.voiceoverSpeaker || 'narrator'}
+                        </div>
+                        <div className="mt-1 whitespace-pre-wrap">{panel.voiceoverScript}</div>
+                        {panel.voiceDirection && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <span className="font-medium">Arah Vokal:</span> {panel.voiceDirection}
+                          </div>
+                        )}
+                        {panel.soundDesign && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <span className="font-medium">Sound Design:</span> {panel.soundDesign}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-muted-foreground">(tidak ada voiceover)</div>
+                    )}
+                  </div>
+                  {panel.dialogueVo && <PanelSection label="Dialog/VO (alternatif)" value={panel.dialogueVo} />}
                   {panel.onScreenText && <PanelSection label="On Screen Text" value={panel.onScreenText} />}
                   <PanelSection label="Transisi" value={panel.transition} />
                   <Separator />
